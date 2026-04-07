@@ -1,0 +1,47 @@
+"use client";
+
+import * as React from "react";
+import * as SwitchPrimitive from "@radix-ui/react-switch";
+import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
+
+const Toggle = React.forwardRef<
+  React.ElementRef<typeof SwitchPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof SwitchPrimitive.Root> & { label?: string; description?: string }
+>(({ className, label, description, ...props }, ref) => (
+  <div className="flex items-center space-x-4">
+    <SwitchPrimitive.Root
+      className={cn(
+        "peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-surface-3",
+        className
+      )}
+      {...props}
+      ref={ref}
+    >
+      <SwitchPrimitive.Thumb
+        asChild
+        className={cn(
+          "pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
+        )}
+      >
+        <motion.span
+          layout
+          transition={{ type: "spring", stiffness: 500, damping: 30 }}
+        />
+      </SwitchPrimitive.Thumb>
+    </SwitchPrimitive.Root>
+    {(label || description) && (
+      <div className="grid gap-1.5 leading-none">
+        {label && (
+          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-text-primary">
+            {label}
+          </label>
+        )}
+        {description && <p className="text-xs text-text-muted">{description}</p>}
+      </div>
+    )}
+  </div>
+));
+Toggle.displayName = SwitchPrimitive.Root.displayName;
+
+export { Toggle };
