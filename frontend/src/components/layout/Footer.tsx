@@ -2,15 +2,14 @@
 
 import Link from "next/link";
 import { Bot, Zap, Home, Users } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="footer-bg-glow py-16 px-6 lg:px-8 bg-surface-2/30 backdrop-blur-3xl border-t border-white/5">
-      <div className="mx-auto max-w-7xl">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-8 border-b border-white/5 pb-12">
+    <footer className="footer-bg-glow py-16 px-6 lg:px-8 bg-surface-2/30 backdrop-blur-3xl border-t border-border/40">
+      <div className="mx-auto max-center max-w-7xl">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-8 border-b border-border/40 pb-12">
           <Link href="/" className="flex items-center gap-2 group">
             <div className="bg-gradient-primary p-1.5 rounded-lg">
               <Bot className="w-5 h-5 text-white" />

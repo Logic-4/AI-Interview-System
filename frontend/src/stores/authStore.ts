@@ -1,12 +1,16 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { User } from '@/types/user'; // This will just be imported but we also need to generate it
+import Cookies from 'js-cookie';
+import { User } from '@/types/user';
 
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
-  login: (user: User) => void;
+  isLoading: boolean;
+  setUser: (user: User | null) => void;
+  login: (user: User, accessToken: string) => void;
   logout: () => void;
+  setLoading: (loading: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -14,16 +18,28 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       isAuthenticated: false,
-      login: (user) => set({ user, isAuthenticated: true }),
+      isLoading: false,
+      setUser: (user) => set({ user, isAuthenticated: !!user }),
+      login: (user, accessToken) => {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('accessToken', accessToken);
+          // Sync with cookie for middleware (expires in 7 days)
+          Cookies.set('accessToken', accessToken, { expires: 7, secure: true, sameSite: 'strict' });
+        }
+        set({ user, isAuthenticated: true });
+      },
       logout: () => {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('accessToken');
+          Cookies.remove('accessToken');
         }
         set({ user: null, isAuthenticated: false });
       },
+      setLoading: (loading) => set({ isLoading: loading }),
     }),
     {
       name: 'auth-storage',
+      partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
     }
   )
 );

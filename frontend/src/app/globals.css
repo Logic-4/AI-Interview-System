@@ -4,101 +4,113 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%; /* #FAFBFC approx */
-    --foreground: 233 28% 14%; /* #1A1A2E */
+    --background: 231 100% 98%; /* #f8f9ff */
+    --foreground: 222 47% 11%;   /* #0F172A - Oxford Blue */
     
-    --surface: 0 0% 100%; /* #FFFFFF */
-    --surface-2: 220 20% 96%; /* #F5F6F8 */
-    --surface-3: 240 10% 93%; /* #EEEEF0 */
+    --surface: 0 0% 100%;       /* #FFFFFF */
+    --surface-2: 223 100% 97%;   /* #eff4ff - Section Layer */
+    --surface-3: 223 100% 95%;
     
-    --border: 240 10% 90%; /* #E5E5EA */
-    --border-light: 240 10% 94%;
+    --border: 222 15% 90%;
+    --border-light: 222 15% 94%;
     
-    --text-primary: 233 28% 14%; /* #1A1A2E */
-    --text-secondary: 240 11% 46%; /* #6B6B80 */
-    --text-muted: 240 9% 62%; /* #9898A8 */
+    /* Text semantic variables */
+    --text-primary: 222 47% 11%;   /* Same as foreground */
+    --text-secondary: 215 16% 47%; /* #64748B - Slate Gray */
+    --text-muted: 215 13% 65%;
 
     --card: 0 0% 100%;
-    --card-foreground: 233 28% 14%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 233 28% 14%;
+    --popover-foreground: 222 47% 11%;
     
-    --primary: 221 83% 53%; /* #3B82F6 */
+    --primary: 221 83% 53%; /* #2563EB - Sapphire Blue */
     --primary-foreground: 0 0% 100%;
-    --primary-gradient-start: 221 83% 53%; /* #3B82F6 */
-    --primary-gradient-end: 217 91% 60%; /* #2563EB */
+    --primary-gradient-start: 221 83% 53%;
+    --primary-gradient-end: 222 47% 11%; /* Oxford Blue */
 
-    --secondary: 190 100% 50%; /* #00D2FF */
+    --secondary: 215 16% 47%; /* Slate Gray */
     --secondary-foreground: 0 0% 100%;
-    --secondary-gradient-start: 190 100% 50%;
-    --secondary-gradient-end: 214 62% 53%; /* #3A7BD5 */
+    --secondary-gradient-start: 215 16% 47%;
+    --secondary-gradient-end: 222 47% 11%;
 
-    --success: 150 100% 45%; /* #00E676 */
+    --tertiary: 45 61% 52%; /* #D4AF37 - Champagne Gold */
+    --tertiary-foreground: 0 0% 100%;
+
+    --success: 150 100% 45%;
+    --success-foreground: 0 0% 100%;
     --success-gradient-start: 150 100% 45%;
-    --success-gradient-end: 144 100% 39%; /* #00C853 */
+    --success-gradient-end: 144 100% 39%;
 
-    --warning: 42 100% 50%; /* #FFB300 */
+    --warning: 42 100% 50%;
+    --warning-foreground: 0 0% 100%;
     --warning-gradient-start: 42 100% 50%;
-    --warning-gradient-end: 33 100% 50%; /* #FF8F00 */
+    --warning-gradient-end: 33 100% 50%;
 
-    --danger: 0 100% 66%; /* #FF5252 */
-    --danger-gradient-start: 0 100% 66%;
-    --danger-gradient-end: 0 100% 41%; /* #D50000 */
+    --danger: 0 100% 60%;
+    --danger-foreground: 0 0% 100%;
+    --danger-gradient-start: 0 100% 60%;
+    --danger-gradient-end: 0 100% 40%;
 
-    --info: 198 100% 62%; /* #40C4FF */
+    --info: 198 100% 62%;
+    --info-foreground: 0 0% 100%;
     --info-gradient-start: 198 100% 62%;
-    --info-gradient-end: 202 100% 45%; /* #0091EA */
+    --info-gradient-end: 202 100% 45%;
 
-    --muted: 220 20% 96%;
-    --accent: 220 20% 96%;
-    --input: 240 10% 90%;
-    --ring: 250 71% 63%;
+    --muted: 223 100% 97%;
+    --accent: 223 100% 97%;
+    --input: 222 15% 90%;
+    --ring: 221 83% 53%;
     --radius: 0.75rem;
   }
 
   .dark {
-    --background: 240 20% 5%; /* #0A0A0F */
-    --foreground: 240 20% 97%; /* #F5F5F7 */
+    --background: 222 47% 4%; /* Deep Oxford Blue */
+    --foreground: 210 40% 98%;
     
-    --surface: 240 18% 8%; /* #12121A */
-    --surface-2: 240 17% 12%; /* #1A1A25 */
-    --surface-3: 240 15% 15%; /* #22222E */
+    --surface: 222 47% 6%;
+    --surface-2: 222 47% 8%;
+    --surface-3: 222 47% 10%;
     
-    --border: 240 15% 20%; /* #2A2A3A */
-    --border-light: 240 15% 24%; /* #333345 */
+    --border: 222 25% 15%;
+    --border-light: 222 25% 18%;
     
-    --text-primary: 240 20% 97%; /* #F5F5F7 */
-    --text-secondary: 240 11% 66%; /* #A0A0B0 */
-    --text-muted: 240 9% 46%; /* #6B6B80 */
+    --text-primary: 210 40% 98%;
+    --text-secondary: 215 16% 75%;
+    --text-muted: 215 13% 60%;
 
-    --card: 240 18% 8%;
-    --card-foreground: 240 20% 97%;
-    --popover: 240 18% 8%;
-    --popover-foreground: 240 20% 97%;
+    --card: 222 47% 6%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 6%;
+    --popover-foreground: 210 40% 98%;
     
-    --muted: 240 17% 12%;
-    --accent: 240 17% 12%;
-    --input: 240 15% 20%;
+    --muted: 222 47% 8%;
+    --accent: 222 47% 8%;
+    --input: 222 25% 15%;
     --ring: 221 83% 53%;
   }
-  .bg-gradient-primary-to-blue {
-    background: linear-gradient(135deg, #6C5CE7 0%, #3A7BD5 100%);
-  }
-  .footer-bg-glow {
-    background: radial-gradient(circle at top, rgba(108, 92, 231, 0.05), transparent 70%);
-  }
+}
+
+html,
+body {
+  height: 100%;
+  width: 100%;
+  overflow-x: hidden !important;
+  position: relative;
 }
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border transition-colors duration-200;
+    box-sizing: border-box;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground transition-colors duration-200 shadow-none;
     font-feature-settings: "rlig" 1, "calt" 1;
+    overflow-x: hidden;
   }
   h1, h2, h3, h4, h5, h6 {
-    @apply font-black tracking-tighter;
+    @apply font-black tracking-tighter text-foreground;
   }
 }
 
@@ -123,16 +135,20 @@
   }
   
   .bg-hero-gradient {
-    background: linear-gradient(135deg, #3B82F6 0%, #00D2FF 100%);
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--info)) 100%);
   }
   .bg-card-glow {
-    background: radial-gradient(ellipse at center, rgba(37,99,235,0.15) 0%, transparent 70%);
+    background: radial-gradient(ellipse at center, hsla(var(--primary), 0.1) 0%, transparent 70%);
   }
   .bg-xp-bar {
-    background: linear-gradient(90deg, #2563EB, #00D2FF, #00E676);
+    background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--info)), hsl(var(--success)));
   }
   .glass-effect {
-    background-color: hsl(var(--surface) / 0.6);
-    @apply backdrop-blur-xl border border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)];
+    background-color: hsla(var(--surface-2), 0.6);
+    @apply backdrop-blur-xl border border-border/50 shadow-none;
+  }
+  .dark .glass-effect {
+    background-color: hsla(var(--surface), 0.4);
+    @apply border-white/5;
   }
 }

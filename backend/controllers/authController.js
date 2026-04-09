@@ -37,7 +37,7 @@ const register = async (req, res, next) => {
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
@@ -90,7 +90,7 @@ const login = async (req, res, next) => {
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -150,7 +150,7 @@ const refreshTokenHandler = async (req, res, next) => {
     res.cookie('refreshToken', newRefreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -169,23 +169,27 @@ const logout = async (req, res, next) => {
   try {
     const token = req.cookies.refreshToken;
 
-    if (token && req.user) {
-      // Remove the specific refresh token
-      const user = await User.findById(req.user._id);
-      if (user) {
-        user.refreshTokens = user.refreshTokens.filter((t) => t.token !== token);
-        await user.save();
+    if (token) {
+      try {
+        const decoded = verifyRefreshToken(token);
+        const user = await User.findById(decoded.id);
+        if (user) {
+          user.refreshTokens = user.refreshTokens.filter((t) => t.token !== token);
+          await user.save();
+          logger.info(`User logged out: ${user.email}`);
+        }
+      } catch {
+        // Token invalid/expired — still clear the cookie below
       }
     }
 
-    // Clear cookie
+    // Always clear cookie
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
     });
 
-    logger.info(`User logged out: ${req.user?.email}`);
     ApiResponse.success(res, null, 'Logout successful');
   } catch (error) {
     next(error);
@@ -206,10 +210,58 @@ const getMe = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Validate session from refresh token cookie
+ * @route   GET /api/v1/auth/session
+ * @access  Public
+ */
+const validateSession = async (req, res, next) => {
+  try {
+    const token = req.cookies.refreshToken;
+    const clearCookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    };
+
+    if (!token) {
+      return ApiResponse.success(res, { authenticated: false });
+    }
+
+    try {
+      const decoded = verifyRefreshToken(token);
+      const user = await User.findById(decoded.id).select('refreshTokens');
+
+      if (!user) {
+        res.clearCookie('refreshToken', clearCookieOptions);
+        return ApiResponse.success(res, { authenticated: false });
+      }
+
+      const hasValidToken = user.refreshTokens.some(
+        (stored) => stored.token === token && stored.expiresAt > new Date()
+      );
+
+      if (!hasValidToken) {
+        res.clearCookie('refreshToken', clearCookieOptions);
+        return ApiResponse.success(res, { authenticated: false });
+      }
+
+      return ApiResponse.success(res, { authenticated: true });
+    } catch {
+      res.clearCookie('refreshToken', clearCookieOptions);
+
+      return ApiResponse.success(res, { authenticated: false });
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
   refreshToken: refreshTokenHandler,
   logout,
   getMe,
+  validateSession,
 };

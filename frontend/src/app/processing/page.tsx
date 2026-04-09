@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bot, X, Mic2, FileText, Smile } from "lucide-react";
-import { cn } from "@/lib/utils";
+import ThemeToggle from "@/components/layout/ThemeToggle";
 
 export default function ProcessingPage() {
   const router = useRouter();
@@ -25,21 +25,26 @@ export default function ProcessingPage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-[#0A0A0F] text-text-primary flex flex-col font-sans selection:bg-primary selection:text-white">
+    <div className="min-h-screen bg-background text-text-primary flex flex-col font-sans selection:bg-primary transition-colors duration-500">
       {/* Header */}
-      <header className="h-16 flex items-center justify-between px-6 border-b border-white/5 bg-[#12151C]/80">
+      <header className="h-16 flex items-center justify-between px-6 border-b border-border/40 bg-surface/80 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <div className="bg-primary p-1.5 rounded-lg shadow-lg shadow-primary/20 flex items-center justify-center">
             <Bot className="w-5 h-5 text-white" />
           </div>
-          <span className="font-bold text-white tracking-tight">AI Mock Interview</span>
+          <span className="font-bold text-text-primary tracking-tight">AI Mock Interview</span>
         </div>
         <div className="flex items-center gap-6">
           <div className="flex flex-col items-end">
             <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Interview Session</span>
-            <span className="text-sm font-semibold text-white">Senior Product Manager</span>
+            <span className="text-sm font-semibold text-text-primary">Senior Product Manager</span>
           </div>
-          <button className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
+          <div className="w-px h-6 bg-border/40 mx-2" />
+          <ThemeToggle />
+          <button 
+            onClick={() => router.back()}
+            className="w-9 h-9 rounded-full bg-foreground/5 hover:bg-foreground/10 flex items-center justify-center transition-colors"
+          >
             <X className="w-4 h-4 text-text-muted" />
           </button>
         </div>
@@ -54,18 +59,18 @@ export default function ProcessingPage() {
           {/* Spinner Circle */}
           <div className="relative w-24 h-24 mb-10">
             {/* Outer spinning ring */}
-            <div className="absolute inset-0 rounded-full border-2 border-white/5" />
+            <div className="absolute inset-0 rounded-full border-2 border-border/40" />
             <div 
               className="absolute inset-0 rounded-full border-2 border-t-primary border-r-transparent border-b-transparent border-l-transparent animate-spin"
               style={{ animationDuration: '1.5s' }}
             />
             {/* Inner pulsing circle */}
             <div className="absolute inset-2 rounded-full bg-primary/10 flex items-center justify-center animate-pulse">
-               <Bot className="w-8 h-8 text-primary shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
+               <Bot className="w-8 h-8 text-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.5)]" />
             </div>
           </div>
 
-          <h1 className="text-3xl font-bold text-white text-center mb-4 leading-tight">
+          <h1 className="text-3xl font-bold text-text-primary text-center mb-4 leading-tight">
             Analyzing responses and generating<br />feedback...
           </h1>
           <p className="text-text-muted font-medium text-center max-w-lg mb-16 text-sm">
@@ -75,12 +80,12 @@ export default function ProcessingPage() {
           {/* Progress Bar Area */}
           <div className="w-full max-w-xl space-y-3">
              <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider">
-                <span className="text-primary">Processing Module {progress < 40 ? "1" : progress < 70 ? "2" : progress < 90 ? "3" : "4"} of 4</span>
-                <span className="text-white">{progress}%</span>
+                <span className="text-primary font-bold">Processing Module {progress < 40 ? "1" : progress < 70 ? "2" : progress < 90 ? "3" : "4"} of 4</span>
+                <span className="text-text-primary tabular-nums">{progress}%</span>
              </div>
-             <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+             <div className="h-2 w-full bg-foreground/10 rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-primary transition-all duration-200 ease-out shadow-[0_0_10px_rgba(59,130,246,0.6)]" 
+                  className="h-full bg-primary transition-all duration-200 ease-out shadow-[0_0_10px_rgba(var(--primary-rgb),0.6)]" 
                   style={{ width: `${progress}%` }}
                 />
              </div>
@@ -91,27 +96,27 @@ export default function ProcessingPage() {
 
           {/* Cards below */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full mt-20">
-             <div className="bg-surface/50 border border-white/5 rounded-2xl p-6 flex flex-col items-center text-center justify-center gap-2">
+             <div className="bg-surface/50 border border-border/40 rounded-2xl p-6 flex flex-col items-center text-center justify-center gap-2">
                 <div className="text-primary mb-1">
                    <Mic2 className="w-5 h-5" />
                 </div>
-                <h3 className="text-sm font-bold text-white">Voice Tone</h3>
+                <h3 className="text-sm font-bold text-text-primary">Voice Tone</h3>
                 <p className="text-[10px] text-text-muted font-medium">Analyzing inflection and clarity</p>
              </div>
              
-             <div className="bg-surface/50 border border-white/5 rounded-2xl p-6 flex flex-col items-center text-center justify-center gap-2">
+             <div className="bg-surface/50 border border-border/40 rounded-2xl p-6 flex flex-col items-center text-center justify-center gap-2">
                 <div className="text-primary mb-1">
                    <FileText className="w-5 h-5" />
                 </div>
-                <h3 className="text-sm font-bold text-white">Keywords</h3>
+                <h3 className="text-sm font-bold text-text-primary">Keywords</h3>
                 <p className="text-[10px] text-text-muted font-medium">Checking technical terminology</p>
              </div>
 
-             <div className="bg-surface/50 border border-white/5 rounded-2xl p-6 flex flex-col items-center text-center justify-center gap-2">
+             <div className="bg-surface/50 border border-border/40 rounded-2xl p-6 flex flex-col items-center text-center justify-center gap-2">
                 <div className="text-primary mb-1">
                    <Smile className="w-5 h-5" />
                 </div>
-                <h3 className="text-sm font-bold text-white">Sentiment</h3>
+                <h3 className="text-sm font-bold text-text-primary">Sentiment</h3>
                 <p className="text-[10px] text-text-muted font-medium">Assessing confidence levels</p>
              </div>
           </div>
@@ -119,7 +124,7 @@ export default function ProcessingPage() {
       </main>
 
       {/* Footer */}
-      <footer className="h-16 border-t border-white/5 flex items-center justify-between px-8 text-[11px] font-bold tracking-wider">
+      <footer className="h-16 border-t border-border/40 flex items-center justify-between px-8 text-[11px] font-bold tracking-wider">
          <div className="flex items-center gap-2 text-text-muted">
             <div className="w-2 h-2 rounded-full bg-success" />
             AI Core Online
@@ -128,7 +133,7 @@ export default function ProcessingPage() {
             <span>Total Interview Duration: 14m 22s</span>
             <span>Questions Answered: 5</span>
          </div>
-         <div className="text-primary">
+         <div className="text-primary font-bold">
             Secured by Enterprise Grade AI
          </div>
       </footer>

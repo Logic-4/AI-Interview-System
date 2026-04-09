@@ -8,7 +8,7 @@ export function QuestionDisplay() {
            </div>
            
            <h2 className="text-[32px] sm:text-4xl leading-tight font-semibold text-white tracking-tight mb-6 px-4">
-             "Can you describe a time when you had to handle a difficult conflict within a team?"
+             &quot;Can you describe a time when you had to handle a difficult conflict within a team?&quot;
            </h2>
            
            <p className="text-[#8B949E] text-sm md:text-[15px] font-medium leading-relaxed max-w-xl mx-auto">

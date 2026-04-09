@@ -1,10 +1,18 @@
 const rateLimit = require('express-rate-limit');
 
+const isDevelopment = process.env.NODE_ENV === 'development';
+const devBypassLimiter = (_req, _res, next) => next();
+
+const createLimiter = (options) => {
+  if (isDevelopment) return devBypassLimiter;
+  return rateLimit(options);
+};
+
 /**
  * General API rate limiter
  * 100 requests per 15 minutes per IP
  */
-const generalLimiter = rateLimit({
+const generalLimiter = createLimiter({
   windowMs: 15 * 60 * 1000,
   max: 100,
   message: {
@@ -20,7 +28,7 @@ const generalLimiter = rateLimit({
  * Auth-specific rate limiter (stricter)
  * 20 requests per 15 minutes per IP
  */
-const authLimiter = rateLimit({
+const authLimiter = createLimiter({
   windowMs: 15 * 60 * 1000,
   max: 20,
   message: {
@@ -36,7 +44,7 @@ const authLimiter = rateLimit({
  * AI endpoint rate limiter (expensive calls)
  * 30 requests per 15 minutes per IP
  */
-const aiLimiter = rateLimit({
+const aiLimiter = createLimiter({
   windowMs: 15 * 60 * 1000,
   max: 30,
   message: {

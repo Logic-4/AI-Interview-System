@@ -38,7 +38,7 @@ export default function PreparationPage() {
             Interview Preparation
           </h1>
           <p className="text-text-muted text-[15px] max-w-md mx-auto">
-            Let's ensure your environment is optimized for the best experience.
+            Let&apos;s ensure your environment is optimized for the best experience.
           </p>
         </div>
 

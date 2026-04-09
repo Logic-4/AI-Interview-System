@@ -3,7 +3,7 @@
 import * as React from "react";
 import toast, { Toaster, Toast as ToastType } from "react-hot-toast";
 import { X, CheckCircle2, AlertCircle, Info, Trophy, Sparkles } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 type ToastProps = {

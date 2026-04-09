@@ -11,9 +11,7 @@ import {
   Video, 
   Zap, 
   Info, 
-  CheckCircle2, 
-  ChevronDown,
-  ArrowRight
+  CheckCircle2
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -50,13 +48,13 @@ export default function InterviewSetupPage() {
     <div className="max-w-3xl mx-auto py-8 space-y-6 animate-in fade-in duration-700">
       {/* Title Section (Left Aligned) */}
       <div className="space-y-1">
-        <h1 className="text-3xl font-semibold tracking-tight leading-tight">Configure Your Interview</h1>
+        <h1 className="text-3xl font-semibold tracking-tight leading-tight text-text-primary">Configure Your Interview</h1>
         <p className="text-base text-text-muted font-medium opacity-70">Set the stage for your AI-powered mock interview session.</p>
       </div>
 
       <Card 
         hoverEffect={false}
-        className="p-6 border-white/5 bg-surface/30 backdrop-blur-2xl relative overflow-hidden"
+        className="p-6 border-border/40 bg-surface/30 backdrop-blur-2xl relative overflow-hidden"
       >
         <form className="space-y-6 relative z-10">
           {/* Row 1: Role & Type */}
@@ -64,13 +62,13 @@ export default function InterviewSetupPage() {
             <div className="space-y-3">
               <label className="text-xs font-semibold text-text-secondary uppercase tracking-[0.2em] px-1">Job Role</label>
               <Select>
-                <SelectTrigger className="h-12 bg-surface-2/50 border-white/5 rounded-xl px-5 text-sm font-semibold hover:border-primary/50 transition-colors">
+                <SelectTrigger className="h-12 bg-foreground/5 border-border/40 rounded-xl px-5 text-sm font-semibold hover:border-primary/50 transition-colors text-text-primary">
                    <div className="flex items-center gap-3">
                       <Briefcase className="w-4 h-4 text-primary opacity-80" />
                       <SelectValue placeholder="Select your job role" />
                    </div>
                 </SelectTrigger>
-                <SelectContent className="bg-surface-2 border-white/10">
+                <SelectContent className="bg-surface border-border/40">
                   <SelectItem value="frontend">Frontend Developer</SelectItem>
                   <SelectItem value="backend">Backend Developer</SelectItem>
                   <SelectItem value="fullstack">Fullstack Engineer</SelectItem>
@@ -82,13 +80,13 @@ export default function InterviewSetupPage() {
             <div className="space-y-3">
               <label className="text-xs font-semibold text-text-secondary uppercase tracking-[0.2em] px-1">Interview Type</label>
               <Select>
-                <SelectTrigger className="h-12 bg-surface-2/50 border-white/5 rounded-xl px-5 text-sm font-semibold">
+                <SelectTrigger className="h-12 bg-foreground/5 border-border/40 rounded-xl px-5 text-sm font-semibold text-text-primary">
                    <div className="flex items-center gap-3">
                       <MessageSquare className="w-4 h-4 text-text-muted" />
                       <SelectValue placeholder="Select interview type" />
                    </div>
                 </SelectTrigger>
-                <SelectContent className="bg-surface-2 border-white/10">
+                <SelectContent className="bg-surface border-border/40">
                   <SelectItem value="behavioral">Behavioral</SelectItem>
                   <SelectItem value="technical">Technical</SelectItem>
                   <SelectItem value="system-design">System Design</SelectItem>
@@ -111,15 +109,15 @@ export default function InterviewSetupPage() {
                       className={cn(
                         "h-12 rounded-xl border transition-all text-sm font-semibold tracking-tight relative overflow-hidden",
                         isActive 
-                          ? "border-primary bg-primary/10 text-primary shadow-[0_0_20px_rgba(59,130,246,0.1)]" 
-                          : "border-white/5 bg-white/[0.02] text-text-muted hover:bg-white/[0.05] hover:border-white/10"
+                          ? "border-primary bg-primary/10 text-primary shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)]" 
+                          : "border-border/40 bg-foreground/5 text-text-muted hover:bg-foreground/10 hover:border-border/60"
                       )}
                     >
                       {level.title}
                       {isActive && (
                         <motion.div 
                           layoutId="diffActive"
-                          className="absolute inset-x-0 bottom-0 h-0.5 bg-primary shadow-[0_0_10px_rgba(59,130,246,0.5)]" 
+                          className="absolute inset-x-0 bottom-0 h-0.5 bg-primary shadow-[0_0_10px_rgba(var(--primary-rgb),0.5)]" 
                         />
                       )}
                     </button>
@@ -136,7 +134,7 @@ export default function InterviewSetupPage() {
             </div>
             <textarea 
               placeholder="Paste the job description here..."
-              className="w-full h-40 bg-surface-2/50 border border-white/5 rounded-2xl p-6 text-sm font-medium focus:outline-none focus:border-primary/50 focus:bg-surface-2 transition-all resize-none custom-scrollbar"
+              className="w-full h-40 bg-foreground/5 border border-border/40 rounded-2xl p-6 text-sm font-medium focus:outline-none focus:border-primary/50 focus:bg-foreground/10 transition-all resize-none custom-scrollbar text-text-primary placeholder:text-text-muted"
             />
           </div>
 
@@ -149,7 +147,7 @@ export default function InterviewSetupPage() {
           </div>
 
           {/* Bottom Actions Row (Left/Right Centering) */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pt-6 border-t border-white/5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pt-6 border-t border-border/40">
              <div className="flex items-center gap-2 text-success">
                 <div className="w-5 h-5 rounded-full bg-success/10 flex items-center justify-center border border-success/20">
                    <CheckCircle2 className="w-3.5 h-3.5" />
@@ -165,7 +163,7 @@ export default function InterviewSetupPage() {
              >
                 <div className="relative z-10 flex items-center gap-3">
                   {isLoading ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <div className="w-5 h-5 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
                   ) : (
                     <>
                       Generate Interview
@@ -184,41 +182,41 @@ export default function InterviewSetupPage() {
       {/* Feature Icons Footer (In a single row across) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-4">
          <div className="flex items-center gap-4 group">
-            <div className="w-10 h-10 rounded-xl bg-white/[0.04] border border-white/5 flex items-center justify-center text-text-muted group-hover:text-primary transition-all">
+            <div className="w-10 h-10 rounded-xl bg-foreground/5 border border-border/40 flex items-center justify-center text-text-muted group-hover:text-primary transition-all">
                <Clock className="w-5 h-5" />
             </div>
             <div>
-               <p className="text-sm font-semibold tracking-tight leading-none mb-1">30-45 Minutes</p>
+               <p className="text-sm font-semibold tracking-tight leading-none mb-1 text-text-primary">30-45 Minutes</p>
                <p className="text-[10px] font-bold text-text-muted opacity-60">Average session duration</p>
             </div>
          </div>
          <div className="flex items-center gap-4 group">
-            <div className="w-10 h-10 rounded-xl bg-white/[0.04] border border-white/5 flex items-center justify-center text-text-muted group-hover:text-primary transition-all">
+            <div className="w-10 h-10 rounded-xl bg-foreground/5 border border-border/40 flex items-center justify-center text-text-muted group-hover:text-primary transition-all">
                <MessageSquare className="w-5 h-5" />
             </div>
             <div>
-               <p className="text-sm font-semibold tracking-tight leading-none mb-1">Real-time Feedback</p>
+               <p className="text-sm font-semibold tracking-tight leading-none mb-1 text-text-primary">Real-time Feedback</p>
                <p className="text-[10px] font-bold text-text-muted opacity-60">Get instant analysis</p>
             </div>
          </div>
          <div className="flex items-center gap-4 group">
-            <div className="w-10 h-10 rounded-xl bg-white/[0.04] border border-white/5 flex items-center justify-center text-text-muted group-hover:text-primary transition-all">
+            <div className="w-10 h-10 rounded-xl bg-foreground/5 border border-border/40 flex items-center justify-center text-text-muted group-hover:text-primary transition-all">
                <Video className="w-5 h-5" />
             </div>
             <div>
-               <p className="text-sm font-semibold tracking-tight leading-none mb-1">Video Optional</p>
+               <p className="text-sm font-semibold tracking-tight leading-none mb-1 text-text-primary">Video Optional</p>
                <p className="text-[10px] font-bold text-text-muted opacity-60">Voice or text also available</p>
             </div>
          </div>
       </div>
 
-      <footer className="pt-12 pb-6 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4 scale-90 opacity-40">
-         <p className="text-[10px] font-semibold tracking-[0.3em]">
+      <footer className="pt-12 pb-6 border-t border-border/40 flex flex-col md:flex-row items-center justify-between gap-4 scale-90 opacity-40">
+         <p className="text-[10px] font-semibold tracking-[0.3em] text-text-muted">
            © 2024 INTERVIEWAI. ALL RIGHTS RESERVED.
          </p>
          <div className="flex gap-8">
-            <Link href="/support" className="text-[10px] font-semibold hover:text-text-primary transition-colors tracking-[0.3em]">SUPPORT</Link>
-            <Link href="/privacy" className="text-[10px] font-semibold hover:text-text-primary transition-colors tracking-[0.3em]">PRIVACY</Link>
+            <Link href="/support" className="text-[10px] font-semibold text-text-muted hover:text-text-primary transition-colors tracking-[0.3em]">SUPPORT</Link>
+            <Link href="/privacy" className="text-[10px] font-semibold text-text-muted hover:text-text-primary transition-colors tracking-[0.3em]">PRIVACY</Link>
          </div>
       </footer>
     </div>

@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 const Slider = React.forwardRef<
   React.ElementRef<typeof SliderPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root> & { showTooltip?: boolean }
->(({ className, showTooltip = true, ...props }, ref) => {
+>(({ className, ...props }, ref) => {
   const [isHovered, setIsHovered] = React.useState(false);
   const [value, setValue] = React.useState(props.value || props.defaultValue || [0]);
 

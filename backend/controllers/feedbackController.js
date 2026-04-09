@@ -120,9 +120,7 @@ const getUserProgress = async (req, res, next) => {
           createdAt: { $gte: startDate },
         },
       },
-      {
-        $sort: { createdAt: 1 },
-      },
+      { $sort: { createdAt: 1 } },
       {
         $project: {
           overallScore: 1,
@@ -136,7 +134,7 @@ const getUserProgress = async (req, res, next) => {
       },
     ]);
 
-    // Calculate averages per category
+    // Calculate averages per category (all-time)
     const categoryAverages = await Feedback.aggregate([
       { $match: { user: userId } },
       {
@@ -153,6 +151,26 @@ const getUserProgress = async (req, res, next) => {
       },
     ]);
 
+    // Recent feedback insights with interview context
+    const recentInsights = await Feedback.find({ user: userId })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate('interview', 'title domain type')
+      .select('overallScore strengths improvements categories createdAt interview')
+      .lean();
+
+    // Interview count grouped by domain
+    const domainActivityRaw = await Interview.aggregate([
+      { $match: { user: userId } },
+      { $group: { _id: '$domain', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]);
+
+    const domainActivity = domainActivityRaw.map((d) => ({
+      domain: d._id,
+      count: d.count,
+    }));
+
     const averages = categoryAverages[0] || {};
 
     ApiResponse.success(res, {
@@ -167,6 +185,8 @@ const getUserProgress = async (req, res, next) => {
         confidence: Math.round(averages.avgConfidence || 0),
       },
       totalInterviewsReviewed: averages.count || 0,
+      recentInsights,
+      domainActivity,
     });
   } catch (error) {
     next(error);

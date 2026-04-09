@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
-import { Outfit, Inter } from "next/font/google";
+import { Outfit } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { Providers } from "@/components/providers";
 
 const outfit = Outfit({ subsets: ["latin"], weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"] });
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "AI Mock Interview Training",
@@ -20,7 +19,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={cn(outfit.className, "min-h-screen bg-background antialiased")}>
-        <Providers attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+        <Providers attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           {children}
         </Providers>
       </body>

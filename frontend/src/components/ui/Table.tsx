@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp, MoreVertical } from "lucide-react";
+import { motion } from "framer-motion";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const Table = React.forwardRef<
@@ -59,7 +59,7 @@ const TableRow = React.forwardRef<
   Omit<React.ComponentPropsWithoutRef<typeof motion.tr>, "children"> & { children?: React.ReactNode }
 >(({ className, ...props }, ref) => (
   <motion.tr
-    ref={ref as any}
+    ref={ref}
     initial={{ opacity: 0, y: 10 }}
     animate={{ opacity: 1, y: 0 }}
     whileHover={{ backgroundColor: "rgba(108, 92, 231, 0.05)" }}

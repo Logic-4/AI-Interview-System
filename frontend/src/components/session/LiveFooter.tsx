@@ -22,12 +22,12 @@ export function LiveFooter() {
   };
 
   return (
-      <footer className="h-[100px] border-t border-white/5 bg-[#0D1017] flex items-center justify-between px-6 lg:px-12 w-full mt-auto relative z-20">
+      <footer className="h-[100px] border-t border-border/40 bg-surface flex items-center justify-between px-6 lg:px-12 w-full mt-auto relative z-20 transition-colors duration-500">
          {/* Left: Recording Status & Waveform */}
          <div className="flex items-center gap-6 flex-1">
             <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#EF4444] shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse" />
-              <span className="text-xs font-semibold tracking-widest text-[#EF4444]">REC</span>
+              <div className="w-2.5 h-2.5 rounded-full bg-danger shadow-[0_0_8px_rgba(var(--danger-rgb),0.8)] animate-pulse" />
+              <span className="text-xs font-semibold tracking-widest text-danger">REC</span>
             </div>
             
             <div className="hidden md:flex items-center gap-1 opacity-80">
@@ -37,7 +37,7 @@ export function LiveFooter() {
                   key={i} 
                   className={cn(
                     "w-1 rounded-full",
-                    i < 5 ? "bg-primary" : "bg-[#293556]"
+                    i < 5 ? "bg-primary" : "bg-foreground/10"
                   )}
                   style={{ height: `${h * 6}px` }} 
                 />
@@ -47,7 +47,7 @@ export function LiveFooter() {
 
          {/* Center: Main Controls */}
          <div className="flex items-center gap-4 flex-none">
-            <span className="text-lg font-bold text-white tabular-nums tracking-widest font-mono mr-2">
+            <span className="text-lg font-bold text-text-primary tabular-nums tracking-widest font-mono mr-2">
               {formatTime(time)}
             </span>
             
@@ -56,8 +56,8 @@ export function LiveFooter() {
               className={cn(
                 "h-12 px-5 rounded-xl border flex items-center gap-2 transition-all font-bold text-sm shadow-sm",
                 isMuted 
-                  ? "bg-[#EF4444]/10 border-[#EF4444]/20 text-[#EF4444] hover:bg-[#EF4444]/20" 
-                  : "bg-[#161B26] border-white/5 text-text-secondary hover:bg-[#1C2230]"
+                  ? "bg-danger/10 border-danger/20 text-danger hover:bg-danger/20" 
+                  : "bg-foreground/5 border-border/40 text-text-secondary hover:bg-foreground/10"
               )}
             >
               {isMuted ? (
@@ -67,7 +67,7 @@ export function LiveFooter() {
                 </>
               ) : (
                 <>
-                  <Mic className="w-[18px] h-[18px] stroke-[2.5] text-[#EF4444]" />
+                  <Mic className="w-[18px] h-[18px] stroke-[2.5] text-danger" />
                   Mute
                 </>
               )}
@@ -75,7 +75,7 @@ export function LiveFooter() {
 
             <button 
               onClick={() => router.push("/processing")}
-              className="h-14 bg-primary hover:bg-primary/90 text-white rounded-xl px-8 flex items-center gap-3 shadow-[0_0_20px_rgba(41,98,255,0.25)] transition-all transform hover:scale-[1.02]"
+              className="h-14 bg-primary hover:bg-primary/90 text-white rounded-xl px-8 flex items-center gap-3 shadow-[0_0_20px_rgba(var(--primary-rgb),0.25)] transition-all transform hover:scale-[1.02]"
             >
                <div className="w-5 h-5 rounded-full border-2 border-white flex items-center justify-center">
                   <div className="w-2 h-2 bg-white rounded-[2px]" />
@@ -86,7 +86,7 @@ export function LiveFooter() {
                </div>
             </button>
 
-            <button className="h-12 bg-[#161B26] hover:bg-[#1C2230] border border-white/5 text-text-secondary rounded-xl px-6 flex items-center gap-2 transition-colors">
+            <button className="h-12 bg-foreground/5 hover:bg-foreground/10 border border-border/40 text-text-secondary rounded-xl px-6 flex items-center gap-2 transition-colors">
                <span className="text-sm font-bold">Next</span>
                <div className="flex flex-col items-start leading-none">
                  <span className="text-[10px] font-semibold uppercase tracking-wider opacity-70">Question</span>
@@ -97,11 +97,11 @@ export function LiveFooter() {
 
          {/* Right: Technical Stats */}
          <div className="flex flex-col items-end gap-1.5 flex-1 opacity-50 hover:opacity-100 transition-opacity cursor-default">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 text-text-primary">
                <Wifi className="w-[14px] h-[14px]" />
                <span className="text-[10px] font-semibold tracking-wider uppercase">Latency: 24ms</span>
             </div>
-            <span className="text-[9px] font-medium tracking-wide">Camera & Mic Enabled</span>
+            <span className="text-[9px] font-medium tracking-wide text-text-muted">Camera & Mic Enabled</span>
          </div>
       </footer>
   );

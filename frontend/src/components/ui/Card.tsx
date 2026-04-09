@@ -13,7 +13,7 @@ const cardVariants = cva(
         default: "bg-surface border-border hover:border-border-light shadow-sm hover:shadow-md hover:-translate-y-1",
         elevated: "bg-surface border-transparent shadow-[0_4px_25px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_40px_rgba(0,0,0,0.12)] hover:-translate-y-1",
         bordered: "bg-surface border-border-light shadow-none hover:border-primary/40",
-        glass: "glass-effect backdrop-blur-xl bg-surface/10 border-white/5 hover:border-white/10 hover:shadow-[0_0_50px_rgba(108,92,231,0.1)]",
+        glass: "glass-effect backdrop-blur-xl bg-surface/10 border-border/10 hover:border-border/20 hover:shadow-[0_0_50px_hsla(var(--primary),0.1)]",
         gradient: "bg-surface group",
       },
     },
@@ -34,13 +34,13 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
   ({ className, variant, hoverEffect = true, children, ...props }, ref) => {
     return (
       <motion.div
-        ref={ref as any}
+        ref={ref}
         whileHover={
           hoverEffect
             ? {
                 y: -4,
                 scale: 1.01,
-                boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
+                boxShadow: "0 20px 25px -5px hsla(var(--foreground), 0.05), 0 8px 10px -6px hsla(var(--foreground), 0.05)",
               }
             : {}
         }

@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { motion, useSpring, useTransform, animate } from "framer-motion";
-import { ArrowUpRight, ArrowDownRight, LucideIcon } from "lucide-react";
+import { motion, animate } from "framer-motion";
+import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { cn } from "@/lib/utils";
 
@@ -48,17 +48,17 @@ const StatCard = ({
   }, [value, suffix]);
 
   return (
-    <Card className={cn("relative group transition-all duration-500 overflow-hidden", className)}>
+    <Card className={cn("relative group transition-all duration-500 overflow-hidden border-border/40", className)}>
       {/* Background decoration */}
       <div className={`absolute -right-6 -bottom-6 w-32 h-32 rounded-full bg-${color}/10 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity`} />
       
       <CardContent className="p-6">
         <div className="flex items-center justify-between mb-4">
           <div className={cn(
-            "p-3 rounded-2xl border border-white/5",
-            `bg-gradient-${color} shadow-[0_0_20px_rgba(var(--${color}),0.15)]`
+            "p-3 rounded-2xl border border-border/40",
+            `bg-${color}/10 shadow-[0_0_20px_rgba(var(--${color}-rgb),0.15)]`
           )}>
-            <Icon className="w-6 h-6 text-white" />
+            <Icon className={cn("w-6 h-6", `text-${color}`)} />
           </div>
           
           {trend && (

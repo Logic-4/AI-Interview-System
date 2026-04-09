@@ -40,16 +40,17 @@ export interface ButtonProps
   isLoading?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  noMotion?: boolean;
   children?: React.ReactNode;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, isLoading, leftIcon, rightIcon, children, ...props }, ref) => {
+  ({ className, variant, size, isLoading, leftIcon, rightIcon, noMotion = false, children, ...props }, ref) => {
     return (
       <motion.button
         ref={ref}
-        whileHover={{ y: -2 }}
-        whileTap={{ scale: 0.96 }}
+        whileHover={noMotion ? undefined : { y: -2 }}
+        whileTap={noMotion ? undefined : { scale: 0.96 }}
         className={cn(buttonVariants({ variant, size, className }))}
         disabled={isLoading || props.disabled}
         {...props}

@@ -1,24 +1,16 @@
 "use client";
 
 import React from "react";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import {
-  Bot,
   Mic,
-  Video,
   Zap,
   BarChart3,
-  ShieldCheck,
-  MessageSquare,
-  ChevronRight,
   Play,
-  ArrowRight,
-  CheckCircle2,
-  Users
+  ArrowRight
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -39,7 +31,6 @@ export default function LandingPage() {
       "Hello! I am your AI Interviewer. I'm here to help you practice and perfect your interview skills with real-time feedback. Let's start the session."
     );
 
-    // Find a professional female voice if available
     const voices = window.speechSynthesis.getVoices();
     const preferredVoice = voices.find(v => v.name.includes("Samantha") || v.name.includes("Female") || v.name.includes("Google US English"));
     if (preferredVoice) utterance.voice = preferredVoice;
@@ -71,19 +62,19 @@ export default function LandingPage() {
     visible: {
       opacity: 1,
       y: 0,
-      transition: { type: "spring", stiffness: 100, damping: 20 } as any
+      transition: { type: "spring", stiffness: 100, damping: 20 } as unknown as Variants
     }
   };
 
   return (
-    <div className="min-h-screen bg-background text-text-primary selection:bg-primary selection:text-white">
+    <div className="min-h-screen bg-background text-text-primary selection:bg-primary selection:text-white transition-colors duration-500">
       <Navbar />
 
       <main>
         {/* --- HERO SECTION --- */}
         <section className="relative pt-24 pb-32 overflow-hidden px-6 lg:px-8">
           {/* Background Glows */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1200px] h-96 bg-primary/20 hover:bg-primary/30 blur-[150px] rounded-full transition-colors duration-1000" />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1200px] h-96 bg-primary/10 blur-[150px] rounded-full transition-colors duration-1000" />
 
           <motion.div
             initial="hidden"
@@ -92,7 +83,7 @@ export default function LandingPage() {
             className="mx-auto max-w-7xl text-center space-y-10"
           >
             <motion.div variants={itemVariants} className="flex justify-center">
-              <Badge variant="soft" color="primary" className="py-2 px-4 rounded-full border border-primary/20 gap-2 font-semibold uppercase text-[10px] tracking-widest bg-primary/5">
+              <Badge variant="soft" color="primary" className="py-2 px-4 rounded-full border border-primary/10 gap-2 font-semibold uppercase text-[10px] tracking-widest bg-primary/5">
                 <span className="bg-primary/20 px-1.5 py-0.5 rounded-full text-primary">NEW</span>
                 ✨ Powered by GPT-4 Vision & Voice
               </Badge>
@@ -100,10 +91,10 @@ export default function LandingPage() {
 
             <motion.h1
               variants={itemVariants}
-              className="text-6xl md:text-8xl font-semibold tracking-tighter leading-[0.9] md:leading-[1]"
+              className="text-6xl md:text-8xl font-black tracking-tighter leading-[0.9] md:leading-[1] text-text-primary uppercase"
             >
               Master Your Next <br />
-              <span className="bg-clip-text text-transparent bg-gradient-primary">
+              <span className="text-primary">
                 Interview with AI
               </span>
             </motion.h1>
@@ -117,18 +108,18 @@ export default function LandingPage() {
             </motion.p>
 
             <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-center gap-6 pt-4">
-              <Button size="xl" variant="premium" className="group shadow-[0_0_30px_rgba(108,92,231,0.3)]">
+              <Button size="xl" variant="premium" className="group shadow-[0_0_30px_hsla(var(--primary),0.3)]">
                 Start Practice Interview
                 <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Button>
               <Button
                 size="xl"
                 variant="outline"
-                className="group text-text-primary px-8 border-white/10 hover:bg-white/5 active:scale-95 transition-transform"
+                className="group text-text-primary px-8 border-border hover:bg-surface-2 active:scale-95 transition-transform"
                 onClick={handlePlay}
               >
-                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center mr-3 group-hover:scale-110 transition-transform">
-                  <Play className={cn("w-3.5 h-3.5 text-white", isPlaying ? "fill-white" : "fill-white")} />
+                <div className="w-8 h-8 rounded-full bg-surface-2 flex items-center justify-center mr-3 group-hover:scale-110 transition-transform">
+                  <Play className={cn("w-3.5 h-3.5 text-primary", isPlaying ? "fill-primary" : "fill-primary")} />
                 </div>
                 {isPlaying ? "Stop Introduction" : "View Demo Video"}
               </Button>
@@ -139,18 +130,18 @@ export default function LandingPage() {
               variants={itemVariants}
               className="mx-auto max-w-5xl mt-24 relative group"
             >
-              <div className="absolute -inset-1 bg-gradient-primary rounded-[2.5rem] blur-2xl opacity-20 group-hover:opacity-30 transition-opacity" />
+              <div className="absolute -inset-1 bg-gradient-primary rounded-[2.5rem] blur-2xl opacity-10 group-hover:opacity-20 transition-opacity" />
               <div className="relative glass-effect rounded-[2.2rem] p-2 md:p-4 overflow-hidden shadow-2xl">
-                <div className="relative aspect-video rounded-3xl overflow-hidden border border-white/5 bg-surface-2 shadow-inner">
+                <div className="relative aspect-video rounded-3xl overflow-hidden border border-border bg-surface-2 shadow-inner">
                   {/* Simplified UI Mockup */}
-                  <div className="absolute inset-0 bg-[#0A0A0F] flex flex-col">
-                    <div className="absolute top-6 left-1/2 -translate-x-1/2 flex gap-4 items-center">
-                      <Badge variant="soft" color="success" className="animate-pulse">● LIVE SESSION</Badge>
-                      <span className="text-sm font-bold text-white uppercase tracking-widest opacity-60">Architectural Designer Role</span>
+                  <div className="absolute inset-0 bg-background flex flex-col">
+                    <div className="absolute top-6 left-1/2 -translate-x-1/2 flex gap-4 items-center z-10">
+                      <Badge variant="soft" color="success" className="animate-pulse bg-success/10 border-success/20">● LIVE SESSION</Badge>
+                      <span className="text-sm font-bold text-text-primary uppercase tracking-widest opacity-60">Architectural Designer Role</span>
                     </div>
 
                     <div
-                      className="flex-1 flex items-center justify-center relative bg-surface-2 cursor-pointer group"
+                      className="flex-1 flex items-center justify-center relative bg-surface-2 cursor-pointer group/mockup"
                       onClick={handlePlay}
                     >
                       <motion.div
@@ -163,15 +154,15 @@ export default function LandingPage() {
                         style={{ backgroundImage: "url('/assets/cartoon-interviewer.png')" }}
                       />
                       <div className={cn(
-                        "absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px]",
-                        isPlaying && "opacity-0 group-hover:opacity-0"
+                        "absolute inset-0 bg-black/5 flex items-center justify-center opacity-0 group-hover/mockup:opacity-100 transition-opacity backdrop-blur-[2px]",
+                        isPlaying && "opacity-0 group-hover/mockup:opacity-0"
                       )}>
                         <div className="w-20 h-20 rounded-full bg-primary/20 backdrop-blur-md flex items-center justify-center border border-primary/30 text-white shadow-2xl">
                           <Play className="w-8 h-8 fill-current" />
                         </div>
                       </div>
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
-                      <div className="absolute bottom-12 left-1/2 -translate-x-1/2 w-3/4 h-24 bg-surface/40 backdrop-blur-md rounded-2xl border border-white/10 flex items-center justify-center overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent pointer-events-none" />
+                      <div className="absolute bottom-12 left-1/2 -translate-x-1/2 w-3/4 h-24 bg-surface/60 backdrop-blur-md rounded-2xl border border-border flex items-center justify-center overflow-hidden">
                         {/* Mock Waveform */}
                         <div className="flex items-end gap-1 px-8 w-full justify-between">
                           {[...Array(30)].map((_, i) => (
@@ -189,7 +180,7 @@ export default function LandingPage() {
                               }}
                               className={cn(
                                 "w-2 rounded-full transition-colors",
-                                isPlaying ? "bg-primary shadow-[0_0_15px_rgba(108,92,231,0.5)]" : "bg-primary/40"
+                                isPlaying ? "bg-primary shadow-[0_0_15px_hsla(var(--primary),0.5)]" : "bg-primary/40"
                               )}
                             />
                           ))}
@@ -197,19 +188,19 @@ export default function LandingPage() {
                       </div>
                     </div>
 
-                    <div className="h-20 bg-black/40 backdrop-blur-3xl border-t border-white/5 p-6 flex items-center justify-between">
+                    <div className="h-20 bg-surface/40 backdrop-blur-3xl border-t border-border p-6 flex items-center justify-between">
                       <div className="flex gap-4">
-                        <div className="bg-primary/20 p-2.5 rounded-xl border border-primary/30">
+                        <div className="bg-primary/10 p-2.5 rounded-xl border border-primary/20">
                           <Mic className="w-5 h-5 text-primary" />
                         </div>
                         <div className="text-left">
                           <p className="text-[10px] font-semibold uppercase tracking-tighter text-text-muted">Audio Input</p>
-                          <p className="text-xs font-bold text-white">Shure MV7 Dynamic</p>
+                          <p className="text-xs font-bold text-text-primary">Shure MV7 Dynamic</p>
                         </div>
                       </div>
                       <div className="flex gap-6 items-center">
                         <span className="text-xs font-bold text-text-muted">02:45 / 15:00</span>
-                        <div className="h-1.5 w-64 bg-white/10 rounded-full overflow-hidden">
+                        <div className="h-1.5 w-64 bg-border/40 rounded-full overflow-hidden">
                           <motion.div
                             initial={{ width: 0 }}
                             animate={{ width: "25%" }}
@@ -226,7 +217,7 @@ export default function LandingPage() {
         </section>
 
         {/* --- LOGO BAR --- */}
-        <section className="py-20 border-y border-white/5 bg-surface/30 px-6 lg:px-8">
+        <section className="py-20 border-y border-border bg-surface/30 px-6 lg:px-8">
           <div className="mx-auto max-w-7xl">
             <h2 className="text-center text-xs font-semibold uppercase tracking-[0.3em] text-text-muted mb-12 opacity-80">
               Helping Candidates Land Roles At
@@ -243,7 +234,7 @@ export default function LandingPage() {
         <section id="features" className="py-32 px-6 lg:px-8">
           <div className="mx-auto max-w-7xl">
             <div className="text-left mb-20 space-y-4">
-              <h2 className="text-4xl md:text-5xl font-semibold tracking-tighter">
+              <h2 className="text-4xl md:text-5xl font-semibold tracking-tighter text-text-primary">
                 Engineered for <span className="text-primary">Career Growth</span>
               </h2>
               <p className="max-w-xl text-lg text-text-muted font-medium leading-relaxed">
@@ -273,15 +264,17 @@ export default function LandingPage() {
                   color: "secondary"
                 }
               ].map((feature, i) => (
-                <Card key={i} variant="elevated" className="border-white/5 bg-surface-2 group hover:bg-surface-3 transition-colors">
+                <Card key={i} variant="elevated" className="border-border bg-surface-2 group hover:bg-surface-3 transition-colors">
                   <CardHeader className="p-8">
                     <div className={cn(
                       "w-12 h-12 rounded-2xl flex items-center justify-center mb-6 ring-1 ring-inset",
-                      `bg-${feature.color}/10 text-${feature.color} ring-${feature.color}/20`
+                      feature.color === 'primary' ? "bg-primary/10 text-primary ring-primary/20" :
+                      feature.color === 'success' ? "bg-success/10 text-success ring-success/20" :
+                      "bg-secondary/10 text-secondary ring-secondary/20"
                     )}>
                       <feature.icon className="w-6 h-6" />
                     </div>
-                    <CardTitle className="text-2xl font-bold mb-4">{feature.title}</CardTitle>
+                    <CardTitle className="text-2xl font-bold mb-4 text-text-primary">{feature.title}</CardTitle>
                     <CardDescription className="text-base leading-relaxed text-text-muted font-medium">
                       {feature.desc}
                     </CardDescription>
@@ -293,9 +286,9 @@ export default function LandingPage() {
         </section>
 
         {/* --- STATS SECTION --- */}
-        <section className="py-32 border-t border-white/5 bg-surface/20 px-6 lg:px-8 overflow-hidden relative">
+        <section className="py-32 border-t border-border bg-surface/20 px-6 lg:px-8 overflow-hidden relative">
           {/* Subtle Glow */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-secondary/5 blur-[120px] rounded-full pointer-events-none" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-primary/5 blur-[120px] rounded-full pointer-events-none" />
 
           <div className="mx-auto max-w-7xl grid grid-cols-1 md:grid-cols-3 gap-16 text-center relative z-10">
             <div className="space-y-2">
@@ -316,7 +309,7 @@ export default function LandingPage() {
         {/* --- CTA SECTION --- */}
         <section className="py-24 px-6 lg:px-8">
           <div className="mx-auto max-w-7xl">
-            <div className="relative overflow-hidden rounded-[3rem] p-12 md:p-24 bg-gradient-primary-to-blue shadow-2xl shadow-primary/20">
+            <div className="relative overflow-hidden rounded-[3rem] p-12 md:p-24 bg-gradient-primary shadow-2xl shadow-primary/20">
               {/* Grid Pattern Overlay */}
               <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.2)_1px,transparent_0)] bg-[size:32px_32px]" />
 

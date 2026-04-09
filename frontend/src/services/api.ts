@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api",
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1",
   headers: {
     "Content-Type": "application/json",
   },
@@ -22,18 +22,32 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    const requestUrl = originalRequest?.url || '';
+    const isAuthRequest = [
+      '/auth/login',
+      '/auth/register',
+      '/auth/refresh-token',
+      '/auth/forgot-password',
+      '/auth/reset-password',
+      '/auth/logout',
+    ].some((path) => requestUrl.includes(path));
+
+    if (isAuthRequest) {
+      return Promise.reject(error);
+    }
+
     // If 401 and retry flag not set, try to refresh
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       try {
         // Call refresh endpoint
         const res = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/refresh`,
+          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1"}/auth/refresh-token`,
           {},
           { withCredentials: true }
         );
         
-        const { accessToken } = res.data;
+        const { accessToken } = res.data.data;
         if (typeof window !== 'undefined') {
           localStorage.setItem('accessToken', accessToken);
         }
@@ -42,13 +56,31 @@ api.interceptors.response.use(
         api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
         
         // Retry original request with new token
+        originalRequest.headers = originalRequest.headers || {};
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
-        // Refresh failed (token expired), force logout
+        // Refresh failed — clear cookie via server + local state, then redirect
         if (typeof window !== 'undefined') {
           localStorage.removeItem('accessToken');
-          window.location.href = '/login';
+          localStorage.removeItem('auth-storage');
+          try {
+            await axios.post(
+              `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1"}/auth/logout`,
+              {},
+              { withCredentials: true }
+            );
+          } catch {}
+
+          const currentPath = `${window.location.pathname}${window.location.search}`;
+          const isAuthRoute = ['/login', '/register', '/forgot-password', '/reset-password', '/auth/callback']
+            .some((path) => window.location.pathname.startsWith(path));
+
+          if (isAuthRoute) {
+            window.location.href = '/login';
+          } else {
+            window.location.href = `/login?from=${encodeURIComponent(currentPath)}`;
+          }
         }
         return Promise.reject(refreshError);
       }

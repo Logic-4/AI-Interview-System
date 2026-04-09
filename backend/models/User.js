@@ -20,9 +20,17 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, 'Password is required'],
       minlength: [8, 'Password must be at least 8 characters'],
-      select: false, // Don't include password in queries by default
+      select: false,
+    },
+    provider: {
+      type: String,
+      enum: ['local', 'google', 'github'],
+      default: 'local',
+    },
+    providerId: {
+      type: String,
+      default: null,
     },
     role: {
       type: String,
@@ -103,7 +111,7 @@ userSchema.index({ createdAt: -1 });
 
 // Pre-save hook — hash password
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
+  if (!this.isModified('password') || !this.password) return next();
 
   const salt = await bcrypt.genSalt(12);
   this.password = await bcrypt.hash(this.password, salt);
@@ -112,6 +120,7 @@ userSchema.pre('save', async function (next) {
 
 // Instance method — compare password
 userSchema.methods.comparePassword = async function (candidatePassword) {
+  if (!this.password) return false;
   return bcrypt.compare(candidatePassword, this.password);
 };
 

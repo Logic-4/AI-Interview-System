@@ -33,7 +33,6 @@ export interface InputProps
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, error, label, leftIcon, rightIcon, success, variant, ...props }, ref) => {
-    const [isFocused, setIsFocused] = React.useState(false);
 
     return (
       <div className="w-full space-y-1.5 group">
@@ -58,8 +57,6 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
               success && "border-success ring-success focus-visible:ring-success",
               "group-hover:shadow-[0_0_10px_rgba(108,92,231,0.05)]"
             )}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
             ref={ref}
             {...props}
           />
