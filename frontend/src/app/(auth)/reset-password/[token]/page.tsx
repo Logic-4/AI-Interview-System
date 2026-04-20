@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useParams } from "next/navigation";
-import { Bot, Lock, ShieldCheck, AlertCircle, CheckCircle2, ArrowLeft } from "lucide-react";
+import { Bot, Lock, ShieldCheck, AlertCircle, CheckCircle2, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
@@ -19,6 +19,8 @@ export default function ResetPasswordPage() {
 
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [done, setDone] = React.useState(false);
@@ -60,7 +62,7 @@ export default function ResetPasswordPage() {
           <div className="bg-primary p-2 rounded-xl shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform">
             <Bot className="w-6 h-6 text-white" />
           </div>
-          <span className="text-2xl font-black tracking-tighter uppercase">
+          <span className="text-2xl font-bold tracking-tight uppercase">
             Interview<span className="text-primary">AI</span>
           </span>
         </Link>
@@ -73,11 +75,11 @@ export default function ResetPasswordPage() {
             <Badge variant="soft" color="primary" className="mb-6 bg-primary/10 text-primary border-primary/20 px-3 py-1 font-bold tracking-widest uppercase text-[10px]">
               Security Protocol
             </Badge>
-            <h2 className="text-6xl font-black tracking-tighter leading-[0.9] uppercase mb-6">
+            <h2 className="text-4xl xl:text-5xl font-bold tracking-tight leading-tight mb-6">
               Secure Your <br />
               <span className="text-primary italic">Expert Identity</span>
             </h2>
-            <p className="text-xl text-text-secondary font-medium max-w-sm leading-relaxed">
+            <p className="text-lg text-text-secondary font-medium max-w-sm leading-relaxed">
               Your professional credentials are being restored. Choose a strong new security key to continue.
             </p>
           </motion.div>
@@ -97,7 +99,7 @@ export default function ResetPasswordPage() {
         <nav className="lg:hidden flex items-center justify-between px-6 py-4 border-b border-border/40 bg-surface/60 backdrop-blur-md sticky top-0 z-50">
           <Link href="/" className="flex items-center gap-2">
             <Bot className="w-5 h-5 text-primary" />
-            <span className="text-lg font-black tracking-tighter uppercase">InterviewAI</span>
+            <span className="text-lg font-bold tracking-tight uppercase">InterviewAI</span>
           </Link>
           <ThemeToggle />
         </nav>
@@ -127,7 +129,7 @@ export default function ResetPasswordPage() {
                      <div className="w-16 h-16 rounded-2xl bg-success/10 flex items-center justify-center border border-success/20 mb-6 scale-in">
                        <CheckCircle2 className="w-8 h-8 text-success" />
                      </div>
-                     <h1 className="text-4xl font-black tracking-tighter uppercase">Key Updated</h1>
+                     <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Key Updated</h1>
                      <p className="text-text-secondary font-medium text-base leading-relaxed">
                        Your security credentials have been successfully restored. We are redirecting you to the portal.
                      </p>
@@ -148,7 +150,7 @@ export default function ResetPasswordPage() {
                     <Badge variant="soft" color="success" className="mb-2 bg-success/10 text-success border-success/20 font-bold tracking-widest uppercase text-[10px]">
                       RESTORE ACCESS
                     </Badge>
-                    <h1 className="text-4xl font-black tracking-tighter uppercase">Set New Password</h1>
+                    <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Set New Password</h1>
                     <p className="text-text-secondary font-medium text-base">Initialize your new account security key.</p>
                   </div>
 
@@ -163,23 +165,43 @@ export default function ResetPasswordPage() {
                     <div className="space-y-4">
                       <Input
                         label="New Password"
-                        type="password"
+                        type={showPassword ? "text" : "password"}
                         placeholder="••••••••"
                         leftIcon={<Lock className="w-4 h-4 text-text-muted" />}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         className="bg-surface/50 border-border/60 focus:bg-surface transition-all h-14"
+                        rightIcon={
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword((v) => !v)}
+                            className="hover:text-text-primary transition-colors p-2"
+                            aria-label={showPassword ? "Hide password" : "Show password"}
+                          >
+                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        }
                         required
                       />
 
                       <Input
                         label="Confirm New Password"
-                        type="password"
+                        type={showConfirmPassword ? "text" : "password"}
                         placeholder="••••••••"
                         leftIcon={<ShieldCheck className="w-4 h-4 text-text-muted" />}
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         className="bg-surface/50 border-border/60 focus:bg-surface transition-all h-14"
+                        rightIcon={
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword((v) => !v)}
+                            className="hover:text-text-primary transition-colors p-2"
+                            aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                          >
+                            {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        }
                         required
                       />
                     </div>

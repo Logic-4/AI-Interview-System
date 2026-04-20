@@ -13,40 +13,65 @@ const openai = new OpenAI({
  * @param {number} count - Number of questions to generate
  * @returns {Array} Array of question objects
  */
-const generateInterviewQuestions = async (type, domain, difficulty, count = 5) => {
+const generateInterviewQuestions = async (type, domain, difficulty, count = 5, context = {}) => {
   try {
-    const prompt = `You are an expert technical interviewer. Generate ${count} ${type} interview questions for a ${difficulty}-level ${domain} developer position.
+    const { jobRole, jobDescription, focusSkills } = context;
+
+    // Build a rich, domain-aware prompt
+    const roleLabel = jobRole || `${difficulty}-level ${domain} professional`;
+    const typeLabel = {
+      technical: 'technical/skill-based',
+      behavioral: 'behavioral (STAR-method)',
+      'system-design': 'system design and architecture',
+      hr: 'HR screening (motivation, culture fit, strengths/weaknesses)',
+      mixed: 'mixed (technical + behavioral + situational)',
+    }[type] || type;
+
+    let contextBlock = '';
+    if (jobDescription) {
+      contextBlock += `\n\nJob Description provided by candidate:\n"""${jobDescription.slice(0, 3000)}"""\nUse this JD to tailor questions to the specific responsibilities, tools, and qualifications mentioned.`;
+    }
+    if (focusSkills && focusSkills.length > 0) {
+      contextBlock += `\n\nCandidate wants to focus on these skills: ${focusSkills.join(', ')}. Ensure at least half the questions cover these areas.`;
+    }
+
+    const prompt = `You are an expert interviewer across all industries and departments. Generate ${count} ${typeLabel} interview questions for a "${roleLabel}" position (${difficulty} experience level, ${domain} domain).${contextBlock}
 
 For each question, provide:
-1. The question text
-2. A category (e.g., "algorithms", "system design", "behavioral", "coding", etc.)
-3. Difficulty level (easy, medium, hard)
-4. An ideal/expected answer
+1. The question text (realistic, industry-standard)
+2. A category that fits the domain (e.g., for tech: "algorithms", "system design"; for healthcare: "patient care", "clinical knowledge"; for finance: "financial analysis", "risk management"; for marketing: "campaign strategy", "analytics"; etc.)
+3. Difficulty level (easy, medium, hard) — calibrated to the ${difficulty} experience level
+4. An ideal/expected answer that a strong candidate would give
 
-Return the response as a JSON array with this structure:
+Return ONLY a JSON array:
 [
   {
     "text": "Question text here",
-    "category": "category name",
+    "category": "relevant category",
     "difficulty": "easy|medium|hard",
-    "expectedAnswer": "Ideal answer explanation"
+    "expectedAnswer": "Comprehensive ideal answer"
   }
 ]
 
-Make the questions realistic, challenging, and relevant to current industry standards.
+Rules:
+- Questions must be realistic and match current industry standards for ${domain}.
+- For behavioral questions, frame them using the STAR method.
+- For HR questions, focus on motivation, culture fit, career goals, and soft skills.
+- Vary difficulty within the set (mix easy/medium/hard appropriate to ${difficulty} level).
+- No duplicate or overly similar questions.
 Only return the JSON array, no other text.`;
 
     const response = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4',
+      model: process.env.OPENAI_MODEL || 'gpt-5.4-nano',
       messages: [
         {
           role: 'system',
-          content: 'You are an expert technical interviewer who generates realistic interview questions. Always respond with valid JSON only.',
+          content: 'You are an expert interviewer who generates realistic interview questions for any industry — technology, healthcare, finance, marketing, legal, education, engineering, and more. Always respond with valid JSON only.',
         },
         { role: 'user', content: prompt },
       ],
       temperature: 0.7,
-      max_tokens: 3000,
+      max_completion_tokens: 4000,
     });
 
     const content = response.choices[0].message.content.trim();
@@ -71,7 +96,7 @@ Only return the JSON array, no other text.`;
  */
 const evaluateAnswer = async (questionText, expectedAnswer, userAnswer) => {
   try {
-    const prompt = `You are an expert technical interviewer evaluating a candidate's answer.
+    const prompt = `You are an expert interviewer evaluating a candidate's answer across any industry.
 
 Question: ${questionText}
 
@@ -80,32 +105,34 @@ Expected/Ideal Answer: ${expectedAnswer}
 Candidate's Answer: ${userAnswer}
 
 Please evaluate the candidate's answer and provide:
-1. A score from 0 to 100
+1. A score from 0 to 100 (be fair — partial credit for partially correct answers)
 2. Detailed feedback explaining the score
-3. What was done well
-4. What could be improved
+3. An array of strengths (what was done well)
+4. An array of improvements (what could be improved)
+5. A short "better answer" suggestion
 
 Return as JSON:
 {
   "score": <number>,
   "feedback": "<detailed feedback>",
-  "strengths": "<what was done well>",
-  "improvements": "<what could be improved>"
+  "strengths": ["<strength 1>", "<strength 2>"],
+  "improvements": ["<improvement 1>", "<improvement 2>"],
+  "suggestedAnswer": "<concise improved answer>"
 }
 
 Only return the JSON, no other text.`;
 
     const response = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4',
+      model: process.env.OPENAI_MODEL || 'gpt-5.4-nano',
       messages: [
         {
           role: 'system',
-          content: 'You are a fair and thorough technical interviewer. Evaluate answers objectively. Always respond with valid JSON only.',
+          content: 'You are a fair and thorough interviewer for any industry. Evaluate answers objectively. Always respond with valid JSON only.',
         },
         { role: 'user', content: prompt },
       ],
       temperature: 0.3,
-      max_tokens: 1000,
+      max_completion_tokens: 1500,
     });
 
     const content = response.choices[0].message.content.trim();
@@ -163,7 +190,7 @@ Provide a comprehensive evaluation in this JSON format:
 Only return the JSON, no other text.`;
 
     const response = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4',
+      model: process.env.OPENAI_MODEL || 'gpt-5.4-nano',
       messages: [
         {
           role: 'system',
@@ -172,7 +199,7 @@ Only return the JSON, no other text.`;
         { role: 'user', content: prompt },
       ],
       temperature: 0.4,
-      max_tokens: 3000,
+      max_completion_tokens: 3000,
     });
 
     const content = response.choices[0].message.content.trim();

@@ -27,6 +27,7 @@ export default function LoginPage() {
 
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [rememberMe, setRememberMe] = React.useState(false);
   const [showPassword, setShowPassword] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isCheckingSession, setIsCheckingSession] = React.useState(true);
@@ -84,7 +85,7 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const { user, accessToken } = await authService.login({ email, password });
+      const { user, accessToken } = await authService.login({ email, password, rememberMe });
       login(user, accessToken);
       router.replace(redirectPath);
     } catch (err: unknown) {
@@ -108,7 +109,7 @@ export default function LoginPage() {
           <div className="bg-primary p-2 rounded-xl shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform">
             <Bot className="w-6 h-6 text-white" />
           </div>
-          <span className="text-2xl font-black tracking-tighter uppercase">
+          <span className="text-2xl font-bold tracking-tight uppercase">
             Interview<span className="text-primary">AI</span>
           </span>
         </Link>
@@ -121,11 +122,11 @@ export default function LoginPage() {
             <Badge variant="soft" color="primary" className="mb-6 bg-primary/10 text-primary border-primary/20 px-3 py-1 font-bold tracking-widest uppercase text-[10px]">
               Premium Practice Environment
             </Badge>
-            <h2 className="text-6xl font-black tracking-tighter leading-[0.9] uppercase mb-6">
+            <h2 className="text-4xl xl:text-5xl font-bold tracking-tight leading-tight mb-6">
               Refine Your <br />
               <span className="text-primary italic">Executive Voice</span>
             </h2>
-            <p className="text-xl text-text-secondary font-medium max-w-sm leading-relaxed">
+            <p className="text-lg text-text-secondary font-medium max-w-sm leading-relaxed">
               Sign in to access your personalized dashboard, track progress, and continue your path to mastery.
             </p>
           </motion.div>
@@ -147,7 +148,7 @@ export default function LoginPage() {
         <nav className="lg:hidden flex items-center justify-between px-6 py-4 border-b border-border/40 bg-surface/60 backdrop-blur-md sticky top-0 z-50">
           <Link href="/" className="flex items-center gap-2">
             <Bot className="w-5 h-5 text-primary" />
-            <span className="text-lg font-black tracking-tighter uppercase">InterviewAI</span>
+            <span className="text-lg font-bold tracking-tight uppercase">InterviewAI</span>
           </Link>
           <ThemeToggle />
         </nav>
@@ -171,7 +172,7 @@ export default function LoginPage() {
             className="w-full max-w-[400px] space-y-10"
           >
             <div className="space-y-3 text-center lg:text-left">
-              <h1 className="text-4xl font-black tracking-tighter uppercase">Welcome back</h1>
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Welcome back</h1>
               <p className="text-text-secondary font-medium text-base">
                 Continue your journey toward career excellence.
               </p>
@@ -217,6 +218,19 @@ export default function LoginPage() {
                     }
                     required
                   />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    id="remember-me"
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-border bg-surface-3 text-primary focus:ring-primary focus:ring-offset-0 transition-all cursor-pointer accent-primary"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                  />
+                  <label htmlFor="remember-me" className="text-xs font-medium text-text-secondary cursor-pointer">
+                    Remember me for a longer session
+                  </label>
                 </div>
               </div>
 

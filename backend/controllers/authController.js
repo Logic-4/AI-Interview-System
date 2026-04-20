@@ -1,8 +1,22 @@
+const crypto = require('crypto');
 const User = require('../models/User');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
-const { generateAccessToken, generateRefreshToken, verifyRefreshToken, getTokenExpiry } = require('../utils/tokenUtils');
+const { generateAccessToken, generateRefreshToken, verifyRefreshToken, getTokenExpiry, getExpiryMs } = require('../utils/tokenUtils');
+const { sendPasswordResetEmail } = require('../services/emailService');
 const logger = require('../utils/logger');
+
+const DEFAULT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+const REMEMBER_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_REMEMBER_EXPIRES_IN || '30d';
+
+const getRefreshDuration = (rememberMe) => (rememberMe ? REMEMBER_REFRESH_EXPIRES_IN : DEFAULT_REFRESH_EXPIRES_IN);
+
+const getRefreshCookieOptions = (expiresIn) => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax',
+  maxAge: getExpiryMs(expiresIn),
+});
 
 /**
  * @desc    Register a new user
@@ -11,7 +25,9 @@ const logger = require('../utils/logger');
  */
 const register = async (req, res, next) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, rememberMe = false } = req.body;
+    const shouldRemember = Boolean(rememberMe);
+    const refreshExpiresIn = getRefreshDuration(shouldRemember);
 
     // Check if user exists
     const existingUser = await User.findOne({ email });
@@ -24,22 +40,18 @@ const register = async (req, res, next) => {
 
     // Generate tokens
     const accessToken = generateAccessToken({ id: user._id, email: user.email, role: user.role });
-    const refreshToken = generateRefreshToken({ id: user._id });
+    const refreshToken = generateRefreshToken({ id: user._id }, refreshExpiresIn);
 
     // Store refresh token
     user.refreshTokens.push({
       token: refreshToken,
-      expiresAt: getTokenExpiry(process.env.JWT_REFRESH_EXPIRES_IN || '7d'),
+      expiresAt: getTokenExpiry(refreshExpiresIn),
+      rememberMe: shouldRemember,
     });
     await user.save();
 
     // Set refresh token in httpOnly cookie
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+    res.cookie('refreshToken', refreshToken, getRefreshCookieOptions(refreshExpiresIn));
 
     logger.info(`New user registered: ${email}`);
 
@@ -59,7 +71,9 @@ const register = async (req, res, next) => {
  */
 const login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, rememberMe = false } = req.body;
+    const shouldRemember = Boolean(rememberMe);
+    const refreshExpiresIn = getRefreshDuration(shouldRemember);
 
     // Find user with password
     const user = await User.findOne({ email }).select('+password');
@@ -75,24 +89,20 @@ const login = async (req, res, next) => {
 
     // Generate tokens
     const accessToken = generateAccessToken({ id: user._id, email: user.email, role: user.role });
-    const refreshToken = generateRefreshToken({ id: user._id });
+    const refreshToken = generateRefreshToken({ id: user._id }, refreshExpiresIn);
 
     // Clean up expired refresh tokens and add new one
     user.refreshTokens = user.refreshTokens.filter((t) => t.expiresAt > new Date());
     user.refreshTokens.push({
       token: refreshToken,
-      expiresAt: getTokenExpiry(process.env.JWT_REFRESH_EXPIRES_IN || '7d'),
+      expiresAt: getTokenExpiry(refreshExpiresIn),
+      rememberMe: shouldRemember,
     });
     user.lastLogin = new Date();
     await user.save();
 
     // Set refresh token cookie
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie('refreshToken', refreshToken, getRefreshCookieOptions(refreshExpiresIn));
 
     logger.info(`User logged in: ${email}`);
 
@@ -139,20 +149,18 @@ const refreshTokenHandler = async (req, res, next) => {
     user.refreshTokens = user.refreshTokens.filter((t) => t.token !== token);
 
     const newAccessToken = generateAccessToken({ id: user._id, email: user.email, role: user.role });
-    const newRefreshToken = generateRefreshToken({ id: user._id });
+    const shouldRemember = Boolean(storedToken.rememberMe);
+    const refreshExpiresIn = getRefreshDuration(shouldRemember);
+    const newRefreshToken = generateRefreshToken({ id: user._id }, refreshExpiresIn);
 
     user.refreshTokens.push({
       token: newRefreshToken,
-      expiresAt: getTokenExpiry(process.env.JWT_REFRESH_EXPIRES_IN || '7d'),
+      expiresAt: getTokenExpiry(refreshExpiresIn),
+      rememberMe: shouldRemember,
     });
     await user.save();
 
-    res.cookie('refreshToken', newRefreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie('refreshToken', newRefreshToken, getRefreshCookieOptions(refreshExpiresIn));
 
     ApiResponse.success(res, { accessToken: newAccessToken }, 'Token refreshed');
   } catch (error) {
@@ -257,6 +265,89 @@ const validateSession = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Forgot password — send reset link
+ * @route   POST /api/v1/auth/forgot-password
+ * @access  Public
+ */
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email });
+
+    // Always respond success to prevent email enumeration
+    if (!user || user.provider !== 'local') {
+      return ApiResponse.success(res, null, 'If an account exists with that email, a reset link has been sent.');
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    // Save hashed token + expiry (1 hour)
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000);
+    await user.save({ validateBeforeSave: false });
+
+    // Send email (logs to console in dev)
+    try {
+      await sendPasswordResetEmail(user, resetToken);
+      logger.info(`Password reset requested for: ${email}`);
+    } catch (emailError) {
+      // Clear token if email fails
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpires = undefined;
+      await user.save({ validateBeforeSave: false });
+      logger.error(`Password reset email failed: ${emailError.message}`);
+      return next(ApiError.internal('Failed to send reset email. Please try again.'));
+    }
+
+    ApiResponse.success(res, null, 'If an account exists with that email, a reset link has been sent.');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Reset password with token
+ * @route   POST /api/v1/auth/reset-password/:token
+ * @access  Public
+ */
+const resetPassword = async (req, res, next) => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    // Hash the incoming token to compare with stored hash
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: new Date() },
+    }).select('+resetPasswordToken +resetPasswordExpires');
+
+    if (!user) {
+      return next(ApiError.badRequest('Invalid or expired reset token. Please request a new reset link.'));
+    }
+
+    // Set new password
+    user.password = password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+
+    // Invalidate all existing refresh tokens (security: force re-login)
+    user.refreshTokens = [];
+    await user.save();
+
+    logger.info(`Password reset completed for: ${user.email}`);
+
+    ApiResponse.success(res, null, 'Password has been reset successfully. Please sign in with your new password.');
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -264,4 +355,6 @@ module.exports = {
   logout,
   getMe,
   validateSession,
+  forgotPassword,
+  resetPassword,
 };

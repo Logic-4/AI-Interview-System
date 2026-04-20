@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
 import authService from "@/services/authService";
@@ -10,8 +10,12 @@ export default function AuthCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const login = useAuthStore((s) => s.login);
+  const handledRef = useRef(false);
 
   useEffect(() => {
+    if (handledRef.current) return;
+    handledRef.current = true;
+
     const handle = async () => {
       const accessToken = searchParams.get("accessToken");
       if (!accessToken) {

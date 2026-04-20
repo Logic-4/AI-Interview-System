@@ -18,8 +18,8 @@ const interviewSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Interview type is required'],
       enum: {
-        values: ['technical', 'behavioral', 'system-design', 'mixed'],
-        message: 'Type must be technical, behavioral, system-design, or mixed',
+        values: ['technical', 'behavioral', 'system-design', 'hr', 'mixed'],
+        message: 'Type must be technical, behavioral, system-design, hr, or mixed',
       },
     },
     difficulty: {
@@ -36,18 +36,31 @@ const interviewSchema = new mongoose.Schema(
       trim: true,
       enum: {
         values: [
-          'frontend',
-          'backend',
-          'fullstack',
-          'devops',
-          'data-science',
-          'mobile',
-          'cloud',
-          'security',
-          'general',
+          'frontend', 'backend', 'fullstack', 'devops',
+          'data-science', 'mobile', 'cloud', 'security', 'qa-testing', 'ai-ml',
+          'healthcare', 'finance', 'marketing', 'sales',
+          'human-resources', 'education', 'legal',
+          'engineering', 'creative', 'operations',
+          'customer-service', 'management', 'general',
         ],
         message: 'Invalid domain',
       },
+    },
+    jobRole: {
+      type: String,
+      trim: true,
+      maxlength: [200, 'Job role cannot exceed 200 characters'],
+      default: '',
+    },
+    focusSkills: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+    jobDescription: {
+      type: String,
+      default: '',
     },
     status: {
       type: String,

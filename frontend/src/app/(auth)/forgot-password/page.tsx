@@ -46,7 +46,7 @@ export default function ForgotPasswordPage() {
           <div className="bg-primary p-2 rounded-xl shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform">
             <Bot className="w-6 h-6 text-white" />
           </div>
-          <span className="text-2xl font-black tracking-tighter uppercase">
+          <span className="text-2xl font-bold tracking-tight uppercase">
             Interview<span className="text-primary">AI</span>
           </span>
         </Link>
@@ -59,11 +59,11 @@ export default function ForgotPasswordPage() {
             <Badge variant="soft" color="primary" className="mb-6 bg-primary/10 text-primary border-primary/20 px-3 py-1 font-bold tracking-widest uppercase text-[10px]">
               Access Restoration
             </Badge>
-            <h2 className="text-6xl font-black tracking-tighter leading-[0.9] uppercase mb-6">
+            <h2 className="text-4xl xl:text-5xl font-bold tracking-tight leading-tight mb-6">
               Reclaim Your <br />
               <span className="text-primary italic">Expert Identity</span>
             </h2>
-            <p className="text-xl text-text-secondary font-medium max-w-sm leading-relaxed">
+            <p className="text-lg text-text-secondary font-medium max-w-sm leading-relaxed">
               Secure access management is fundamental to your professional growth roadmap.
             </p>
           </motion.div>
@@ -81,7 +81,7 @@ export default function ForgotPasswordPage() {
         <nav className="lg:hidden flex items-center justify-between px-6 py-4 border-b border-border/40 bg-surface/60 backdrop-blur-md sticky top-0 z-50">
           <Link href="/" className="flex items-center gap-2">
             <Bot className="w-5 h-5 text-primary" />
-            <span className="text-lg font-black tracking-tighter uppercase">InterviewAI</span>
+            <span className="text-lg font-bold tracking-tight uppercase">InterviewAI</span>
           </Link>
           <ThemeToggle />
         </nav>
@@ -102,7 +102,7 @@ export default function ForgotPasswordPage() {
                    <div className="w-16 h-16 rounded-2xl bg-success/10 flex items-center justify-center border border-success/20 mb-6">
                      <CheckCircle2 className="w-8 h-8 text-success" />
                    </div>
-                   <h1 className="text-4xl font-black tracking-tighter uppercase">Check inbox</h1>
+                   <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Check inbox</h1>
                    <p className="text-text-secondary font-medium text-base leading-relaxed">
                      A recovery link has been dispatched to <span className="text-text-primary font-bold">{email}</span>.
                    </p>
@@ -120,7 +120,7 @@ export default function ForgotPasswordPage() {
                     <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
                     Back to Sign In
                   </Link>
-                  <h1 className="text-4xl font-black tracking-tighter uppercase">Reset Password</h1>
+                  <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Reset Password</h1>
                   <p className="text-text-secondary font-medium text-base">Enter your credentials to receive a recovery link.</p>
                 </div>
 

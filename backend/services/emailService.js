@@ -54,8 +54,27 @@ const sendInterviewCompletionEmail = async (user, interview, score) => {
   });
 };
 
+const sendPasswordResetEmail = async (user, resetToken) => {
+  const resetUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
+
+  return sendEmail({
+    to: user.email,
+    subject: 'InterviewAI — Password Reset Request',
+    html: `
+      <h1>Password Reset</h1>
+      <p>Hi ${user.name},</p>
+      <p>You requested a password reset. Click the link below to set a new password:</p>
+      <a href="${resetUrl}" style="display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:8px;font-weight:bold;">Reset Password</a>
+      <p style="margin-top:16px;color:#666;">This link expires in 1 hour. If you didn't request this, ignore this email.</p>
+      <p style="margin-top:24px;font-size:12px;color:#999;">Reset URL: ${resetUrl}</p>
+    `,
+    text: `Reset your password: ${resetUrl}\nThis link expires in 1 hour.`,
+  });
+};
+
 module.exports = {
   sendEmail,
   sendVerificationEmail,
   sendInterviewCompletionEmail,
+  sendPasswordResetEmail,
 };

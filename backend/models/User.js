@@ -48,6 +48,7 @@ const userSchema = new mongoose.Schema(
       {
         token: { type: String, required: true },
         expiresAt: { type: Date, required: true },
+        rememberMe: { type: Boolean, default: false },
         createdAt: { type: Date, default: Date.now },
       },
     ],
@@ -67,6 +68,14 @@ const userSchema = new mongoose.Schema(
         default: 'active',
       },
       expiresAt: Date,
+    },
+    resetPasswordToken: {
+      type: String,
+      select: false,
+    },
+    resetPasswordExpires: {
+      type: Date,
+      select: false,
     },
     isEmailVerified: {
       type: Boolean,
@@ -129,6 +138,8 @@ userSchema.methods.toSafeObject = function () {
   const obj = this.toObject();
   delete obj.password;
   delete obj.refreshTokens;
+  delete obj.resetPasswordToken;
+  delete obj.resetPasswordExpires;
   delete obj.__v;
   return obj;
 };

@@ -14,7 +14,7 @@ const logger = require('../utils/logger');
  */
 const createInterview = async (req, res, next) => {
   try {
-    const { title, type, difficulty, domain, duration, scheduledAt } = req.body;
+    const { title, type, difficulty, domain, duration, scheduledAt, jobRole, focusSkills, jobDescription } = req.body;
 
     // Create interview
     const interview = await Interview.create({
@@ -25,6 +25,9 @@ const createInterview = async (req, res, next) => {
       domain,
       duration: duration || 30,
       scheduledAt: scheduledAt || new Date(),
+      jobRole: jobRole || '',
+      focusSkills: focusSkills || [],
+      jobDescription: jobDescription || '',
     });
 
     // Generate AI questions
@@ -32,12 +35,17 @@ const createInterview = async (req, res, next) => {
     let aiQuestions = [];
 
     try {
-      aiQuestions = await generateInterviewQuestions(type, domain, difficulty, questionCount);
+      aiQuestions = await generateInterviewQuestions(type, domain, difficulty, questionCount, {
+        jobRole,
+        jobDescription,
+        focusSkills,
+      });
     } catch (aiError) {
       logger.warn(`AI question generation failed, using fallback: ${aiError.message}`);
       // Fallback: create placeholder questions
+      const roleLabel = jobRole || domain;
       aiQuestions = Array.from({ length: questionCount }, (_, i) => ({
-        text: `${type} question ${i + 1} for ${domain} at ${difficulty} level`,
+        text: `${type} question ${i + 1} for ${roleLabel} at ${difficulty} level`,
         category: type,
         difficulty: 'medium',
         expectedAnswer: 'AI-generated answer will be available when OpenAI API is configured.',

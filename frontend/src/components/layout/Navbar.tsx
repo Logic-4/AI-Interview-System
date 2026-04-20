@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Bot, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import ThemeToggle from "@/components/layout/ThemeToggle";
 
 const Navbar = () => {
+  const router = useRouter();
+
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/60 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 lg:px-8">
@@ -34,7 +37,12 @@ const Navbar = () => {
           <Link href="/login" className="hidden sm:block text-sm font-bold text-text-secondary hover:text-text-primary transition-colors">
             Log In
           </Link>
-          <Button variant="primary" size="sm" className="px-5 font-semibold text-xs uppercase tracking-wider">
+          <Button
+            variant="primary"
+            size="sm"
+            className="px-5 font-semibold text-xs uppercase tracking-wider"
+            onClick={() => router.push("/register")}
+          >
             Get Started
           </Button>
         </div>

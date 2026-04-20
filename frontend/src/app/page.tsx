@@ -72,7 +72,7 @@ export default function LandingPage() {
 
       <main>
         {/* --- HERO SECTION --- */}
-        <section className="relative pt-24 pb-32 overflow-hidden px-6 lg:px-8">
+        <section className="relative pt-14 md:pt-18 pb-28 overflow-hidden px-6 lg:px-8">
           {/* Background Glows */}
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1200px] h-96 bg-primary/10 blur-[150px] rounded-full transition-colors duration-1000" />
 
@@ -80,7 +80,7 @@ export default function LandingPage() {
             initial="hidden"
             animate="visible"
             variants={containerVariants}
-            className="mx-auto max-w-7xl text-center space-y-10"
+            className="mx-auto max-w-7xl text-center space-y-8"
           >
             <motion.div variants={itemVariants} className="flex justify-center">
               <Badge variant="soft" color="primary" className="py-2 px-4 rounded-full border border-primary/10 gap-2 font-semibold uppercase text-[10px] tracking-widest bg-primary/5">
@@ -91,7 +91,7 @@ export default function LandingPage() {
 
             <motion.h1
               variants={itemVariants}
-              className="text-6xl md:text-8xl font-black tracking-tighter leading-[0.9] md:leading-[1] text-text-primary uppercase"
+              className="text-6xl md:text-8xl font-bold tracking-tight leading-[1.04] md:leading-[1.02] text-text-primary"
             >
               Master Your Next <br />
               <span className="text-primary">
@@ -101,7 +101,7 @@ export default function LandingPage() {
 
             <motion.p
               variants={itemVariants}
-              className="mx-auto max-w-2xl text-xl text-text-secondary leading-relaxed font-medium"
+              className="mx-auto max-w-3xl text-xl md:text-2xl text-text-secondary leading-relaxed font-medium"
             >
               Practice with an industry-specific AI interviewer and receive instant,
               actionable feedback to land your dream job at top-tier companies.
@@ -234,7 +234,7 @@ export default function LandingPage() {
         <section id="features" className="py-32 px-6 lg:px-8">
           <div className="mx-auto max-w-7xl">
             <div className="text-left mb-20 space-y-4">
-              <h2 className="text-4xl md:text-5xl font-semibold tracking-tighter text-text-primary">
+              <h2 className="text-4xl md:text-5xl font-semibold tracking-tight text-text-primary">
                 Engineered for <span className="text-primary">Career Growth</span>
               </h2>
               <p className="max-w-xl text-lg text-text-muted font-medium leading-relaxed">
@@ -292,15 +292,15 @@ export default function LandingPage() {
 
           <div className="mx-auto max-w-7xl grid grid-cols-1 md:grid-cols-3 gap-16 text-center relative z-10">
             <div className="space-y-2">
-              <h3 className="text-6xl font-semibold tracking-tighter text-primary">100k+</h3>
+              <h3 className="text-5xl md:text-6xl font-semibold tracking-tight text-primary">100k+</h3>
               <p className="text-sm font-bold uppercase tracking-widest text-text-muted">Interviews Conducted</p>
             </div>
             <div className="space-y-2">
-              <h3 className="text-6xl font-semibold tracking-tighter text-primary">92%</h3>
+              <h3 className="text-5xl md:text-6xl font-semibold tracking-tight text-primary">92%</h3>
               <p className="text-sm font-bold uppercase tracking-widest text-text-muted">Success Rate</p>
             </div>
             <div className="space-y-2">
-              <h3 className="text-6xl font-semibold tracking-tighter text-primary">4.9/5</h3>
+              <h3 className="text-5xl md:text-6xl font-semibold tracking-tight text-primary">4.9/5</h3>
               <p className="text-sm font-bold uppercase tracking-widest text-text-muted">User Satisfaction</p>
             </div>
           </div>

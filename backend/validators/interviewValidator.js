@@ -11,8 +11,8 @@ const createInterviewValidator = [
   body('type')
     .notEmpty()
     .withMessage('Interview type is required')
-    .isIn(['technical', 'behavioral', 'system-design', 'mixed'])
-    .withMessage('Type must be technical, behavioral, system-design, or mixed'),
+    .isIn(['technical', 'behavioral', 'system-design', 'hr', 'mixed'])
+    .withMessage('Type must be technical, behavioral, system-design, hr, or mixed'),
 
   body('difficulty')
     .notEmpty()
@@ -23,8 +23,38 @@ const createInterviewValidator = [
   body('domain')
     .notEmpty()
     .withMessage('Domain is required')
-    .isIn(['frontend', 'backend', 'fullstack', 'devops', 'data-science', 'mobile', 'cloud', 'security', 'general'])
+    .isIn([
+      'frontend', 'backend', 'fullstack', 'devops',
+      'data-science', 'mobile', 'cloud', 'security', 'qa-testing', 'ai-ml',
+      'healthcare', 'finance', 'marketing', 'sales',
+      'human-resources', 'education', 'legal',
+      'engineering', 'creative', 'operations',
+      'customer-service', 'management', 'general',
+    ])
     .withMessage('Invalid domain'),
+
+  body('jobRole')
+    .optional()
+    .trim()
+    .isLength({ max: 200 })
+    .withMessage('Job role cannot exceed 200 characters'),
+
+  body('focusSkills')
+    .optional()
+    .isArray({ max: 20 })
+    .withMessage('Focus skills must be an array with max 20 items'),
+
+  body('focusSkills.*')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Each skill cannot exceed 100 characters'),
+
+  body('jobDescription')
+    .optional()
+    .isString()
+    .withMessage('Job description must be a string'),
 
   body('duration')
     .optional()
@@ -75,7 +105,7 @@ const listInterviewsValidator = [
 
   query('type')
     .optional()
-    .isIn(['technical', 'behavioral', 'system-design', 'mixed'])
+    .isIn(['technical', 'behavioral', 'system-design', 'hr', 'mixed'])
     .withMessage('Invalid type filter'),
 ];
 

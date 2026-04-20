@@ -1,8 +1,12 @@
-export type InterviewType = 'technical' | 'behavioral' | 'system-design' | 'mixed';
+export type InterviewType = 'technical' | 'behavioral' | 'system-design' | 'hr' | 'mixed';
 export type InterviewDifficulty = 'junior' | 'mid' | 'senior' | 'lead';
 export type InterviewDomain =
   | 'frontend' | 'backend' | 'fullstack' | 'devops'
-  | 'data-science' | 'mobile' | 'cloud' | 'security' | 'general';
+  | 'data-science' | 'mobile' | 'cloud' | 'security' | 'qa-testing' | 'ai-ml'
+  | 'healthcare' | 'finance' | 'marketing' | 'sales'
+  | 'human-resources' | 'education' | 'legal'
+  | 'engineering' | 'creative' | 'operations'
+  | 'customer-service' | 'management' | 'general';
 export type InterviewStatus = 'scheduled' | 'in-progress' | 'completed' | 'cancelled';
 
 export interface Interview {
@@ -15,6 +19,8 @@ export interface Interview {
   status: InterviewStatus;
   questions: string[];
   duration: number;
+  jobRole?: string;
+  focusSkills?: string[];
   jobDescription?: string;
   scheduledAt?: string;
   startedAt?: string;
@@ -40,6 +46,8 @@ export interface CreateInterviewPayload {
   difficulty: InterviewDifficulty;
   domain: InterviewDomain;
   duration?: number;
+  jobRole?: string;
+  focusSkills?: string[];
   jobDescription?: string;
   scheduledAt?: string;
   questionCount?: number;
@@ -57,6 +65,9 @@ export interface SubmitAnswerResponse {
   evaluation: {
     score: number;
     feedback: string;
+    strengths?: string[];
+    improvements?: string[];
+    suggestedAnswer?: string;
   };
 }
 
