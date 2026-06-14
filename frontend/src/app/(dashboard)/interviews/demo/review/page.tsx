@@ -12,6 +12,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import interviewService from "@/services/interviewService";
@@ -164,8 +165,8 @@ export default function QuestionFeedbackPage() {
 
   if (loadingList) {
     return (
-      <div className="h-64 flex items-center justify-center text-sm font-semibold text-text-muted">
-        Loading interview sessions...
+      <div className="h-64 flex items-center justify-center">
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
@@ -219,8 +220,8 @@ export default function QuestionFeedbackPage() {
       )}
 
       {loading ? (
-        <div className="h-56 flex items-center justify-center text-sm font-semibold text-text-muted">
-          Loading detailed feedback...
+        <div className="h-56 flex items-center justify-center">
+          <LoadingSpinner size="lg" />
         </div>
       ) : (
         <>

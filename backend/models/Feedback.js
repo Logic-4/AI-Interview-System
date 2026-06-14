@@ -6,7 +6,6 @@ const feedbackSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Interview',
       required: [true, 'Interview reference is required'],
-      index: true,
     },
     user: {
       type: mongoose.Schema.Types.ObjectId,
@@ -66,7 +65,7 @@ const feedbackSchema = new mongoose.Schema(
     ],
     aiModel: {
       type: String,
-      default: 'gpt-4',
+      default: 'gemma-3-technical-interviewer',
     },
   },
   {

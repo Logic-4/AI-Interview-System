@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   Search,
   Filter,
-  Loader2,
   BookOpen,
   ChevronLeft,
   ChevronRight,
@@ -17,16 +16,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { cn } from "@/lib/utils";
 import questionService from "@/services/questionService";
 import type { QuestionBankItem, QuestionBankListParams } from "@/types/question";
-
-const DOMAINS = [
-  "frontend", "backend", "fullstack", "devops", "data-science", "mobile", "cloud",
-  "security", "qa-testing", "ai-ml", "healthcare", "finance", "marketing", "sales",
-  "human-resources", "education", "legal", "engineering", "creative", "operations",
-  "customer-service", "management", "general",
-];
+import { DOMAINS } from "@/lib/constants";
 
 const TYPES = ["technical", "behavioral", "system-design", "mixed"];
 const DIFFICULTIES = ["easy", "medium", "hard"];
@@ -151,8 +146,22 @@ export default function QuestionsPage() {
 
       {/* Content */}
       {loading ? (
-        <div className="flex justify-center py-20">
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i} hoverEffect={false} className="p-5 border-border/40 bg-surface/30 space-y-3">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-14 rounded-full" />
+                <Skeleton className="h-4 w-20 rounded-full" />
+              </div>
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+              <div className="flex items-center justify-between pt-2">
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-3 w-12" />
+              </div>
+            </Card>
+          ))}
         </div>
       ) : error ? (
         <Card hoverEffect={false} className="p-8 border-border/40 bg-surface/30 text-center">

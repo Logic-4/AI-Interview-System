@@ -8,12 +8,13 @@ import {
   Medal,
   Star,
   TrendingUp,
-  Loader2,
   Users,
+  User,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/authStore";
 import userService from "@/services/userService";
@@ -28,12 +29,12 @@ export default function LeaderboardPage() {
     userService.getDashboard().then(setStats).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  const fallbackAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.name ?? "user")}`;
+  const avatarSrc = user?.avatar || null;
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
@@ -48,8 +49,12 @@ export default function LeaderboardPage() {
       {/* Your Stats */}
       <Card hoverEffect={false} className="p-6 border-primary/20 bg-primary/5 relative overflow-hidden">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-primary/30 bg-foreground/5">
-            <Image src={user?.avatar || fallbackAvatar} alt={user?.name ?? "You"} width={56} height={56} className="w-full h-full object-cover" />
+          <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-primary/30 bg-foreground/5 flex items-center justify-center">
+            {avatarSrc ? (
+              <Image src={avatarSrc} alt={user?.name ?? "You"} width={56} height={56} className="w-full h-full object-cover" />
+            ) : (
+              <User className="w-5 h-5 text-text-muted" />
+            )}
           </div>
           <div className="flex-1">
             <p className="text-sm font-semibold text-text-primary">{user?.name ?? "You"}</p>

@@ -35,12 +35,17 @@ export interface ConversationEngineConfig {
   userName: string;
   interviewTitle: string;
   interviewType: string;
+  language?: string;
   questions: Question[];
   onSubmitAnswer: (questionId: string, answer: string, timeSpent: number) => Promise<{
     score: number;
     feedback: string;
-    strengths?: string[];
-    improvements?: string[];
+    strengths: string[];
+    improvements: string[];
+    suggestedAnswer: string;
+    isTimeUp?: boolean;
+    isFollowUp?: boolean;
+    followUpText?: string | null;
   }>;
   onComplete: () => Promise<void>;
   onGenerateFeedback: () => Promise<void>;
@@ -48,7 +53,6 @@ export interface ConversationEngineConfig {
 
 export interface ConversationEngineReturn {
   phase: ConversationPhase;
-  messages: ChatMessage[];
   currentQuestionIndex: number;
   totalQuestions: number;
   answeredCount: number;
@@ -56,76 +60,24 @@ export interface ConversationEngineReturn {
   recognition: ReturnType<typeof useSpeechRecognition>;
   analysisStage: AnalysisStage;
   timer: number;
+  isPaused: boolean;
+  activeFollowUpText: string | null;
+  isQuestionTextVisible: boolean;
   start: () => void;
+  pause: () => void;
+  resume: () => void;
   interruptAndContinue: () => void;
 }
 
 /* ─── Helpers ───────────────────────────────────────────── */
-let msgCounter = 0;
-function makeMsg(
-  role: ChatMessage["role"],
-  text: string
-): ChatMessage {
-  return { id: `msg-${++msgCounter}`, role, text, timestamp: Date.now() };
-}
-
 function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
 /* Silence threshold: if user is silent this long after speaking, auto-submit */
 const AUTO_SUBMIT_SILENCE_SEC = 3.5;
-/* If user never speaks for this long, gently prompt */
-const GENTLE_PROMPT_SILENCE_SEC = 8;
 /* Maximum listen time per question */
 const MAX_LISTEN_SEC = 120;
-
-/* ─── Natural reactions to score ────────────────────────── */
-function getScoreReaction(score: number): string {
-  if (score >= 85) {
-    const opts = [
-      "That was a really strong answer.",
-      "Great response, well articulated.",
-      "Impressive, you covered the key points very well.",
-    ];
-    return opts[Math.floor(Math.random() * opts.length)];
-  }
-  if (score >= 65) {
-    const opts = [
-      "Good answer. You touched on the main ideas there.",
-      "Solid response. A couple of areas you could expand on, but overall good.",
-      "That was decent. You showed understanding of the concept.",
-    ];
-    return opts[Math.floor(Math.random() * opts.length)];
-  }
-  if (score >= 40) {
-    const opts = [
-      "Thanks for that. There are some areas where you could go deeper.",
-      "I see where you were going. Let me note that for the feedback.",
-      "Okay, that gives me a sense of your thinking on this.",
-    ];
-    return opts[Math.floor(Math.random() * opts.length)];
-  }
-  const opts = [
-    "Alright, noted. We'll cover that in the feedback.",
-    "Thanks for trying. Let's move on to the next one.",
-    "Okay, no worries. Let's continue.",
-  ];
-  return opts[Math.floor(Math.random() * opts.length)];
-}
-
-function getTransitionPhrase(index: number, total: number): string {
-  if (index === total - 1) return "Alright, this is the last question.";
-  if (index === 0) return "Let's start with the first question.";
-  const opts = [
-    "Let's move on.",
-    "Next question.",
-    "Here's the next one for you.",
-    "Alright, moving forward.",
-    "Okay, next up.",
-  ];
-  return opts[Math.floor(Math.random() * opts.length)];
-}
 
 /* ─── Hook ──────────────────────────────────────────────── */
 export function useConversationEngine(
@@ -134,6 +86,7 @@ export function useConversationEngine(
   const {
     userName,
     interviewType,
+    language = "english",
     questions,
     onSubmitAnswer,
     onComplete,
@@ -141,7 +94,6 @@ export function useConversationEngine(
   } = config;
 
   const [phase, setPhase] = useState<ConversationPhase>("idle");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answeredCount, setAnsweredCount] = useState(0);
   const [timer, setTimer] = useState(0);
@@ -149,45 +101,56 @@ export function useConversationEngine(
     label: "",
     progress: 0,
   });
+  const [activeFollowUpText, setActiveFollowUpText] = useState<string | null>(null);
+  const [isQuestionTextVisible, setIsQuestionTextVisible] = useState(false);
 
-  const tts = useSpeechSynthesis();
-  const recognition = useSpeechRecognition();
+  // Map our language names to Web Speech API locale codes
+  const getLanguageCode = (lang: string) => {
+    switch (lang.toLowerCase()) {
+      case "somali": return "so-SO";
+      default: return "en-US";
+    }
+  };
+
+  const languageCode = getLanguageCode(language);
+  const tts = useSpeechSynthesis(languageCode);
+  const recognition = useSpeechRecognition(languageCode);
 
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
+
+  const [isPaused, setIsPaused] = useState(false);
+  const isPausedRef = useRef(false);
+  isPausedRef.current = isPaused;
 
   const timerRef = useRef<ReturnType<typeof setInterval>>();
   const listenStartRef = useRef(0);
   const questionTimerRef = useRef(0);
   const answeredRef = useRef<Set<string>>(new Set());
   const hasSpokenRef = useRef(false);
-  const promptedRef = useRef(false);
   const abortRef = useRef(false);
 
-  /* ── Push message ──────────────────────────────────────── */
-  const pushMsg = useCallback(
-    (role: ChatMessage["role"], text: string) => {
-      setMessages((prev) => [...prev, makeMsg(role, text)]);
-    },
-    []
-  );
+  /* ── Pause / Resume ────────────────────────────────────── */
+  const pause = useCallback(() => {
+    if (isPausedRef.current) return;
+    setIsPaused(true);
+    tts.pause();
+    try { recognition.stopListening(); } catch {}
+  }, [tts, recognition]);
+
+  const resume = useCallback(() => {
+    if (!isPausedRef.current) return;
+    setIsPaused(false);
+    tts.resume();
+    if (phaseRef.current === "listening") {
+      recognition.startListening();
+    }
+  }, [tts, recognition]);
 
   /* ── Speak and wait until done ─────────────────────────── */
   const speakAndWait = useCallback(
-    async (text: string) => {
-      tts.speak(text);
-      // Wait for speech to finish
-      await new Promise<void>((resolve) => {
-        const check = setInterval(() => {
-          if (!window.speechSynthesis.speaking) {
-            clearInterval(check);
-            resolve();
-          }
-        }, 150);
-        // Safety timeout
-        setTimeout(() => { clearInterval(check); resolve(); }, 30000);
-      });
-      // Small breathing pause
+    async (text: string, onPlay?: () => void) => {
+      await tts.speak(text, onPlay);
       await delay(400);
     },
     [tts]
@@ -195,7 +158,7 @@ export function useConversationEngine(
 
   /* ── Session timer ─────────────────────────────────────── */
   useEffect(() => {
-    if (phase !== "idle" && phase !== "done" && phase !== "analyzing") {
+    if (phase !== "idle" && phase !== "done" && phase !== "analyzing" && !isPaused) {
       timerRef.current = setInterval(() => setTimer((p) => p + 1), 1000);
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -203,11 +166,12 @@ export function useConversationEngine(
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [phase]);
+  }, [phase, isPaused]);
 
   /* ── Auto-submit when user stops speaking ──────────────── */
   useEffect(() => {
     if (phase !== "listening") return;
+    if (isPaused) return;
     if (!recognition.isListening) return;
 
     const fullText = (recognition.finalTranscript + " " + recognition.interimTranscript).trim();
@@ -218,7 +182,6 @@ export function useConversationEngine(
       hasSpokenRef.current &&
       recognition.silenceDuration >= AUTO_SUBMIT_SILENCE_SEC
     ) {
-      // Trigger processing
       handleAutoSubmit(fullText);
       return;
     }
@@ -226,24 +189,6 @@ export function useConversationEngine(
     // Track whether user has started speaking
     if (recognition.isSpeaking && fullText.length > 2) {
       hasSpokenRef.current = true;
-      promptedRef.current = false;
-    }
-
-    // Gentle prompt if user hasn't said anything
-    if (
-      !hasSpokenRef.current &&
-      recognition.silenceDuration >= GENTLE_PROMPT_SILENCE_SEC &&
-      !promptedRef.current
-    ) {
-      promptedRef.current = true;
-      const prompts = [
-        "Take your time. Whenever you're ready.",
-        "No rush, just speak naturally when you're ready.",
-        "I'm listening, go ahead whenever you'd like.",
-      ];
-      const prompt = prompts[Math.floor(Math.random() * prompts.length)];
-      pushMsg("interviewer", prompt);
-      tts.speak(prompt);
     }
 
     // Max time guard
@@ -271,28 +216,49 @@ export function useConversationEngine(
       const question = questions[currentQuestionIndex];
       if (!question) return;
 
-      pushMsg("candidate", transcript);
-
       const timeSpent = Math.round(
         (Date.now() - listenStartRef.current) / 1000
       );
 
       try {
-        const evaluation = await onSubmitAnswer(
+        const result = await onSubmitAnswer(
           question._id,
           transcript,
           timeSpent
         );
+
+        // Time is up — wrap up the interview
+        if (result.isTimeUp) {
+          answeredRef.current.add(question._id);
+          setAnsweredCount(answeredRef.current.size);
+          await speakAndWait("We are out of time. Thank you for completing this interview. We will now prepare your report.");
+          await wrapUp();
+          return;
+        }
+
+        // Follow-up — speak the follow-up and re-listen on the SAME question
+        if (result.isFollowUp && result.followUpText) {
+          setPhase("follow-up");
+          setActiveFollowUpText(result.followUpText);
+          setIsQuestionTextVisible(false);
+          await delay(500);
+          if (abortRef.current) return;
+          await speakAndWait(result.followUpText, () => setIsQuestionTextVisible(true));
+          if (abortRef.current) return;
+
+          // Re-listen for the follow-up answer (same question index)
+          setPhase("listening");
+          hasSpokenRef.current = false;
+          listenStartRef.current = Date.now();
+          recognition.resetTranscript();
+          recognition.startListening();
+          return;
+        }
+
+        // Topic complete — mark answered and advance to the next pre-generated question
         answeredRef.current.add(question._id);
         setAnsweredCount(answeredRef.current.size);
 
-        // React naturally
-        setPhase("reacting");
-        const reaction = getScoreReaction(evaluation.score);
-        pushMsg("interviewer", reaction);
-        await speakAndWait(reaction);
-
-        // Move to next question or wrap up
         const nextIdx = currentQuestionIndex + 1;
         if (nextIdx < questions.length) {
           setPhase("transitioning");
@@ -303,7 +269,9 @@ export function useConversationEngine(
           await wrapUp();
         }
       } catch {
-        pushMsg("system", "There was a technical issue. Let me note your answer and move on.");
+        // Silently move on — answer was already recorded server-side
+        answeredRef.current.add(question._id);
+        setAnsweredCount(answeredRef.current.size);
         const nextIdx = currentQuestionIndex + 1;
         if (nextIdx < questions.length) {
           setCurrentQuestionIndex(nextIdx);
@@ -325,43 +293,34 @@ export function useConversationEngine(
       if (!q) return;
 
       setPhase("asking");
+      setActiveFollowUpText(null);
+      setIsQuestionTextVisible(false);
 
-      // Transition phrase
-      const transition = getTransitionPhrase(idx, questions.length);
-      pushMsg("interviewer", transition);
-      await speakAndWait(transition);
-      if (abortRef.current) return;
-
-      // Small pause to simulate thinking
+      // Ask the actual question directly — no hardcoded transition phrases
       await delay(500);
       if (abortRef.current) return;
 
-      // Ask the actual question
-      pushMsg("interviewer", q.text);
-      await speakAndWait(q.text);
+      await speakAndWait(q.text, () => setIsQuestionTextVisible(true));
       if (abortRef.current) return;
 
       // Start listening automatically
       setPhase("listening");
       hasSpokenRef.current = false;
-      promptedRef.current = false;
       listenStartRef.current = Date.now();
       questionTimerRef.current = 0;
       recognition.resetTranscript();
       recognition.startListening();
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [questions, speakAndWait, pushMsg]
+    [questions, speakAndWait]
   );
 
   /* ── Wrap up ───────────────────────────────────────────── */
   const wrapUp = useCallback(async () => {
     setPhase("wrapping-up");
-    const farewell =
-      `That's all the questions I had for you today. Thank you for your time, ${userName.split(" ")[0]}. ` +
-      "I'll now analyze your responses and prepare a detailed report.";
-    pushMsg("interviewer", farewell);
-    await speakAndWait(farewell);
+
+    // No hardcoded farewell — move directly to analysis
+    await delay(500);
 
     // Analysis phase
     setPhase("analyzing");
@@ -374,11 +333,9 @@ export function useConversationEngine(
     ];
 
     try {
-      // Complete the interview
       setAnalysisStage(stages[0]);
       await onComplete();
 
-      // Generate feedback
       setAnalysisStage(stages[1]);
       await delay(800);
       setAnalysisStage(stages[2]);
@@ -395,36 +352,24 @@ export function useConversationEngine(
     }
 
     setPhase("done");
-  }, [userName, pushMsg, speakAndWait, onComplete, onGenerateFeedback]);
+  }, [onComplete, onGenerateFeedback]);
 
   /* ── Greeting + Start ──────────────────────────────────── */
   const start = useCallback(async () => {
     abortRef.current = false;
-    msgCounter = 0;
-    setMessages([]);
     setCurrentQuestionIndex(0);
     setAnsweredCount(0);
     answeredRef.current.clear();
     setTimer(0);
+    setIsQuestionTextVisible(false);
 
+    // No hardcoded greeting — the AI's intro-category question handles it
     setPhase("greeting");
-
-    const firstName = userName.split(" ")[0] || "there";
-    const greeting =
-      `Hi ${firstName}, welcome! I'll be conducting your ${interviewType.replace("-", " ")} interview today. ` +
-      `We have ${questions.length} questions lined up. ` +
-      "Take your time and answer naturally. Let's get started.";
-
-    pushMsg("interviewer", greeting);
-    await speakAndWait(greeting);
+    await delay(400);
     if (abortRef.current) return;
 
-    await delay(600);
-    if (abortRef.current) return;
-
-    // Ask first question
     await askQuestion(0);
-  }, [userName, interviewType, questions.length, pushMsg, speakAndWait, askQuestion]);
+  }, [askQuestion]);
 
   /* ── Manual interrupt (skip / continue) ────────────────── */
   const interruptAndContinue = useCallback(() => {
@@ -434,18 +379,10 @@ export function useConversationEngine(
     const fullText = (recognition.finalTranscript + " " + recognition.interimTranscript).trim();
 
     if (phase === "listening" && fullText.length > 0) {
-      // Submit whatever we have
       handleAutoSubmit(fullText);
     } else if (phase === "listening") {
-      // Skip question
-      pushMsg("system", "Question skipped.");
-      const nextIdx = currentQuestionIndex + 1;
-      if (nextIdx < questions.length) {
-        setCurrentQuestionIndex(nextIdx);
-        askQuestion(nextIdx);
-      } else {
-        wrapUp();
-      }
+      // User skips without answering, act like they submitted empty text
+      handleAutoSubmit("I don't have an answer for this.");
     }
   }, [
     phase,
@@ -454,7 +391,6 @@ export function useConversationEngine(
     currentQuestionIndex,
     questions.length,
     handleAutoSubmit,
-    pushMsg,
     askQuestion,
     wrapUp,
   ]);
@@ -472,7 +408,6 @@ export function useConversationEngine(
 
   return {
     phase,
-    messages,
     currentQuestionIndex,
     totalQuestions: questions.length,
     answeredCount,
@@ -480,7 +415,12 @@ export function useConversationEngine(
     recognition,
     analysisStage,
     timer,
+    isPaused,
+    activeFollowUpText,
+    isQuestionTextVisible,
     start,
+    pause,
+    resume,
     interruptAndContinue,
   };
 }

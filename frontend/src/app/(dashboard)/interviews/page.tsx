@@ -6,18 +6,22 @@ import {
   Plus,
   Search,
   Filter,
-  Loader2,
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
   Briefcase,
   Clock,
+  Trash2,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { Skeleton } from "@/components/ui/Skeleton";
 import interviewService from "@/services/interviewService";
 import { Interview, InterviewStatus } from "@/types/interview";
 import { cn } from "@/lib/utils";
+
+import { DOMAIN_LABELS } from "@/lib/constants";
 
 const STATUS_OPTIONS: { label: string; value: InterviewStatus | "" }[] = [
   { label: "All", value: "" },
@@ -26,32 +30,6 @@ const STATUS_OPTIONS: { label: string; value: InterviewStatus | "" }[] = [
   { label: "Completed", value: "completed" },
   { label: "Cancelled", value: "cancelled" },
 ];
-
-const DOMAIN_LABELS: Record<string, string> = {
-  frontend: "Frontend",
-  backend: "Backend",
-  fullstack: "Full Stack",
-  devops: "DevOps",
-  "data-science": "Data Science",
-  mobile: "Mobile",
-  cloud: "Cloud",
-  security: "Security",
-  "qa-testing": "QA / Testing",
-  "ai-ml": "AI / ML",
-  healthcare: "Healthcare",
-  finance: "Finance",
-  marketing: "Marketing",
-  sales: "Sales",
-  "human-resources": "Human Resources",
-  education: "Education",
-  legal: "Legal",
-  engineering: "Engineering",
-  creative: "Creative",
-  operations: "Operations",
-  "customer-service": "Customer Service",
-  management: "Management",
-  general: "General",
-};
 
 function StatusBadge({ status, score }: { status: string; score: number | null }) {
   if (status === "completed") {
@@ -80,6 +58,8 @@ export default function InterviewsPage() {
   const [statusFilter, setStatusFilter] = useState<InterviewStatus | "">("");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null);
 
   const fetchInterviews = useCallback(async () => {
     setLoading(true);
@@ -109,6 +89,21 @@ export default function InterviewsPage() {
     e.preventDefault();
     setSearch(searchInput);
     setPage(1);
+  };
+
+  const executeDelete = async () => {
+    if (!confirmDelete) return;
+    const { id } = confirmDelete;
+    setConfirmDelete(null);
+    setDeletingId(id);
+    try {
+      await interviewService.deleteInterview(id);
+      setInterviews((prev) => prev.filter((iv) => iv._id !== id));
+    } catch {
+      setError("Failed to delete interview. Please try again.");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const filteredInterviews = search
@@ -167,8 +162,19 @@ export default function InterviewsPage() {
       {/* Table */}
       <Card className="border-border/40 bg-surface/30 backdrop-blur-xl overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-7 h-7 animate-spin text-primary" />
+          <div className="p-6 space-y-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 p-4">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-5 w-20 rounded-full" />
+                <Skeleton className="h-4 w-12" />
+                <Skeleton className="h-4 w-12" />
+              </div>
+            ))}
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -199,6 +205,7 @@ export default function InterviewsPage() {
                   <th className="px-6 py-4 text-[10px] font-semibold text-text-muted uppercase tracking-[0.2em]">Status</th>
                   <th className="px-6 py-4 text-[10px] font-semibold text-text-muted uppercase tracking-[0.2em]">Score</th>
                   <th className="px-6 py-4 text-[10px] font-semibold text-text-muted uppercase tracking-[0.2em]">Duration</th>
+                  <th className="px-6 py-4 text-[10px] font-semibold text-text-muted uppercase tracking-[0.2em]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
@@ -229,6 +236,20 @@ export default function InterviewsPage() {
                         <Clock className="w-3 h-3" />
                         {iv.duration}m
                       </div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <button
+                        onClick={(e) => { e.preventDefault(); setConfirmDelete({ id: iv._id, title: iv.title }); }}
+                        disabled={deletingId === iv._id}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-text-muted hover:text-danger hover:bg-danger/5 transition-all disabled:opacity-30"
+                        title="Delete interview"
+                      >
+                        {deletingId === iv._id ? (
+                          <LoadingSpinner size="sm" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -276,6 +297,36 @@ export default function InterviewsPage() {
             >
               <ChevronRightIcon className="w-4 h-4" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-danger/10 flex items-center justify-center flex-shrink-0">
+                <Trash2 className="w-5 h-5 text-danger" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-foreground">Delete Interview</h3>
+                <p className="text-sm text-text-muted mt-0.5">
+                  This will permanently remove all questions, answers, and feedback.
+                </p>
+              </div>
+            </div>
+            <p className="text-sm font-medium text-foreground bg-gray-50 rounded-lg px-3 py-2 truncate">
+              &ldquo;{confirmDelete.title}&rdquo;
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <Button variant="outline" size="sm" onClick={() => setConfirmDelete(null)} className="text-text-primary border-border/40">
+                Cancel
+              </Button>
+              <Button size="sm" onClick={executeDelete} className="bg-danger text-white hover:bg-danger/90">
+                Delete
+              </Button>
+            </div>
           </div>
         </div>
       )}

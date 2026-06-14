@@ -6,7 +6,6 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
-  Loader2,
   AlertCircle,
   Trophy,
   BarChart3,
@@ -25,9 +24,11 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Progress } from "@/components/ui/Progress";
 import { cn } from "@/lib/utils";
 import interviewService from "@/services/interviewService";
+import feedbackService from "@/services/feedbackService";
 import type { PopulatedInterview } from "@/types/interview";
 import type { Question } from "@/types/question";
 import type { Feedback, FeedbackCategories } from "@/types/feedback";
@@ -70,6 +71,7 @@ export default function ReportPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -93,8 +95,8 @@ export default function ReportPage() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-sm font-semibold text-text-muted">Loading report...</p>
+          <LoadingSpinner size="lg" />
+          <p className="text-sm font-semibold text-text-muted animate-pulse">Loading report...</p>
         </div>
       </div>
     );
@@ -121,6 +123,25 @@ export default function ReportPage() {
   const overallScore = feedback?.overallScore ?? interview.overallScore ?? 0;
   const scoreColor = getScoreColor(overallScore);
   const totalTimeSpent = questions.reduce((sum, q) => sum + (q.timeSpent || 0), 0);
+
+  // Detect placeholder/missing feedback
+  const hasFeedback = feedback && feedback.detailedFeedback
+    && !feedback.detailedFeedback.includes('unavailable')
+    && !feedback.improvements?.some(s => s.includes('will be available once'));
+
+  const handleRegenerateFeedback = async () => {
+    setRegenerating(true);
+    try {
+      await feedbackService.generateFeedback(interviewId, true);
+      // Reload interview data to get fresh feedback
+      const data = await interviewService.getInterview(interviewId);
+      setInterview(data);
+    } catch {
+      // Silent fail — user can retry
+    } finally {
+      setRegenerating(false);
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto py-6 space-y-6 animate-in fade-in duration-700">
@@ -198,6 +219,29 @@ export default function ReportPage() {
         </div>
         <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
       </Card>
+
+      {/* Regenerate feedback banner — shown when feedback is missing or placeholder */}
+      {!hasFeedback && (
+        <Card hoverEffect={false} className="p-5 border-warning/30 bg-warning/5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-warning flex-shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-text-primary">AI Feedback Missing or Incomplete</p>
+                <p className="text-xs text-text-muted font-medium">Click regenerate to get detailed AI-powered analysis of your interview performance.</p>
+              </div>
+            </div>
+            <Button
+              onClick={handleRegenerateFeedback}
+              disabled={regenerating}
+              className="h-9 px-5 rounded-xl text-xs font-bold flex-shrink-0"
+            >
+              {regenerating ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-3.5 h-3.5 mr-2" />}
+              {regenerating ? 'Generating...' : 'Regenerate'}
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Category Breakdown */}
       {feedback?.categories && (

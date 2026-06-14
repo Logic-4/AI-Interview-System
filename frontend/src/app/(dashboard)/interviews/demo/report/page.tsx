@@ -13,6 +13,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import interviewService from "@/services/interviewService";
 import feedbackService from "@/services/feedbackService";
 import { Interview, PopulatedInterview } from "@/types/interview";
@@ -170,8 +171,8 @@ export default function InterviewResultPage() {
 
   if (loadingList) {
     return (
-      <div className="h-64 flex items-center justify-center text-sm font-semibold text-text-muted">
-        Loading interview sessions...
+      <div className="h-64 flex items-center justify-center">
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
@@ -237,8 +238,8 @@ export default function InterviewResultPage() {
       )}
 
       {loading ? (
-        <div className="h-56 flex items-center justify-center text-sm font-semibold text-text-muted">
-          Loading interview result...
+        <div className="h-56 flex items-center justify-center">
+          <LoadingSpinner size="lg" />
         </div>
       ) : (
         <>

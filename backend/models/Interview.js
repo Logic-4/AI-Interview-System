@@ -35,16 +35,17 @@ const interviewSchema = new mongoose.Schema(
       required: [true, 'Domain is required'],
       trim: true,
       enum: {
-        values: [
-          'frontend', 'backend', 'fullstack', 'devops',
-          'data-science', 'mobile', 'cloud', 'security', 'qa-testing', 'ai-ml',
-          'healthcare', 'finance', 'marketing', 'sales',
-          'human-resources', 'education', 'legal',
-          'engineering', 'creative', 'operations',
-          'customer-service', 'management', 'general',
-        ],
+        values: ['technology', 'healthcare', 'finance', 'engineering', 'education', 'legal'],
         message: 'Invalid domain',
       },
+    },
+    language: {
+      type: String,
+      enum: {
+        values: ['english', 'somali'],
+        message: 'Language must be english or somali',
+      },
+      default: 'english',
     },
     jobRole: {
       type: String,
@@ -61,6 +62,10 @@ const interviewSchema = new mongoose.Schema(
     jobDescription: {
       type: String,
       default: '',
+    },
+    roleProfile: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
     },
     status: {
       type: String,
@@ -104,12 +109,25 @@ const interviewSchema = new mongoose.Schema(
     },
     aiModel: {
       type: String,
-      default: 'gpt-4',
+      default: 'gemma-3-technical-interviewer',
     },
     tags: [
       {
         type: String,
         trim: true,
+      },
+    ],
+    conversationHistory: [
+      {
+        role: {
+          type: String,
+          enum: ['interviewer', 'candidate', 'system'],
+        },
+        content: String,
+        timestamp: {
+          type: Date,
+          default: Date.now,
+        },
       },
     ],
     isDeleted: {

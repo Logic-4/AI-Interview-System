@@ -14,7 +14,7 @@ const createQuestionValidator = [
   body('domain')
     .notEmpty()
     .withMessage('Domain is required')
-    .isIn(['frontend', 'backend', 'fullstack', 'devops', 'data-science', 'mobile', 'cloud', 'security', 'general'])
+    .isIn(['technology', 'healthcare', 'finance', 'engineering', 'education', 'legal'])
     .withMessage('Invalid domain'),
 
   body('difficulty')
@@ -50,7 +50,7 @@ const generateQuestionsValidator = [
   body('domain')
     .notEmpty()
     .withMessage('Domain is required')
-    .isIn(['frontend', 'backend', 'fullstack', 'devops', 'data-science', 'mobile', 'cloud', 'security', 'general'])
+    .isIn(['technology', 'healthcare', 'finance', 'engineering', 'education', 'legal'])
     .withMessage('Invalid domain'),
 
   body('difficulty')
@@ -78,7 +78,7 @@ const listQuestionsValidator = [
 
   query('domain')
     .optional()
-    .isIn(['frontend', 'backend', 'fullstack', 'devops', 'data-science', 'mobile', 'cloud', 'security', 'general'])
+    .isIn(['technology', 'healthcare', 'finance', 'engineering', 'education', 'legal'])
     .withMessage('Invalid domain'),
 
   query('difficulty')

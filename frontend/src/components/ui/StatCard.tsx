@@ -6,6 +6,15 @@ import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { cn } from "@/lib/utils";
 
+const COLOR_MAP: Record<string, string> = {
+  primary: 'hsl(var(--primary))',
+  secondary: 'hsl(var(--secondary))',
+  success: 'hsl(var(--success))',
+  warning: 'hsl(var(--warning))',
+  danger: 'hsl(var(--danger))',
+  info: 'hsl(var(--info))',
+};
+
 interface StatCardProps {
   title: string;
   value: number;
@@ -47,18 +56,25 @@ const StatCard = ({
     }
   }, [value, suffix]);
 
+  const colorHsl = COLOR_MAP[color] || COLOR_MAP.primary;
+
   return (
     <Card className={cn("relative group transition-all duration-500 overflow-hidden border-border/40", className)}>
       {/* Background decoration */}
-      <div className={`absolute -right-6 -bottom-6 w-32 h-32 rounded-full bg-${color}/10 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity`} />
+      <div className="absolute -right-6 -bottom-6 w-32 h-32 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{ backgroundColor: `color-mix(in srgb, ${colorHsl} 10%, transparent)` }}
+      />
       
       <CardContent className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <div className={cn(
-            "p-3 rounded-2xl border border-border/40",
-            `bg-${color}/10 shadow-[0_0_20px_rgba(var(--${color}-rgb),0.15)]`
-          )}>
-            <Icon className={cn("w-6 h-6", `text-${color}`)} />
+          <div
+            className="p-3 rounded-2xl border border-border/40"
+            style={{
+              backgroundColor: `color-mix(in srgb, ${colorHsl} 10%, transparent)`,
+              boxShadow: `0 0 20px color-mix(in srgb, ${colorHsl} 15%, transparent)`,
+            }}
+          >
+            <Icon className="w-6 h-6" style={{ color: colorHsl }} />
           </div>
           
           {trend && (

@@ -8,6 +8,7 @@ const {
   submitAnswer,
   completeInterview,
   deleteInterview,
+  retryEvaluate,
 } = require('../controllers/interviewController');
 const { createInterviewValidator, submitAnswerValidator, listInterviewsValidator } = require('../validators/interviewValidator');
 const validate = require('../middleware/validate');
@@ -28,5 +29,8 @@ router.delete('/:id', deleteInterview);
 router.put('/:id/start', startInterview);
 router.put('/:interviewId/questions/:questionId/answer', upload.single('audio'), submitAnswerValidator, validate, submitAnswer);
 router.put('/:id/complete', completeInterview);
+
+// Practice loop — retry a question after feedback (Step 7)
+router.post('/:interviewId/questions/:questionId/retry', retryEvaluate);
 
 module.exports = router;

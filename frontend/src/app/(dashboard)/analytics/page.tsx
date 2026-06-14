@@ -1,27 +1,17 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Star, CheckCircle2, Loader2 } from "lucide-react";
+import { Star, CheckCircle2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import feedbackService from "@/services/feedbackService";
 import { UserProgress, ProgressPeriod } from "@/types/feedback";
 import { Button } from "@/components/ui/Button";
+import { DOMAIN_LABELS } from "@/lib/constants";
 
 const PERIOD_MAP: Record<string, ProgressPeriod> = { "1W": "7d", "1M": "30d", "1Y": "365d" };
-
-const DOMAIN_LABELS: Record<string, string> = {
-  frontend: "Frontend Engineering",
-  backend: "Backend Systems",
-  fullstack: "Full Stack",
-  devops: "DevOps",
-  "data-science": "Data Science",
-  mobile: "Mobile Development",
-  cloud: "Cloud Architecture",
-  security: "Security",
-  general: "General",
-};
 
 function buildSvgPath(scores: number[]) {
   if (!scores.length) return { linePath: "", fillPath: "", points: [] as { x: number; y: number }[] };
@@ -185,7 +175,7 @@ export default function AnalyticsPage() {
         <div className="w-full h-[250px] relative">
           {loading ? (
             <div className="flex items-center justify-center h-full">
-              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              <LoadingSpinner size="md" />
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center h-full gap-2">
@@ -242,7 +232,7 @@ export default function AnalyticsPage() {
 
           {loading ? (
             <div className="flex items-center justify-center h-48">
-              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              <LoadingSpinner size="md" />
             </div>
           ) : !progress ? (
             <div className="flex items-center justify-center h-48 text-sm text-text-muted">No data available</div>
@@ -302,7 +292,7 @@ export default function AnalyticsPage() {
 
           {loading ? (
             <div className="flex items-center justify-center h-32">
-              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              <LoadingSpinner size="md" />
             </div>
           ) : !domainBars.length ? (
             <div className="flex items-center justify-center h-32 text-sm text-text-muted">
@@ -339,7 +329,7 @@ export default function AnalyticsPage() {
         <div className="overflow-x-auto custom-scrollbar">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              <LoadingSpinner size="md" />
             </div>
           ) : !progress?.recentInsights?.length ? (
             <div className="py-12 text-center text-sm font-medium text-text-muted">

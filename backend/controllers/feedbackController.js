@@ -2,7 +2,7 @@ const Feedback = require('../models/Feedback');
 const Interview = require('../models/Interview');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
-const { generateComprehensiveFeedback } = require('../services/openaiService');
+const { generateComprehensiveFeedback } = require('../services/kaggleService');
 const logger = require('../utils/logger');
 
 /**
@@ -28,9 +28,34 @@ const getFeedback = async (req, res, next) => {
 };
 
 /**
+ * Normalize raw AI feedback to match the exact Feedback model schema.
+ * Handles variations in key names (summary→detailedFeedback, skillBreakdown→categories).
+ */
+function normalizeFeedback(raw, interview) {
+  const cats = raw.categories || raw.skillBreakdown || {};
+  const defaultCat = { score: 0, feedback: '' };
+
+  return {
+    overallScore: typeof raw.overallScore === 'number' ? raw.overallScore : (interview.overallScore || 0),
+    categories: {
+      communication: cats.communication || defaultCat,
+      technicalAccuracy: cats.technicalAccuracy || cats.technical_accuracy || cats.technical || defaultCat,
+      problemSolving: cats.problemSolving || cats.problem_solving || defaultCat,
+      codeQuality: cats.codeQuality || cats.code_quality || defaultCat,
+      confidence: cats.confidence || defaultCat,
+    },
+    strengths: Array.isArray(raw.strengths) ? raw.strengths : [],
+    improvements: Array.isArray(raw.improvements) ? raw.improvements : [],
+    detailedFeedback: raw.detailedFeedback || raw.summary || '',
+    recommendations: Array.isArray(raw.recommendations) ? raw.recommendations : [],
+  };
+}
+
+/**
  * @desc    Generate AI feedback for a completed interview
  * @route   POST /api/v1/feedback/:interviewId/generate
  * @access  Private
+ * @query   force=true — delete existing feedback and regenerate
  */
 const generateFeedback = async (req, res, next) => {
   try {
@@ -46,31 +71,28 @@ const generateFeedback = async (req, res, next) => {
 
     // Check if feedback already exists
     const existingFeedback = await Feedback.findOne({ interview: interview._id });
-    if (existingFeedback) {
+
+    if (existingFeedback && req.query.force !== 'true') {
       return ApiResponse.success(res, { feedback: existingFeedback }, 'Feedback already exists');
+    }
+
+    // If force=true, delete stale feedback so we can regenerate
+    if (existingFeedback) {
+      await Feedback.deleteOne({ _id: existingFeedback._id });
+      logger.info(`Deleted stale feedback for interview ${interview._id} (force regenerate)`);
     }
 
     // Generate comprehensive AI feedback
     let aiFeedback;
     try {
-      aiFeedback = await generateComprehensiveFeedback(interview);
+      const rawFeedback = await generateComprehensiveFeedback(interview);
+      aiFeedback = normalizeFeedback(rawFeedback, interview);
     } catch (aiError) {
       logger.warn(`AI feedback generation failed: ${aiError.message}`);
-      // Fallback feedback
-      aiFeedback = {
-        overallScore: interview.overallScore || 0,
-        categories: {
-          communication: { score: 0, feedback: 'AI feedback unavailable' },
-          technicalAccuracy: { score: 0, feedback: 'AI feedback unavailable' },
-          problemSolving: { score: 0, feedback: 'AI feedback unavailable' },
-          codeQuality: { score: 0, feedback: 'AI feedback unavailable' },
-          confidence: { score: 0, feedback: 'AI feedback unavailable' },
-        },
-        strengths: ['Completed the interview'],
-        improvements: ['AI feedback will be available when OpenAI API is configured'],
-        detailedFeedback: 'Comprehensive AI feedback is unavailable at this time.',
-        recommendations: ['Retry feedback generation once API is configured'],
-      };
+      // DO NOT save placeholder feedback — return error so user can retry
+      return next(ApiError.badRequest(
+        'AI feedback generation failed. Please try again. Error: ' + aiError.message
+      ));
     }
 
     // Create feedback document
@@ -83,9 +105,10 @@ const generateFeedback = async (req, res, next) => {
       improvements: aiFeedback.improvements,
       detailedFeedback: aiFeedback.detailedFeedback,
       recommendations: aiFeedback.recommendations,
+      aiModel: 'gemma-3-technical-interviewer',
     });
 
-    // Update interview with overall score
+    // Update interview with overall score from comprehensive feedback
     interview.overallScore = aiFeedback.overallScore;
     await interview.save();
 

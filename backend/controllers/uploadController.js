@@ -1,6 +1,6 @@
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
-const { uploadRecording, uploadAudio, uploadAvatar } = require('../services/cloudinaryService');
+const { uploadRecording, uploadAudio, uploadAvatar } = require('../services/blobService');
 
 /**
  * @desc    Upload an interview recording

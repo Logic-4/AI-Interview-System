@@ -7,17 +7,21 @@ import { motion } from "framer-motion";
 import {
   ArrowLeft,
   ArrowRight,
-  Loader2,
   AlertCircle,
   CheckCircle2,
   XCircle,
   Clock,
   BarChart3,
   Volume2,
+  RefreshCw,
+  Send,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { cn } from "@/lib/utils";
 import interviewService from "@/services/interviewService";
 import type { PopulatedInterview } from "@/types/interview";
@@ -43,6 +47,11 @@ export default function ReviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentIdx, setCurrentIdx] = useState(0);
+  const [retryMode, setRetryMode] = useState<string | null>(null);
+  const [retryAnswer, setRetryAnswer] = useState('');
+  const [retryLoading, setRetryLoading] = useState(false);
+  const [retryResult, setRetryResult] = useState<{ score: number; feedback: string; strengths: string[]; improvements: string[] } | null>(null);
+  const [expandedRetry, setExpandedRetry] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -66,12 +75,38 @@ export default function ReviewPage() {
     window.speechSynthesis.speak(u);
   };
 
+  const handleRetry = async () => {
+    if (!q || !retryAnswer.trim()) return;
+    setRetryLoading(true);
+    setRetryResult(null);
+    try {
+      const result = await interviewService.retryEvaluate(interviewId, q._id, retryAnswer);
+      setRetryResult(result.evaluation);
+    } catch {
+      setRetryResult({ score: 0, feedback: 'Evaluation failed. Please try again.', strengths: [], improvements: [] });
+    } finally {
+      setRetryLoading(false);
+    }
+  };
+
+  const startRetry = (questionId: string) => {
+    setRetryMode(questionId);
+    setRetryAnswer('');
+    setRetryResult(null);
+  };
+
+  const cancelRetry = () => {
+    setRetryMode(null);
+    setRetryAnswer('');
+    setRetryResult(null);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-sm font-semibold text-text-muted">Loading review...</p>
+          <LoadingSpinner size="lg" />
+          <p className="text-sm font-semibold text-text-muted animate-pulse">Loading review...</p>
         </div>
       </div>
     );
@@ -220,6 +255,142 @@ export default function ReviewPage() {
               <div className="bg-foreground/[0.03] rounded-xl p-4 border border-border/40">
                 <p className="text-xs text-text-muted font-medium leading-relaxed">{q.aiFeedback}</p>
               </div>
+            </div>
+          )}
+
+          {/* Practice Loop — Retry (Step 7) */}
+          {q.isAnswered && q.score !== null && q.score < 70 && retryMode !== q._id && (
+            <button
+              onClick={() => startRetry(q._id)}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary text-xs font-bold transition-all"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Practice This Question
+            </button>
+          )}
+
+          {retryMode === q._id && (
+            <div className="space-y-3 p-4 rounded-xl border border-primary/20 bg-primary/5">
+              <p className="text-[10px] font-bold text-primary uppercase tracking-widest flex items-center gap-1.5">
+                <RefreshCw className="w-3 h-3" /> Retry Answer
+              </p>
+              <textarea
+                value={retryAnswer}
+                onChange={(e) => setRetryAnswer(e.target.value)}
+                placeholder="Type your improved answer here..."
+                rows={4}
+                className="w-full bg-foreground/5 border border-border/40 rounded-xl p-4 text-xs font-medium focus:outline-none focus:border-primary/50 transition-all resize-none text-text-primary placeholder:text-text-muted"
+              />
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleRetry}
+                  disabled={retryLoading || !retryAnswer.trim()}
+                  className="h-8 px-4 rounded-lg text-[10px] font-bold"
+                >
+                  {retryLoading ? (
+                    <LoadingSpinner size="sm" className="text-white" />
+                  ) : (
+                    <Send className="w-3 h-3 mr-1.5" />
+                  )}
+                  Submit Retry
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={cancelRetry}
+                  className="h-8 px-4 rounded-lg text-[10px] font-bold text-text-muted border-border/40"
+                >
+                  Cancel
+                </Button>
+              </div>
+
+              {/* Retry Result */}
+              {retryResult && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-2 p-3 rounded-lg border border-success/20 bg-success/5"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-success uppercase tracking-widest">Retry Score</span>
+                    <span className={cn(
+                      "text-sm font-bold",
+                      (retryResult.score ?? 0) >= 70 ? "text-success" : "text-warning"
+                    )}>
+                      {retryResult.score}/100
+                    </span>
+                  </div>
+                  {retryResult.feedback && (
+                    <p className="text-xs text-text-muted font-medium leading-relaxed">{retryResult.feedback}</p>
+                  )}
+                  {retryResult.strengths?.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold text-success uppercase tracking-widest">Strengths</p>
+                      <ul className="space-y-0.5">
+                        {retryResult.strengths.map((s: string, i: number) => (
+                          <li key={i} className="flex items-start gap-1.5 text-xs text-text-muted font-medium">
+                            <CheckCircle2 className="w-3 h-3 text-success flex-shrink-0 mt-0.5" />
+                            {s}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {retryResult.improvements?.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold text-warning uppercase tracking-widest">Still Needs Work</p>
+                      <ul className="space-y-0.5">
+                        {retryResult.improvements.map((s: string, i: number) => (
+                          <li key={i} className="flex items-start gap-1.5 text-xs text-text-muted font-medium">
+                            <XCircle className="w-3 h-3 text-warning flex-shrink-0 mt-0.5" />
+                            {s}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <button
+                    onClick={cancelRetry}
+                    className="text-[10px] font-bold text-primary hover:underline mt-1"
+                  >
+                    Close &amp; try again
+                  </button>
+                </motion.div>
+              )}
+            </div>
+          )}
+
+          {/* Retry History */}
+          {q.retryAnswers && q.retryAnswers.length > 0 && (
+            <div className="space-y-1.5">
+              <button
+                onClick={() => setExpandedRetry(expandedRetry === q._id ? null : q._id)}
+                className="flex items-center gap-1.5 text-[10px] font-bold text-text-muted uppercase tracking-widest hover:text-primary transition-colors"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Retry History ({q.retryAnswers.length})
+                {expandedRetry === q._id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </button>
+              {expandedRetry === q._id && (
+                <div className="space-y-2">
+                  {q.retryAnswers.map((ra, i) => (
+                    <div key={i} className="p-3 rounded-xl border border-border/40 bg-foreground/[0.02] space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-bold text-text-muted uppercase tracking-widest">Attempt {i + 1}</span>
+                        <span className={cn(
+                          "text-xs font-bold",
+                          (ra.score ?? 0) >= 70 ? "text-success" : "text-warning"
+                        )}>
+                          {ra.score}/100
+                        </span>
+                      </div>
+                      <p className="text-xs text-text-muted font-medium">{ra.answer}</p>
+                      {ra.feedback && <p className="text-[11px] text-text-muted font-medium">{ra.feedback}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

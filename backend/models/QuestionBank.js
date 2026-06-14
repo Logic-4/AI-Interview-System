@@ -15,17 +15,7 @@ const questionBankSchema = new mongoose.Schema(
     domain: {
       type: String,
       required: [true, 'Domain is required'],
-      enum: [
-        'frontend',
-        'backend',
-        'fullstack',
-        'devops',
-        'data-science',
-        'mobile',
-        'cloud',
-        'security',
-        'general',
-      ],
+      enum: ['technology', 'healthcare', 'finance', 'engineering', 'education', 'legal'],
     },
     difficulty: {
       type: String,

@@ -2,7 +2,7 @@ const multer = require('multer');
 const path = require('path');
 const ApiError = require('../utils/ApiError');
 
-// Use memory storage — files go directly to Cloudinary, not disk
+// Use memory storage — files go directly to Vercel Blob, not disk
 const storage = multer.memoryStorage();
 
 /**

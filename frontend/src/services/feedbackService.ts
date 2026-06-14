@@ -8,8 +8,11 @@ const feedbackService = {
     return res.data.data.feedback;
   },
 
-  async generateFeedback(interviewId: string): Promise<Feedback> {
-    const res = await api.post<ApiResponse<{ feedback: Feedback }>>(`/feedback/${interviewId}/generate`);
+  async generateFeedback(interviewId: string, force = false): Promise<Feedback> {
+    const url = force
+      ? `/feedback/${interviewId}/generate?force=true`
+      : `/feedback/${interviewId}/generate`;
+    const res = await api.post<ApiResponse<{ feedback: Feedback }>>(url);
     return res.data.data.feedback;
   },
 

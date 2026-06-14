@@ -6,7 +6,6 @@ const questionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Interview',
       required: [true, 'Interview reference is required'],
-      index: true,
     },
     text: {
       type: String,
@@ -58,6 +57,17 @@ const questionSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    retryAnswers: [
+      {
+        answer: { type: String, required: true },
+        score: { type: Number, min: 0, max: 100, default: null },
+        feedback: { type: String, default: '' },
+        strengths: [String],
+        improvements: [String],
+        suggestedAnswer: { type: String, default: '' },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   {
     timestamps: true,

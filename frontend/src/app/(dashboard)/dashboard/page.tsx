@@ -11,9 +11,10 @@ import {
   ChevronRight,
   Lightbulb,
   CheckCircle2,
-  Loader2,
+  Bot,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -108,7 +109,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <LoadingSpinner size="lg" />
       </div>
     );
   }

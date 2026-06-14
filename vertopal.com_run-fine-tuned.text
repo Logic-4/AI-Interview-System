@@ -1,0 +1,346 @@
+﻿!pip install fastapi uvicorn nest-asyncio
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
+import nest_asyncio
+import uvicorn
+import threading
+import traceback
+import json
+import re
+
+# Allow nested event loops (required for Kaggle/Jupyter notebooks)
+nest_asyncio.apply()
+
+app = FastAPI()
+
+# ---------------------------------------------------------
+# CORS MIDDLEWARE
+# ---------------------------------------------------------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ---------------------------------------------------------
+# LOAD MODEL
+# ---------------------------------------------------------
+model_id = "Mohamud24/gemma-3-technical-interviewer-merged"
+print("Loading the massive AI model into the GPU...")
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+model = AutoModelForCausalLM.from_pretrained(
+    model_id,
+    torch_dtype=torch.bfloat16,
+    device_map="auto"
+)
+print("Model loaded and dual-API is ready!")
+
+# ---------------------------------------------------------
+# HELPER: PARSE JSON FROM MODEL OUTPUT
+# ---------------------------------------------------------
+def try_parse_json(text: str):
+    try:
+        # Strip markdown code fences if present
+        text = re.sub(r"```json|```", "", text).strip()
+        return json.loads(text)
+    except Exception:
+        return None
+
+# ---------------------------------------------------------
+# ENDPOINT 1: EVALUATOR (Strict & Factual)
+# ---------------------------------------------------------
+@app.post("/evaluate")
+async def evaluate(request: Request):
+    try:
+        data = await request.json()
+        question         = data.get("question", "")
+        candidate_answer = data.get("candidate_answer", "")
+        expected_answer  = data.get("expected_answer", "")
+        domain           = data.get("domain", "general")
+        role             = data.get("role", "candidate")
+        language         = data.get("language", "english")
+        instruction      = data.get("instruction", "")
+
+        lang_hint = (
+            "Respond in English. CRITICAL RULE: Speak exactly like a real human hiring manager. "
+            "Be direct, conversational, and professional. NEVER use robotic AI buzzwords "
+            "(e.g., 'delve', 'furthermore', 'crucial'). Keep your feedback concise and punchy."
+            if language.lower() == "english"
+            else
+            "Respond in Somali. CRITICAL RULE: U turjum qoraalkan si hufan, si qayaxan, si sax ah "
+            "oo qumman, adigoo si dabiici ah ugu dabbaqaya asalka, jiraalka, laxanka, dhaqanka iyo "
+            "macnaha luqadda afsoomaaliga. U turjum hab uu qof kasta oo Soomaali ahi ugu moodi karo "
+            "mid aan lagu samayn kombuyuutar, adiga oo adeegsanaya, jumlado iyo naxwe si dhab ah ugu "
+            "milan dhaqanka. VERY IMPORTANT: Do NOT translate technical jargon (e.g., 'React', 'API', "
+            "'Server', 'Frontend'). Keep all technical terms in English, seamlessly woven into the "
+            "Somali grammar."
+        )
+
+        system_prompt = (
+            f"You are an expert {domain} interviewer hiring for a {role} position. "
+            f"{lang_hint} Evaluate the candidate's answer based on the expected answer. "
+            f"Be strict and factual."
+        )
+        user_prompt = (
+            f"Question: {question}\n"
+            f"Expected Answer: {expected_answer}\n"
+            f"Candidate's Answer: {candidate_answer}\n\n"
+            f"{instruction}"
+        )
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": user_prompt}
+        ]
+
+        prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
+
+        with torch.no_grad():
+            outputs = model.generate(**inputs, max_new_tokens=512, temperature=0.3)
+
+        response = tokenizer.decode(
+            outputs[0][inputs["input_ids"].shape[-1]:],
+            skip_special_tokens=True
+        )
+
+        parsed = try_parse_json(response)
+        if parsed and "score" in parsed:
+            return parsed
+
+        return {
+            "score": 50,
+            "feedback": response.strip(),
+            "strengths": [],
+            "improvements": [],
+            "suggestedAnswer": expected_answer
+        }
+
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+# ---------------------------------------------------------
+# ENDPOINT 2: QUESTION GENERATOR (Creative & Adaptive)
+# ---------------------------------------------------------
+@app.post("/generate-question")
+async def generate_question(request: Request):
+    try:
+        data = await request.json()
+        language = data.get("language", "english")
+        domain   = data.get("domain", "general")
+        role     = data.get("role", "candidate")
+        category = data.get("category", "conceptual")
+
+        category_prompts = {
+            "intro":        "an easy ice-breaker opening question to make the candidate comfortable",
+            "conceptual":   "a conceptual technical question testing fundamental knowledge",
+            "situational":  "a situational scenario-based question testing problem-solving",
+            "behavioral":   "a behavioral question testing past experience and soft skills",
+            "outro":        "a closing question about career goals or interest in the role"
+        }
+        category_desc = category_prompts.get(category, "a technical interview question")
+
+        lang_hint = (
+            "Generate the question in English. CRITICAL RULE: Speak exactly like a real human hiring "
+            "manager. Ask the question directly and naturally. NEVER use robotic AI buzzwords. Keep it concise."
+            if language.lower() == "english"
+            else
+            "Generate the question in Somali. CRITICAL RULE: U turjum qoraalkan si hufan, si qayaxan, "
+            "si sax ah oo qumman, adigoo si dabiici ah ugu dabbaqaya asalka, jiraalka, laxanka, dhaqanka "
+            "iyo macnaha luqadda afsoomaaliga. U turjum hab uu qof kasta oo Soomaali ahi ugu moodi karo "
+            "mid aan lagu samayn kombuyuutar, adiga oo adeegsanaya, jumlado iyo naxwe si dhab ah ugu milan "
+            "dhaqanka. VERY IMPORTANT: Do NOT translate technical jargon like 'Database', 'Framework', or "
+            "'Architecture'. Keep tech words in English but wrap them in proper Somali grammar."
+        )
+
+        answer_hint = (
+            "Provide the expected answer in English."
+            if language.lower() == "english"
+            else "Provide the expected answer in Somali."
+        )
+
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    f"You are an expert {domain} interviewer hiring for a {role} position. "
+                    f"{lang_hint} {answer_hint} "
+                    f"Return ONLY valid JSON with keys: question (string), expectedAnswer (string)."
+                )
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Generate {category_desc} for a {role} role in {domain}. "
+                    "Respond with raw JSON only, no markdown."
+                )
+            }
+        ]
+
+        prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
+
+        with torch.no_grad():
+            outputs = model.generate(**inputs, max_new_tokens=256, temperature=0.7)
+
+        response = tokenizer.decode(
+            outputs[0][inputs["input_ids"].shape[-1]:],
+            skip_special_tokens=True
+        )
+
+        parsed = try_parse_json(response)
+        if parsed and ("question" in parsed or "text" in parsed):
+            return {
+                "question":       parsed.get("question") or parsed.get("text", ""),
+                "expectedAnswer": parsed.get("expectedAnswer") or parsed.get("expected_answer") or parsed.get("answer", "")
+            }
+
+        return {"question": response.strip(), "expectedAnswer": ""}
+
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+# ---------------------------------------------------------
+# ENDPOINT 3: PARSE JOB DESCRIPTION
+# ---------------------------------------------------------
+@app.post("/parse")
+async def parse_job_description(request: Request):
+    try:
+        data            = await request.json()
+        job_description = data.get("job_description", "")
+        role            = data.get("role", "")
+
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are an expert job description parser. "
+                    "Extract key skills, experience requirements, and responsibilities. "
+                    "Return ONLY raw JSON with keys: "
+                    "keySkills (array of strings), experience (string), responsibilities (array of strings)."
+                )
+            },
+            {
+                "role": "user",
+                "content": f"Parse this job description for a {role} role:\n\n{job_description}"
+            }
+        ]
+
+        prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
+
+        with torch.no_grad():
+            outputs = model.generate(**inputs, max_new_tokens=256, temperature=0.3)
+
+        response = tokenizer.decode(
+            outputs[0][inputs["input_ids"].shape[-1]:],
+            skip_special_tokens=True
+        )
+
+        parsed = try_parse_json(response)
+        if parsed:
+            return {"data": parsed}
+
+        return {"data": {"keySkills": [], "experience": "", "responsibilities": []}}
+
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+# ---------------------------------------------------------
+# ENDPOINT 4: COMPREHENSIVE FEEDBACK
+# ---------------------------------------------------------
+@app.post("/feedback")
+async def generate_feedback(request: Request):
+    try:
+        data           = await request.json()
+        interview_data = data.get("interview_data", {})
+
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are an expert interview feedback generator. "
+                    "Analyze the entire interview and provide comprehensive feedback. "
+                    "Return ONLY raw JSON with keys: "
+                    "overallScore (0-100), summary (string), "
+                    "strengths (array of strings), improvements (array of strings), "
+                    "skillBreakdown (object)."
+                )
+            },
+            {
+                "role": "user",
+                "content": f"Generate comprehensive feedback for this interview:\n\n{json.dumps(interview_data, indent=2)}"
+            }
+        ]
+
+        prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
+
+        with torch.no_grad():
+            outputs = model.generate(**inputs, max_new_tokens=512, temperature=0.3)
+
+        response = tokenizer.decode(
+            outputs[0][inputs["input_ids"].shape[-1]:],
+            skip_special_tokens=True
+        )
+
+        parsed = try_parse_json(response)
+        if parsed:
+            return {"feedback": parsed}
+
+        return {
+            "feedback": {
+                "overallScore":  0,
+                "summary":       response.strip(),
+                "strengths":     [],
+                "improvements":  [],
+                "skillBreakdown": {}
+            }
+        }
+
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+# ---------------------------------------------------------
+# SERVER STARTUP (Kaggle / Jupyter notebook compatible)
+# ---------------------------------------------------------
+def start_server():
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+server_thread = threading.Thread(target=start_server, daemon=True)
+server_thread.start()
+print("Server running on http://0.0.0.0:8000")
+Loading the massive AI model into the GPU...
+{"model_id":"2b51a0c1830d4bbcaf6d5b70e135647f","version_major":2,"version_minor":0}
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+{"model_id":"ff1b8c8e9f39474498453ea31242322a","version_major":2,"version_minor":0}
+{"model_id":"e2e790277e324ce08b6c3ef99fc050f9","version_major":2,"version_minor":0}
+{"model_id":"6ab8c9fc0cdf4d9c82dd053ae3f8f490","version_major":2,"version_minor":0}
+`torch_dtype` is deprecated! Use `dtype` instead!
+{"model_id":"8debdfebeadb45b68c758e61595da120","version_major":2,"version_minor":0}
+{"model_id":"75451f4fdbc0412ab90fd726e8a60e46","version_major":2,"version_minor":0}
+{"model_id":"aa60bc6323f74afb9035b22ec63fee76","version_major":2,"version_minor":0}
+Model loaded and dual-API is ready!
+Server running on http://0.0.0.0:8000
+INFO:     Started server process [104]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+# This gets the password you need to unlock the tunnel
+!curl ipv4.icanhazip.com 
+# This opens the tunnel (the -y forces it to skip the 'yes/no' prompt)
+!npx -y localtunnel --port 8000
+34.145.20.52

@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   ArrowLeft,
-  Loader2,
   Clock,
   CheckCircle2,
   AlertCircle,
@@ -17,10 +17,14 @@ import {
   MicOff,
   Volume2,
   SkipForward,
+  Pause,
+  Play,
+  StopCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { cn } from "@/lib/utils";
 import interviewService from "@/services/interviewService";
 import feedbackService from "@/services/feedbackService";
@@ -28,7 +32,6 @@ import { useInterviewStore } from "@/stores/interviewStore";
 import { useAuthStore } from "@/stores/authStore";
 import {
   useConversationEngine,
-  type ChatMessage,
 } from "@/hooks/useConversationEngine";
 import type { Question } from "@/types/question";
 import type { PopulatedInterview } from "@/types/interview";
@@ -59,8 +62,8 @@ export default function InterviewSessionPage() {
   const [pagePhase, setPagePhase] = useState<PagePhase>("loading");
   const [error, setError] = useState<string | null>(null);
   const [interview, setInterview] = useState<PopulatedInterview | null>(null);
-
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const [isMicMuted, setIsMicMuted] = useState(false);
+  const [isEnding, setIsEnding] = useState(false);
 
   /* ── Fetch interview data ─────────────────────────────────── */
   useEffect(() => {
@@ -84,7 +87,7 @@ export default function InterviewSessionPage() {
     fetchInterview();
 
     return () => {
-      if (typeof window !== "undefined") window.speechSynthesis?.cancel();
+      // Cloud TTS cleanup is handled by useSpeechSynthesis hook unmount
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interviewId]);
@@ -97,7 +100,13 @@ export default function InterviewSessionPage() {
         timeSpent,
       });
       recordAnswer(questionId, result.question);
-      return result.evaluation;
+
+      return {
+        ...result.evaluation,
+        isTimeUp: result.isTimeUp,
+        isFollowUp: result.isFollowUp,
+        followUpText: result.followUpText,
+      };
     },
     [interviewId, recordAnswer]
   );
@@ -120,16 +129,12 @@ export default function InterviewSessionPage() {
     userName: user?.name ?? "there",
     interviewTitle: interview?.title ?? "",
     interviewType: interview?.type ?? "mixed",
+    language: interview?.language ?? "english",
     questions,
     onSubmitAnswer,
     onComplete,
     onGenerateFeedback,
   });
-
-  /* ── Auto-scroll chat ─────────────────────────────────────── */
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [engine.messages.length, engine.recognition.interimTranscript]);
 
   /* ── Start interview (API + engine) ───────────────────────── */
   const handleStart = async () => {
@@ -159,13 +164,37 @@ export default function InterviewSessionPage() {
     }
   }, [engine.phase, interviewId, router]);
 
+  /* ── Toggle mic ──────────────────────────────────────────── */
+  const toggleMic = useCallback(() => {
+    setIsMicMuted((prev) => {
+      if (prev) {
+        engine.recognition.startListening();
+      } else {
+        engine.recognition.stopListening();
+      }
+      return !prev;
+    });
+  }, [engine.recognition]);
+
+  /* ── End interview ───────────────────────────────────────── */
+  const handleEndInterview = async () => {
+    if (isEnding) return;
+    setIsEnding(true);
+    engine.tts.cancel();
+    engine.recognition.stopListening();
+    try {
+      await interviewService.completeInterview(interviewId);
+    } catch {}
+    router.push(`/interviews/${interviewId}/report`);
+  };
+
   /* ─── Loading State ───────────────────────────────────────── */
   if (pagePhase === "loading") {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-sm font-semibold text-text-muted">Loading interview...</p>
+          <LoadingSpinner size="lg" />
+          <p className="text-sm font-semibold text-text-muted animate-pulse">Loading interview...</p>
         </div>
       </div>
     );
@@ -268,134 +297,221 @@ export default function InterviewSessionPage() {
 
   const isAnalyzing = engine.phase === "analyzing" || engine.phase === "done";
 
-  /* ── Analysis overlay ──────────────────────────────────────── */
-  if (isAnalyzing) {
-    return (
-      <div className="flex items-center justify-center min-h-[70vh] animate-in fade-in duration-700">
-        <Card hoverEffect={false} className="p-10 border-border/40 bg-surface/30 max-w-md w-full text-center space-y-8">
-          <div className="w-20 h-20 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto relative">
-            <BarChart3 className="w-10 h-10 text-primary" />
-            {engine.phase !== "done" && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary animate-ping" />
+  /* ── Theater Mode (active session) via React Portal ────────── */
+  if (pagePhase === "active") {
+    const showListening = engine.recognition.isListening && engine.phase === "listening";
+    const currentQ = questions[engine.currentQuestionIndex];
+    const currentQuestionText = currentQ?.text || "";
+    const fullTranscript = (engine.recognition.finalTranscript + " " + engine.recognition.interimTranscript).trim();
+
+    /* Analysis overlay */
+    if (isAnalyzing) {
+      return createPortal(
+        <div className="fixed top-0 left-0 w-screen h-screen z-[9999] bg-background flex items-center justify-center">
+          <div className="max-w-md w-full text-center space-y-8 px-6">
+            <div className="relative w-24 h-24 mx-auto">
+              <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
+              <div className="absolute inset-2 rounded-full bg-primary/10 flex items-center justify-center">
+                <BarChart3 className="w-10 h-10 text-primary" />
+              </div>
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-foreground">
+                {engine.phase === "done" ? "Report Ready!" : "Analyzing Your Interview"}
+              </h2>
+              <p className="text-sm text-text-secondary mt-2 font-medium">{engine.analysisStage.label}</p>
+            </div>
+            <div className="space-y-3 max-w-sm mx-auto">
+              <div className="h-2 w-full bg-foreground/10 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-primary rounded-full"
+                  animate={{ width: `${engine.analysisStage.progress}%` }}
+                  transition={{ duration: 0.5 }}
+                />
+              </div>
+              <p className="text-xs font-bold text-text-muted tabular-nums">{engine.analysisStage.progress}%</p>
+            </div>
+            {engine.phase === "done" && (
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm text-text-muted">
+                Redirecting to your report...
+              </motion.p>
             )}
           </div>
+        </div>,
+        document.body
+      );
+    }
 
-          <div className="space-y-2">
-            <h2 className="text-xl font-semibold tracking-tight text-text-primary">
-              {engine.phase === "done" ? "Report Ready!" : "Analyzing Your Interview"}
-            </h2>
-            <p className="text-sm text-text-muted font-medium">{engine.analysisStage.label}</p>
-          </div>
-
-          {/* Progress bar */}
-          <div className="space-y-2">
-            <div className="h-2.5 w-full bg-foreground/10 rounded-full overflow-hidden">
+    /* Active session theater mode — clean single-question UI */
+    return createPortal(
+      <div className="fixed top-0 left-0 w-screen h-screen z-[9999] bg-background text-foreground flex flex-col">
+        {/* ── Top bar ──────────────────────────────────────── */}
+        <div className="flex items-center justify-between px-6 py-3 flex-shrink-0 border-b border-border">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
+              Q{engine.currentQuestionIndex + 1}/{engine.totalQuestions}
+            </span>
+            <div className="w-28 h-1 bg-foreground/10 rounded-full overflow-hidden">
               <motion.div
                 className="h-full bg-primary rounded-full"
-                animate={{ width: `${engine.analysisStage.progress}%` }}
+                animate={{ width: `${progressPercent}%` }}
                 transition={{ duration: 0.5 }}
               />
             </div>
-            <p className="text-xs font-bold text-text-muted tabular-nums">
-              {engine.analysisStage.progress}%
-            </p>
           </div>
 
-          {engine.phase === "done" && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <p className="text-xs text-text-muted font-medium">Redirecting to your report...</p>
-            </motion.div>
-          )}
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-3xl mx-auto py-4 space-y-3 animate-in fade-in duration-500 flex flex-col h-[calc(100vh-6rem)]">
-      {/* ── Top Bar ──────────────────────────────────────────── */}
-      <div className="flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
-            Q{engine.currentQuestionIndex + 1}/{engine.totalQuestions}
-          </span>
-          <div className="w-28 h-1.5 bg-foreground/10 rounded-full overflow-hidden">
-            <motion.div
-              className="h-full bg-primary rounded-full"
-              animate={{ width: `${progressPercent}%` }}
-              transition={{ duration: 0.5 }}
-            />
+          <div className="flex items-center gap-3">
+            {showListening && (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-danger/10 border border-danger/30 rounded-md">
+                <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse" />
+                <span className="text-[10px] font-bold text-danger uppercase tracking-widest">Listening</span>
+              </div>
+            )}
+            {engine.tts.isSpeaking && (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-primary/10 border border-primary/20 rounded-md">
+                <Volume2 className="w-3 h-3 text-primary" />
+                <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Speaking</span>
+              </div>
+            )}
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-foreground/[0.05] border border-border rounded-lg">
+              <Clock className="w-3.5 h-3.5 text-primary" />
+              <span className="text-sm font-bold text-foreground tabular-nums">{formatTime(engine.timer)}</span>
+            </div>
           </div>
-          <span className="text-[10px] font-bold text-text-muted">{progressPercent}%</span>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Live listening indicator */}
-          {engine.recognition.isListening && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-danger/10 border border-danger/20 rounded-lg">
-              <span className="w-2 h-2 rounded-full bg-danger animate-pulse" />
-              <span className="text-[10px] font-bold text-danger uppercase tracking-widest">Listening</span>
-            </div>
-          )}
-          {engine.tts.isSpeaking && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 border border-primary/20 rounded-lg">
-              <Volume2 className="w-3 h-3 text-primary" />
-              <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Speaking</span>
-            </div>
-          )}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-foreground/[0.03] border border-border/40 rounded-lg">
-            <Clock className="w-3.5 h-3.5 text-primary" />
-            <span className="text-sm font-bold text-text-primary tabular-nums">{formatTime(engine.timer)}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Chat Area ──────────────────────────────────────── */}
-      <Card hoverEffect={false} className="flex-1 border-border/40 bg-surface/30 backdrop-blur-2xl relative overflow-hidden flex flex-col min-h-0">
-        <div className="flex-1 overflow-y-auto p-5 space-y-3 custom-scrollbar">
-          <AnimatePresence initial={false}>
-            {engine.messages.map((msg) => (
-              <ChatBubble key={msg.id} message={msg} tts={engine.tts} />
-            ))}
-          </AnimatePresence>
-
-          {/* Live transcript preview */}
-          {engine.phase === "listening" && (
-            <div className="flex justify-end">
-              <div className="max-w-[80%] space-y-1">
-                {(engine.recognition.finalTranscript || engine.recognition.interimTranscript) && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="px-4 py-3 rounded-2xl rounded-br-md bg-primary/10 border border-primary/20"
-                  >
-                    <p className="text-sm text-text-primary font-medium leading-relaxed">
-                      {engine.recognition.finalTranscript}
-                      {engine.recognition.interimTranscript && (
-                        <span className="text-text-muted/60 italic">
-                          {engine.recognition.finalTranscript ? " " : ""}
-                          {engine.recognition.interimTranscript}
-                        </span>
-                      )}
-                    </p>
-                  </motion.div>
-                )}
-
-                {/* Volume indicator */}
-                <div className="flex items-center justify-end gap-2 px-1">
-                  <VolumeBar volume={engine.recognition.volume} />
-                  {engine.recognition.isSpeaking && (
-                    <span className="text-[9px] font-bold text-success uppercase tracking-widest">Speaking</span>
-                  )}
-                  {!engine.recognition.isSpeaking && engine.recognition.isListening && (
-                    <span className="text-[9px] font-bold text-text-muted/50 uppercase tracking-widest">Waiting...</span>
-                  )}
+        {/* ── Center Content (visualizer + current question) ──── */}
+        <div className="flex-1 flex flex-col items-center justify-center px-6 py-4 overflow-y-auto relative">
+          {/* Paused overlay */}
+          {engine.isPaused && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+              <div className="text-center space-y-4 max-w-sm">
+                <div className="w-20 h-20 rounded-full bg-foreground/[0.05] border border-border flex items-center justify-center mx-auto">
+                  <Pause className="w-8 h-8 text-text-secondary" />
                 </div>
+                <h3 className="text-xl font-semibold text-foreground">Interview Paused</h3>
+                <p className="text-sm text-text-secondary">Press resume to continue when you&apos;re ready.</p>
+                <Button onClick={engine.resume} className="mt-4">
+                  <Play className="w-4 h-4 mr-2" /> Resume
+                </Button>
               </div>
             </div>
+          )}
+
+          {/* Audio Visualizer */}
+          <div className="relative w-24 h-24 mb-8 flex-shrink-0">
+            <div className={cn(
+              "absolute inset-0 rounded-full transition-all duration-500",
+              showListening ? "bg-danger/10 scale-110" : engine.tts.isSpeaking ? "bg-primary/10 scale-110" : "bg-foreground/[0.05]"
+            )}>
+              <div className={cn(
+                "absolute inset-0 rounded-full animate-ping opacity-40",
+                showListening ? "bg-danger/20" : engine.tts.isSpeaking ? "bg-primary/20" : "bg-foreground/10"
+              )} />
+            </div>
+            <div className={cn(
+              "absolute inset-3 rounded-full flex items-center justify-center transition-all duration-300",
+              showListening ? "bg-danger/15 border-2 border-danger/40" :
+              engine.tts.isSpeaking ? "bg-primary/20 border-2 border-primary/30" :
+              "bg-surface border border-border"
+            )}>
+              <Mic className={cn(
+                "w-8 h-8 transition-all duration-300",
+                showListening ? "text-danger" :
+                engine.tts.isSpeaking ? "text-primary" :
+                "text-text-muted"
+              )} />
+            </div>
+            <div className="absolute -inset-6 flex items-center justify-center pointer-events-none">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <motion.div
+                  key={i}
+                  className={cn(
+                    "absolute w-[2px] rounded-full",
+                    showListening ? "bg-danger/40" : engine.tts.isSpeaking ? "bg-primary/40" : "bg-foreground/20"
+                  )}
+                  animate={{
+                    height: showListening ? [14, 36, 14] : engine.tts.isSpeaking ? [20, 44, 20] : [14, 14, 14],
+                    opacity: showListening || engine.tts.isSpeaking ? [0.3, 0.7, 0.3] : [0.15],
+                  }}
+                  transition={{
+                    duration: 1 + i * 0.15,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                    delay: i * 0.1,
+                  }}
+                  style={{
+                    transform: `rotate(${i * 60}deg) translateY(-44px)`,
+                    transformOrigin: "center center",
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Current Question Text — single source of truth */}
+          <div className="max-w-2xl w-full text-center mb-4 flex-shrink-0 min-h-[4rem]">
+            {!engine.isQuestionTextVisible ? (
+              <motion.div
+                key="fetching"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex items-center justify-center space-x-2"
+              >
+                <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.3s]"></div>
+                <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.15s]"></div>
+                <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce"></div>
+              </motion.div>
+            ) : engine.activeFollowUpText ? (
+              <motion.p
+                key="follow-up"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-xl md:text-2xl font-semibold text-primary leading-relaxed"
+              >
+                {engine.activeFollowUpText}
+              </motion.p>
+            ) : currentQuestionText ? (
+              <motion.p
+                key="original"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-xl md:text-2xl font-semibold text-foreground leading-relaxed"
+              >
+                {currentQuestionText}
+              </motion.p>
+            ) : (
+              <p className="text-lg text-text-muted">Preparing question...</p>
+            )}
+          </div>
+
+          {/* Interim transcript — live mic feedback */}
+          {showListening && fullTranscript && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="max-w-lg w-full text-center mb-4 flex-shrink-0"
+            >
+              <div className="px-4 py-3 rounded-xl bg-primary/10 border border-primary/20 inline-block">
+                <p className="text-sm text-foreground font-medium leading-relaxed">
+                  {engine.recognition.finalTranscript}
+                  {engine.recognition.interimTranscript && (
+                    <span className="text-text-muted italic">
+                      {engine.recognition.finalTranscript ? " " : ""}
+                      {engine.recognition.interimTranscript}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <VolumeBar volume={engine.recognition.volume} />
+                {engine.recognition.isSpeaking ? (
+                  <span className="text-[9px] font-bold text-success uppercase tracking-widest">Speaking</span>
+                ) : (
+                  <span className="text-[9px] font-bold text-text-muted uppercase tracking-widest">Waiting...</span>
+                )}
+              </div>
+            </motion.div>
           )}
 
           {/* Processing indicator */}
@@ -403,150 +519,108 @@ export default function InterviewSessionPage() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="flex items-center gap-2 px-4 py-2"
+              className="flex items-center gap-2 px-4 py-2 justify-center flex-shrink-0"
             >
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+              <LoadingSpinner size="sm" />
               <span className="text-xs font-medium text-text-muted">Evaluating your answer...</span>
             </motion.div>
           )}
-
-          <div ref={chatEndRef} />
         </div>
 
-        <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
-      </Card>
-
-      {/* ── Bottom Controls ──────────────────────────────────── */}
-      <div className="flex items-center justify-between flex-shrink-0 px-1">
-        <div className="flex items-center gap-2">
-          {engine.recognition.isListening ? (
-            <div className="flex items-center gap-2">
-              <Mic className="w-4 h-4 text-danger animate-pulse" />
-              <span className="text-xs font-semibold text-text-muted">
-                Mic active — speak naturally
-              </span>
+        {/* ── Bottom Control Bar (fixed) ────────────────────────── */}
+        <div className="fixed bottom-0 left-0 w-full bg-background/90 backdrop-blur-md shadow-lg border-t border-border px-6 py-3 z-[10000]">
+          <div className="max-w-4xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3 min-w-0">
+              {showListening ? (
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse" />
+                  <span className="text-xs font-semibold text-text-secondary truncate">Listening</span>
+                </div>
+              ) : engine.recognition.error ? (
+                <div className="flex items-center gap-2">
+                  <MicOff className="w-4 h-4 text-danger flex-shrink-0" />
+                  <span className="text-xs font-semibold text-danger truncate">Mic error</span>
+                </div>
+              ) : null}
+              {engine.phase === "listening" && !showListening && isMicMuted && (
+                <span className="text-xs font-semibold text-warning">Mic muted</span>
+              )}
             </div>
-          ) : engine.recognition.error ? (
-            <div className="flex items-center gap-2">
-              <MicOff className="w-4 h-4 text-danger" />
-              <span className="text-xs font-semibold text-danger">Mic error: {engine.recognition.error}</span>
-            </div>
-          ) : (
-            <span className="text-xs font-semibold text-text-muted/50">
-              {engine.phase === "asking" || engine.phase === "greeting"
-                ? "Interviewer is speaking..."
-                : engine.phase === "reacting" || engine.phase === "transitioning"
-                  ? "Moving on..."
-                  : ""}
-            </span>
-          )}
-        </div>
 
-        <div className="flex items-center gap-2">
-          {engine.phase === "listening" && (
-            <Button
-              variant="outline"
-              onClick={engine.interruptAndContinue}
-              className="h-8 px-3 rounded-lg text-[10px] font-bold text-text-muted border-border/40"
-            >
-              <SkipForward className="w-3 h-3 mr-1.5" />
-              {(engine.recognition.finalTranscript + engine.recognition.interimTranscript).trim()
-                ? "Submit & Continue"
-                : "Skip Question"}
-            </Button>
-          )}
-          {/* Question progress dots */}
-          <div className="flex items-center gap-1">
-            {questions.map((_, i) => (
-              <div
-                key={i}
+            <div className="hidden sm:flex items-center gap-1.5">
+              {questions.map((_, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "w-2 h-2 rounded-full transition-all",
+                    i < engine.answeredCount ? "bg-success" : i === engine.currentQuestionIndex ? "bg-primary scale-125" : "bg-foreground/20"
+                  )}
+                />
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {engine.phase === "listening" && (
+                <button
+                  onClick={engine.interruptAndContinue}
+                  className="h-8 px-3 rounded-lg text-[10px] font-bold text-foreground bg-foreground/[0.05] border border-border hover:bg-foreground/10 transition-colors"
+                >
+                  <SkipForward className="w-3 h-3 mr-1.5 inline-block align-middle" />
+                  {fullTranscript ? "Submit" : "Skip"}
+                </button>
+              )}
+
+              <button
+                onClick={toggleMic}
+                disabled={!showListening}
                 className={cn(
-                  "w-2 h-2 rounded-full transition-all",
-                  i < engine.answeredCount
-                    ? "bg-success"
-                    : i === engine.currentQuestionIndex
-                      ? "bg-primary scale-125"
-                      : "bg-foreground/15"
+                  "w-10 h-10 rounded-full flex items-center justify-center transition-all",
+                  isMicMuted ? "bg-warning/10 text-warning border border-warning/30" :
+                  showListening ? "bg-danger/10 text-danger border border-danger/30" :
+                  "bg-foreground/[0.05] text-text-muted border border-border"
                 )}
-              />
-            ))}
+                title={isMicMuted ? "Unmute" : "Mute"}
+              >
+                {isMicMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
+
+              <button
+                onClick={engine.isPaused ? engine.resume : engine.pause}
+                className="w-10 h-10 rounded-full bg-foreground/[0.05] border border-border flex items-center justify-center text-text-secondary hover:bg-foreground/10 hover:text-foreground transition-all"
+                title={engine.isPaused ? "Resume" : "Pause"}
+              >
+                {engine.isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+              </button>
+
+              <button
+                onClick={handleEndInterview}
+                disabled={isEnding}
+                className="h-10 px-4 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-danger/10 text-danger border border-danger/30 hover:bg-danger/20 transition-colors disabled:opacity-50"
+              >
+                {isEnding ? (
+                  <LoadingSpinner size="sm" className="text-danger" />
+                ) : (
+                  <><StopCircle className="w-4 h-4 mr-1.5 inline-block align-middle" /> End</>
+                )}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
-  );
+
+        {/* Spacer for fixed bottom bar */}
+        <div className="h-16 flex-shrink-0" />
+      </div>,
+      document.body
+    );
+  }
+
+  // Fallback (should never reach here)
+  return null;
 }
 
 /* ═══════════════════════════════════════════════════════════════
    Sub-components
    ═══════════════════════════════════════════════════════════════ */
-
-function ChatBubble({
-  message,
-  tts,
-}: {
-  message: ChatMessage;
-  tts: ReturnType<typeof import("@/hooks/useSpeechSynthesis").useSpeechSynthesis>;
-}) {
-  const isInterviewer = message.role === "interviewer";
-  const isSystem = message.role === "system";
-
-  if (isSystem) {
-    return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="flex justify-center"
-      >
-        <span className="text-[10px] font-bold text-text-muted/50 uppercase tracking-widest bg-foreground/[0.03] px-3 py-1 rounded-full">
-          {message.text}
-        </span>
-      </motion.div>
-    );
-  }
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
-      className={cn("flex", isInterviewer ? "justify-start" : "justify-end")}
-    >
-      <div
-        className={cn(
-          "max-w-[80%] px-4 py-3 rounded-2xl",
-          isInterviewer
-            ? "bg-foreground/[0.04] border border-border/30 rounded-bl-md"
-            : "bg-primary/10 border border-primary/20 rounded-br-md"
-        )}
-      >
-        <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5 text-text-muted/50">
-          {isInterviewer ? "Interviewer" : "You"}
-        </p>
-        <p className="text-sm text-text-primary font-medium leading-relaxed">
-          {isInterviewer && tts.isSpeaking
-            ? message.text.split(/\s+/).map((word, i, arr) => {
-                const isHighlighted = tts.highlight?.wordIndex === i;
-                return (
-                  <span key={i}>
-                    <span
-                      className={cn(
-                        "transition-all duration-100 rounded-sm px-[1px]",
-                        isHighlighted ? "bg-primary/20 text-primary font-semibold" : ""
-                      )}
-                    >
-                      {word}
-                    </span>
-                    {i < arr.length - 1 ? " " : ""}
-                  </span>
-                );
-              })
-            : message.text}
-        </p>
-      </div>
-    </motion.div>
-  );
-}
 
 function VolumeBar({ volume }: { volume: number }) {
   const bars = 8;
@@ -558,7 +632,7 @@ function VolumeBar({ volume }: { volume: number }) {
           key={i}
           className={cn(
             "w-[3px] rounded-full transition-all duration-75",
-            i < filled ? "bg-success h-3" : "bg-foreground/15 h-1.5"
+            i < filled ? "bg-success h-3" : "bg-foreground/20 h-1.5"
           )}
         />
       ))}

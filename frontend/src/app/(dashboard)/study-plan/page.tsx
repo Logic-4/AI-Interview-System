@@ -4,7 +4,6 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Target,
-  Loader2,
   BookOpen,
   TrendingUp,
   CheckCircle2,
@@ -20,6 +19,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Progress } from "@/components/ui/Progress";
 import { cn } from "@/lib/utils";
 import feedbackService from "@/services/feedbackService";
@@ -71,8 +71,8 @@ export default function StudyPlanPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      <div className="flex items-center justify-center min-h-[40vh]">
+        <LoadingSpinner size="lg" />
       </div>
     );
   }

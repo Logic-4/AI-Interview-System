@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { 
   Bell,
   Search,
-  Menu
+  Menu,
+  User
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuthStore } from "@/stores/authStore";
@@ -16,11 +17,10 @@ import Sidebar from "@/components/layout/Sidebar";
 import MobileSidebar from "@/components/layout/MobileSidebar";
 
 const ALLOWED_AVATAR_HOSTS = [
-  'api.dicebear.com',
   'lh3.googleusercontent.com',
   'googleusercontent.com',
   'avatars.githubusercontent.com',
-  'res.cloudinary.com',
+  'public.blob.vercel-storage.com',
   'localhost',
   '127.0.0.1',
 ];
@@ -87,8 +87,7 @@ export default function DashboardLayout({
   };
 
   const displayName = user?.name ?? 'Loading...';
-  const fallbackAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(displayName)}`;
-  const displayAvatar = isTrustedAvatarUrl(user?.avatar) ? user!.avatar! : fallbackAvatar;
+  const displayAvatar = isTrustedAvatarUrl(user?.avatar) ? user!.avatar! : null;
 
   if (!isMounted) return null;
 
@@ -154,7 +153,11 @@ export default function DashboardLayout({
                     </p>
                  </div>
                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 border border-border/40 flex items-center justify-center overflow-hidden shadow-sm shrink-0">
-                    <Image src={displayAvatar} alt={displayName} width={40} height={40} className="w-full h-full object-cover" />
+                    {displayAvatar ? (
+                      <Image src={displayAvatar} alt={displayName} width={40} height={40} className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="w-4 h-4 text-text-muted" />
+                    )}
                  </div>
               </div>
            </div>

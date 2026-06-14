@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { PreparationHeader } from "@/components/preparation/PreparationHeader";
 import { PreSessionChecklist } from "@/components/preparation/PreSessionChecklist";
 import { MicrophoneCheck } from "@/components/preparation/MicrophoneCheck";
@@ -53,7 +54,7 @@ export default function PreparationPage() {
             className="w-full bg-primary hover:bg-primary/90 text-white font-bold h-14 rounded-xl text-base mt-2 shadow-[0_0_20px_rgba(41,98,255,0.2)]"
           >
             {isLoading ? (
-               <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+               <LoadingSpinner size="sm" className="text-white" />
             ) : (
                <>Start Mock Interview <ArrowRight className="w-5 h-5 ml-2" /></>
             )}

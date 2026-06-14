@@ -3,7 +3,7 @@ const Interview = require('../models/Interview');
 const Feedback = require('../models/Feedback');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
-const { uploadAvatar } = require('../services/cloudinaryService');
+const { uploadAvatar } = require('../services/blobService');
 
 /**
  * @desc    Get user profile

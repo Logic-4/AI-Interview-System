@@ -8,7 +8,8 @@ import {
   Bot, 
   X, 
   Settings, 
-  LogOut 
+  LogOut,
+  User as UserIcon 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -26,16 +27,14 @@ export default function MobileSidebar({ user, isOpen, onClose, onLogout }: Mobil
   const pathname = usePathname();
 
   const displayName = user?.name ?? 'User';
-  const fallbackAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.name ?? 'user')}`;
   
-  const isTrustedAvatarUrl = (value?: string): boolean => {
-    if (!value) return false;
+  const displayAvatar = (() => {
+    if (!user?.avatar) return null;
     try {
-      const parsed = new URL(value);
-      return ['http:', 'https:'].includes(parsed.protocol);
-    } catch { return false; }
-  };
-  const displayAvatar = isTrustedAvatarUrl(user?.avatar) ? user!.avatar! : fallbackAvatar;
+      const parsed = new URL(user.avatar);
+      return ['http:', 'https:'].includes(parsed.protocol) ? user.avatar : null;
+    } catch { return null; }
+  })();
 
   return (
     <AnimatePresence>
@@ -155,7 +154,11 @@ export default function MobileSidebar({ user, isOpen, onClose, onLogout }: Mobil
             <div className="p-6 border-t border-border/40 bg-surface/30 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 border border-border/40 flex items-center justify-center overflow-hidden">
-                  <Image src={displayAvatar} alt={displayName} width={40} height={40} className="w-full h-full object-cover" />
+                  {displayAvatar ? (
+                    <Image src={displayAvatar} alt={displayName} width={40} height={40} className="w-full h-full object-cover" />
+                  ) : (
+                    <UserIcon className="w-4 h-4 text-text-muted" />
+                  )}
                 </div>
                 <div>
                   <p className="text-sm font-bold leading-none">{displayName}</p>

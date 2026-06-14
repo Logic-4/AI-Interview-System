@@ -9,23 +9,26 @@ import {
   Palette,
   Camera,
   Save,
-  Loader2,
   CheckCircle2,
   AlertCircle,
   Trash2,
   Shield,
   Eye,
   EyeOff,
+  Cpu,
+  RefreshCw,
+  Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/authStore";
 import userService from "@/services/userService";
 import api from "@/services/api";
 
-type Tab = "profile" | "security" | "preferences";
+type Tab = "profile" | "security" | "preferences" | "ai-engine";
 
 export default function SettingsPage() {
   const { user, setUser } = useAuthStore();
@@ -53,6 +56,15 @@ export default function SettingsPage() {
   const [changingPw, setChangingPw] = useState(false);
   const [pwMsg, setPwMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  // Kaggle connection state
+  const [kaggleUrl, setKaggleUrl] = useState("");
+  const [kaggleStatus, setKaggleStatus] = useState<"online" | "offline" | "checking">("checking");
+  const [kaggleModel, setKaggleModel] = useState<string | null>(null);
+  const [kaggleError, setKaggleError] = useState<string | null>(null);
+  const [updatingKaggle, setUpdatingKaggle] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(false);
+  const [kaggleMsg, setKaggleMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
   useEffect(() => {
     if (user) {
       setName(user.name ?? "");
@@ -62,6 +74,67 @@ export default function SettingsPage() {
       setSkills(user.skills?.join(", ") ?? "");
     }
   }, [user]);
+
+  useEffect(() => {
+    // Fetch Kaggle config on component mount
+    const fetchKaggleConfig = async () => {
+      try {
+        const res = await api.get("/kaggle/config");
+        if (res.data && res.data.success) {
+          setKaggleUrl(res.data.data.url);
+          setKaggleStatus(res.data.data.status);
+          setKaggleModel(res.data.data.model);
+          setKaggleError(res.data.data.error);
+        }
+      } catch (err) {
+        console.error("Failed to load Kaggle config:", err);
+        setKaggleStatus("offline");
+      }
+    };
+    fetchKaggleConfig();
+  }, []);
+
+  const handleCheckKaggleStatus = async () => {
+    setCheckingStatus(true);
+    setKaggleMsg(null);
+    try {
+      const res = await api.get("/kaggle/config");
+      if (res.data && res.data.success) {
+        setKaggleStatus(res.data.data.status);
+        setKaggleModel(res.data.data.model);
+        setKaggleError(res.data.data.error);
+        if (res.data.data.status === "online") {
+          setKaggleMsg({ type: "success", text: "Successfully connected to Kaggle API!" });
+        } else {
+          setKaggleMsg({ type: "error", text: res.data.data.error || "Kaggle model is offline." });
+        }
+      }
+    } catch (err: any) {
+      setKaggleStatus("offline");
+      setKaggleMsg({ type: "error", text: err.response?.data?.message || "Failed to contact backend config API." });
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
+
+  const handleSaveKaggleUrl = async () => {
+    setUpdatingKaggle(true);
+    setKaggleMsg(null);
+    try {
+      const res = await api.post("/kaggle/config", { url: kaggleUrl });
+      if (res.data && res.data.success) {
+        setKaggleUrl(res.data.data.url);
+        setKaggleStatus(res.data.data.status);
+        setKaggleModel(res.data.data.model);
+        setKaggleError(res.data.data.error);
+        setKaggleMsg({ type: "success", text: "Kaggle configuration updated." });
+      }
+    } catch (err: any) {
+      setKaggleMsg({ type: "error", text: err.response?.data?.message || "Failed to update Kaggle URL." });
+    } finally {
+      setUpdatingKaggle(false);
+    }
+  };
 
   const handleSaveProfile = async () => {
     setSaving(true);
@@ -121,13 +194,13 @@ export default function SettingsPage() {
     }
   };
 
-  const fallbackAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.name ?? "user")}`;
-  const avatarSrc = user?.avatar || fallbackAvatar;
+  const avatarSrc = user?.avatar || null;
 
   const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: "profile", label: "Profile", icon: User },
     { id: "security", label: "Security", icon: Lock },
     { id: "preferences", label: "Preferences", icon: Palette },
+    { id: "ai-engine", label: "AI Engine", icon: Cpu },
   ];
 
   return (
@@ -166,15 +239,19 @@ export default function SettingsPage() {
           <Card hoverEffect={false} className="p-6 border-border/40 bg-surface/30">
             <div className="flex items-center gap-5">
               <div className="relative group">
-                <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-border/40 bg-foreground/5">
-                  <Image src={avatarSrc} alt="Avatar" width={80} height={80} className="w-full h-full object-cover" />
+                <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-border/40 bg-foreground/5 flex items-center justify-center">
+                  {avatarSrc ? (
+                    <Image src={avatarSrc} alt="Avatar" width={80} height={80} className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="w-6 h-6 text-text-muted" />
+                  )}
                 </div>
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingAvatar}
                   className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"
                 >
-                  {uploadingAvatar ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <Camera className="w-5 h-5 text-white" />}
+                  {uploadingAvatar ? <LoadingSpinner size="sm" className="text-white" /> : <Camera className="w-5 h-5 text-white" />}
                 </button>
                 <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
               </div>
@@ -389,6 +466,135 @@ export default function SettingsPage() {
                   {theme}
                 </button>
               ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* AI Engine Tab */}
+      {activeTab === "ai-engine" && (
+        <div className="space-y-5">
+          {/* Live Status Card */}
+          <Card hoverEffect={false} className="p-6 border-border/40 bg-surface/30 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+                <Cpu className="w-4 h-4 text-primary" /> Live Kaggle Connection Status
+              </h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCheckKaggleStatus}
+                isLoading={checkingStatus}
+                className="h-8 px-3 rounded-lg text-[10px] font-bold"
+              >
+                <RefreshCw className={cn("w-3 h-3 mr-1.5", checkingStatus && "animate-spin")} />
+                Check Health
+              </Button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 p-4 rounded-xl bg-foreground/[0.02] border border-border/40">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-text-muted">Status:</span>
+                {kaggleStatus === "online" ? (
+                  <Badge className="bg-success/15 text-success border-success/30 font-bold uppercase tracking-wider text-[9px]">
+                    Online
+                  </Badge>
+                ) : kaggleStatus === "checking" ? (
+                  <Badge className="bg-warning/15 text-warning border-warning/30 font-bold uppercase tracking-wider text-[9px]">
+                    Checking...
+                  </Badge>
+                ) : (
+                  <Badge className="bg-danger/15 text-danger border-danger/30 font-bold uppercase tracking-wider text-[9px]">
+                    Offline / Unreachable
+                  </Badge>
+                )}
+              </div>
+
+              {kaggleStatus === "online" && kaggleModel && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-text-muted">• Active Model:</span>
+                  <span className="text-xs font-semibold text-text-primary">{kaggleModel}</span>
+                </div>
+              )}
+
+              {kaggleStatus === "offline" && kaggleError && (
+                <div className="w-full mt-1.5 text-xs text-danger font-medium flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>Connection Error: {kaggleError}</span>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* Configuration Card */}
+          <Card hoverEffect={false} className="p-6 border-border/40 bg-surface/30 space-y-5">
+            <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+              <Globe className="w-4 h-4 text-primary" /> API Configuration
+            </h3>
+            <div className="space-y-4 max-w-xl">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Kaggle API URL</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={kaggleUrl}
+                    onChange={(e) => setKaggleUrl(e.target.value)}
+                    placeholder="https://your-cloudflare-tunnel-url.trycloudflare.com"
+                    className="flex-1 h-10 px-3 rounded-lg border border-border/40 bg-foreground/[0.03] text-sm text-text-primary font-medium placeholder:text-text-muted/40 focus:outline-none focus:border-primary/50 transition-colors"
+                  />
+                </div>
+                <p className="text-[10px] text-text-muted font-medium">
+                  Enter the active tunnel URL printed by the Kaggle Python script.
+                </p>
+              </div>
+
+              {kaggleMsg && (
+                <div className={cn(
+                  "flex items-center gap-2 p-3 rounded-lg text-xs font-medium",
+                  kaggleMsg.type === "success" ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
+                )}>
+                  {kaggleMsg.type === "success" ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                  {kaggleMsg.text}
+                </div>
+              )}
+
+              <Button
+                onClick={handleSaveKaggleUrl}
+                isLoading={updatingKaggle}
+                disabled={!kaggleUrl}
+                className="h-10 px-6 rounded-lg text-xs font-bold"
+              >
+                <Save className="w-3.5 h-3.5 mr-2" /> Save Connection
+              </Button>
+            </div>
+          </Card>
+
+          {/* Step-by-step Card */}
+          <Card hoverEffect={false} className="p-6 border-border/40 bg-surface/30 space-y-4">
+            <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+              <Globe className="w-4 h-4 text-primary" /> How to connect your Kaggle GPU
+            </h3>
+            <div className="text-xs text-text-muted space-y-3 font-medium leading-relaxed">
+              <p>To run the heavy technical interviewer model, follow these quick steps:</p>
+              
+              <div className="border-l-2 border-primary/40 pl-3 py-1 space-y-2">
+                <p className="font-bold text-text-primary text-[11px] uppercase tracking-wider">Option A: Cloudflare Tunnel (Recommended - 1 Click, No Signup)</p>
+                <ol className="list-decimal list-inside space-y-1 text-text-muted">
+                  <li>Open your Fine-tuning / Inference notebook in Kaggle.</li>
+                  <li>Paste and run the updated FastAPI python code.</li>
+                  <li>The script will automatically download Cloudflare's tunnel agent in the background and start the tunnel.</li>
+                  <li>Copy the generated <code className="bg-foreground/10 px-1 py-0.5 rounded text-primary">trycloudflare.com</code> URL and paste it in the field above.</li>
+                </ol>
+              </div>
+
+              <div className="border-l-2 border-secondary/40 pl-3 py-1 space-y-2">
+                <p className="font-bold text-text-primary text-[11px] uppercase tracking-wider">Option B: Ngrok Tunnel (Permanent Static URL)</p>
+                <ol className="list-decimal list-inside space-y-1 text-text-muted">
+                  <li>Sign up for a free <a href="https://ngrok.com" target="_blank" rel="noreferrer" className="text-primary hover:underline">ngrok.com</a> account and claim your 1 free lifetime static domain.</li>
+                  <li>In the python script, set <code className="bg-foreground/10 px-1 py-0.5 rounded text-primary">NGROK_AUTHTOKEN</code> and <code className="bg-foreground/10 px-1 py-0.5 rounded text-primary">NGROK_DOMAIN</code>.</li>
+                  <li>Run the script. Once set up, the URL is permanent, and you never have to change it here again!</li>
+                </ol>
+              </div>
             </div>
           </Card>
         </div>

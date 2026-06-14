@@ -1,5 +1,5 @@
 import api from './api';
-import { Interview, PopulatedInterview, CreateInterviewPayload, SubmitAnswerPayload, SubmitAnswerResponse, InterviewListParams } from '@/types/interview';
+import { Interview, PopulatedInterview, CreateInterviewPayload, SubmitAnswerPayload, SubmitAnswerResponse, AnswerEvaluation, InterviewListParams } from '@/types/interview';
 import { ApiResponse, PaginatedResponse } from '@/types/api';
 
 const interviewService = {
@@ -33,6 +33,14 @@ const interviewService = {
       `/interviews/${interviewId}/questions/${questionId}/answer`,
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return res.data.data;
+  },
+
+  async retryEvaluate(interviewId: string, questionId: string, retryAnswer: string): Promise<{ evaluation: AnswerEvaluation }> {
+    const res = await api.post<ApiResponse<{ evaluation: AnswerEvaluation }>>(
+      `/interviews/${interviewId}/questions/${questionId}/retry`,
+      { retryAnswer }
     );
     return res.data.data;
   },

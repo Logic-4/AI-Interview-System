@@ -1,0 +1,234 @@
+﻿Environment Setup
+!pip install -q -U transformers datasets accelerate peft trl bitsandbytes
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 10.8/10.8 MB 90.6 MB/s eta 0:00:00:00:01:01
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 529.0/529.0 kB 32.7 MB/s eta 0:00:00
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 383.7/383.7 kB 22.9 MB/s eta 0:00:00
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 680.7/680.7 kB 41.4 MB/s eta 0:00:00
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 751.0/751.0 kB 40.8 MB/s eta 0:00:00
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 60.7/60.7 MB 32.3 MB/s eta 0:00:00:00:0100:01
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 668.2/668.2 kB 38.8 MB/s eta 0:00:00
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.5/4.5 MB 106.1 MB/s eta 0:00:0000:01
+GPU Check & Authentication
+import torch
+from kaggle_secrets import UserSecretsClient
+import os
+
+print(f"GPU available: {torch.cuda.is_available()}")
+if torch.cuda.is_available():
+    print(f"Device name: {torch.cuda.get_device_name(0)}")
+
+# Load Hugging Face token from Kaggle Secrets (Create a secret named 'HF_TOKEN')
+try:
+    user_secrets = UserSecretsClient()
+    os.environ["HF_TOKEN"] = user_secrets.get_secret("HF_TOKEN")
+    print("HF_TOKEN loaded successfully.")
+except Exception:
+    print("WARNING: HF_TOKEN secret not found. Gated models will fail to load.")
+GPU available: True
+Device name: Tesla T4
+HF_TOKEN loaded successfully.
+Tokenizer & Executable Dataset
+from transformers import AutoTokenizer
+from datasets import load_dataset
+
+model_id = "google/gemma-3-4b-it"
+
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+tokenizer.pad_token = tokenizer.eos_token
+tokenizer.padding_side = "right"
+
+# Load your full dataset
+full_dataset = load_dataset("json", data_files="/kaggle/input/datasets/mohamud24/interview-dataset-logic4/gema_train.jsonl", split="train")
+
+# Shuffle and split into 80% training and 20% evaluation
+split_dataset = full_dataset.train_test_split(test_size=0.2, seed=42)
+
+train_data = split_dataset["train"]
+eval_data = split_dataset["test"]
+
+print(f"Training on {len(train_data)} examples.")
+print(f"Evaluating on {len(eval_data)} examples.")
+{"model_id":"47d104054869426eb8c3ac3debe7232b","version_major":2,"version_minor":0}
+{"model_id":"78243535fc294f14b39d3739c39f09f6","version_major":2,"version_minor":0}
+{"model_id":"9739508595a842b690d2e0ceb51063be","version_major":2,"version_minor":0}
+{"model_id":"20ef21406c1e4cf384adae0dac1b2b98","version_major":2,"version_minor":0}
+{"model_id":"724f442e51b14cd1b1c4964f3a926534","version_major":2,"version_minor":0}
+{"model_id":"f8865e04991e4ae8a60fa442037263b8","version_major":2,"version_minor":0}
+Training on 8962 examples.
+Evaluating on 2241 examples.
+Model Loading & Quantization
+from transformers import AutoModelForCausalLM, BitsAndBytesConfig
+from peft import prepare_model_for_kbit_training
+import torch
+
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4", 
+    bnb_4bit_use_double_quant=True,
+    bnb_4bit_compute_dtype=torch.float16
+)
+
+# Load the model, explicitly forcing it into standard float16
+model = AutoModelForCausalLM.from_pretrained(
+    model_id,
+    quantization_config=bnb_config,
+    device_map="auto",
+    dtype=torch.float16 # <--- THE FIX
+)
+
+# Disable cache AFTER loading to prevent the TypeError
+model.config.use_cache = False
+
+model = prepare_model_for_kbit_training(model)
+{"model_id":"1d8954f25ddb4752929c4cc4dedc585a","version_major":2,"version_minor":0}
+{"model_id":"0a4009e914c248c2b1a886b0b59c239c","version_major":2,"version_minor":0}
+{"model_id":"8723f0fbd64e4160a98b4c2565d48494","version_major":2,"version_minor":0}
+{"model_id":"c1c62d5da9b34c45829b0d43c10320b3","version_major":2,"version_minor":0}
+{"model_id":"92ee84367bfd49ebb2d68076ecadec68","version_major":2,"version_minor":0}
+LoRA Configuration
+from peft import LoraConfig, get_peft_model
+
+peft_config = LoraConfig(
+    r=16, 
+    lora_alpha=32, 
+    lora_dropout=0.05,
+    bias="none",
+    task_type="CAUSAL_LM",
+    # Targeting all linear layers yields better performance than just attention layers
+    target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+)
+
+model = get_peft_model(model, peft_config)
+model.print_trainable_parameters()
+trainable params: 32,788,480 || all params: 4,332,867,952 || trainable%: 0.7567
+SFT Config & Training Loop
+from trl import SFTConfig, SFTTrainer
+
+sft_config = SFTConfig(
+    output_dir="./gemma-3-interview-finetuned",
+    max_length=512, 
+    per_device_train_batch_size=1, 
+    per_device_eval_batch_size=1,
+    gradient_accumulation_steps=4, 
+    learning_rate=2e-4, 
+    lr_scheduler_type="linear",
+    warmup_ratio=0.03,
+    num_train_epochs=1,
+    fp16=False, 
+    bf16=False,
+    logging_steps=10,
+    eval_strategy="epoch", # <--- Tells the trainer to run a test at the end of the epoch
+    optim="paged_adamw_32bit", 
+    weight_decay=0.01,
+    save_strategy="epoch",
+    gradient_checkpointing=True, 
+    gradient_checkpointing_kwargs={"use_reentrant": False}, 
+    packing=False, 
+    report_to="none" 
+)
+
+trainer = SFTTrainer(
+    model=model,
+    train_dataset=train_data, # <--- 80% of your data
+    eval_dataset=eval_data,   # <--- 20% of your data
+    args=sft_config,
+    processing_class=tokenizer 
+)
+
+print("Starting fine-tuning...")
+trainer.train()
+
+# Save the adapter weights
+final_save_path = "./gemma-3-interview-final-adapter"
+trainer.model.save_pretrained(final_save_path)
+tokenizer.save_pretrained(final_save_path)
+print(f"Model saved to {final_save_path}")
+[transformers] warmup_ratio is deprecated and will be removed in v5.2. Use `warmup_steps` instead.
+{"model_id":"b2986773ef844c4ab0e162b474f847e7","version_major":2,"version_minor":0}
+{"model_id":"9c0d796e2dfa4778b55ad4e51ad0d049","version_major":2,"version_minor":0}
+[transformers] The tokenizer has new PAD/BOS/EOS tokens that differ from the model config and generation config. The model config and generation config were aligned accordingly, being updated with the tokenizer's values. Updated tokens: {'eos_token_id': 1, 'bos_token_id': 2, 'pad_token_id': 1}.
+Starting fine-tuning...
+<IPython.core.display.HTML object>
+Model saved to ./gemma-3-interview-final-adapter
+Save the model on hugging face
+from huggingface_hub import HfApi
+
+api = HfApi()
+
+# Replace with your HF username and your desired model name
+repo_id = "Mohamud24/gemma-3-technical-interviewer" 
+
+print(f"Creating repository: {repo_id}...")
+api.create_repo(repo_id=repo_id, exist_ok=True)
+
+print("Uploading model weights. This might take a few minutes...")
+api.upload_folder(
+    folder_path="./gemma-3-interview-final-adapter",
+    repo_id=repo_id,
+    commit_message="Initial push of fine-tuned adapter"
+)
+
+print(f"Success! Your model is safely stored at: https://huggingface.co/{repo_id}")
+Creating repository: Mohamud24/gemma-3-technical-interviewer...
+Uploading model weights. This might take a few minutes...
+{"model_id":"d9d8e58f77774b688ec259d090e27001","version_major":2,"version_minor":0}
+{"model_id":"8ca12b1b1d794ea095874e72ff3ede99","version_major":2,"version_minor":0}
+Success! Your model is safely stored at: https://huggingface.co/Mohamud24/gemma-3-technical-interviewer
+Inference test
+# Re-enable cache for fast generation
+model.config.use_cache = True
+model.eval()
+
+# Set up a test scenario
+messages = [
+    {"role": "system", "content": "You are an expert technical interviewer. Domain: Technology. Role: Full Stack Developer. Language: English. Focus: technical."},
+    {"role": "user", "content": "Evaluate this candidate. Question: What is the difference between SQL and NoSQL? \n\nCandidate Response: SQL is a relational database with fixed tables. NoSQL is non-relational and stores documents like JSON, which is better for unstructured data."}
+]
+
+prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
+
+print("\n--- AI EVALUATION ---")
+with torch.no_grad():
+    outputs = model.generate(
+        **inputs, 
+        max_new_tokens=256,
+        temperature=0.7,
+        pad_token_id=tokenizer.eos_token_id
+    )
+
+# Print only the newly generated text
+print(tokenizer.decode(outputs[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True))
+
+--- AI EVALUATION ---
+That's a good, concise summary. To dig deeper, can you name one specific advantage of using NoSQL in a system that would be difficult to achieve with a purely relational SQL approach?
+# Ensure the model is in evaluation mode for fast inference
+model.config.use_cache = True
+model.eval()
+
+# Set up the bilingual generation prompt
+messages = [
+    {"role": "system", "content": "You are an expert technical interviewer. Domain: Technology. Role: Full Stack Developer."},
+    {"role": "user", "content": "Generate a medium-difficulty situational interview question about handling technical debt. \n\nProvide the output in exactly this format:\nEnglish: [Your question]\nSomali: [The exact translation in Somali]"}
+]
+
+prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
+
+print("Generating bilingual question...\n")
+with torch.no_grad():
+    outputs = model.generate(
+        **inputs, 
+        max_new_tokens=256,
+        temperature=0.7, # A little creativity for question generation
+        do_sample=True,
+        pad_token_id=tokenizer.eos_token_id
+    )
+
+# Print only the newly generated text
+response = tokenizer.decode(outputs[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True)
+print(response)
+Generating bilingual question...
+
+English: Imagine you discover a significant performance bottleneck in a production application. It's a legacy piece of code with no tests, and refactoring it would take a long time. What are your immediate first two actions?
+Somali: Waxaad ogaatay in application-ka uu wajahayo 'bottleneck' weyn oo ku jirta qayb code oo dhowaan loo wakiilay. Waxay la xiriirtaa caqabado sax ah oo aan lahayn 'tests' ah. Maxay yihiin saddexda tallaabo ee ugu horreeya ee aad qaadi lahayd?

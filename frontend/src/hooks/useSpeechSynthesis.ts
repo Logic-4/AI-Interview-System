@@ -2,193 +2,166 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 
-/** Preferred voices ranked by quality — matched by partial name (case-insensitive). */
-const VOICE_PREFERENCE = [
-  "google uk english female",
-  "google uk english male",
-  "google us english",
-  "microsoft zira",
-  "microsoft david",
-  "microsoft mark",
-  "samantha",        // macOS high-quality
-  "karen",           // macOS Australian
-  "daniel",          // macOS British
-  "moira",           // macOS Irish
-  "fiona",           // macOS Scottish
-  "google",          // any other Google voice
-  "microsoft",       // any other Microsoft voice
-];
-
-function pickBestVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
-  if (!voices.length) return null;
-
-  // Filter to English voices
-  const englishVoices = voices.filter((v) =>
-    v.lang.startsWith("en")
-  );
-  const pool = englishVoices.length ? englishVoices : voices;
-
-  // Walk preference list and return first match
-  for (const pref of VOICE_PREFERENCE) {
-    const match = pool.find((v) =>
-      v.name.toLowerCase().includes(pref)
-    );
-    if (match) return match;
-  }
-
-  // Fallback: first English voice, or first voice overall
-  return pool[0] || voices[0];
-}
-
 export interface WordHighlight {
-  /** Index of the word currently being spoken (0-based) */
   wordIndex: number;
-  /** Character offset into the full text */
   charIndex: number;
-  /** Length of the word being spoken */
   charLength: number;
 }
 
 export interface UseSpeechSynthesisReturn {
-  /** Speak the given text */
-  speak: (text: string) => void;
-  /** Stop speaking */
+  /** Speak the given text. Returns a Promise that resolves when audio finishes. */
+  speak: (text: string, onPlay?: () => void) => Promise<void>;
   cancel: () => void;
-  /** Pause speech */
   pause: () => void;
-  /** Resume speech */
   resume: () => void;
-  /** Whether the engine is currently speaking */
   isSpeaking: boolean;
-  /** Whether the engine is paused */
   isPaused: boolean;
-  /** Current word being highlighted */
+  isFetchingTTS: boolean;
   highlight: WordHighlight | null;
-  /** The selected voice name */
   voiceName: string;
-  /** Whether voices have loaded */
   ready: boolean;
 }
 
-export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
+export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSynthesisReturn {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [isFetchingTTS, setIsFetchingTTS] = useState(false);
   const [highlight, setHighlight] = useState<WordHighlight | null>(null);
-  const [voiceName, setVoiceName] = useState("");
-  const [ready, setReady] = useState(false);
 
-  const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const wordsRef = useRef<string[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  /* Stores the resolve callback for the currently-playing utterance */
+  const playResolveRef = useRef<(() => void) | null>(null);
 
-  // Load voices (may fire async on some browsers)
+  // Create a single reusable Audio element on mount
   useEffect(() => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    if (typeof window === "undefined") return;
 
-    const loadVoices = () => {
-      const voices = window.speechSynthesis.getVoices();
-      if (voices.length) {
-        const best = pickBestVoice(voices);
-        voiceRef.current = best;
-        setVoiceName(best?.name ?? "Default");
-        setReady(true);
-      }
-    };
+    const audio = new Audio();
+    audioRef.current = audio;
 
-    loadVoices();
-    window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
-    return () => {
-      window.speechSynthesis.removeEventListener("voiceschanged", loadVoices);
-    };
-  }, []);
-
-  const speak = useCallback((text: string) => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-
-    // Cancel any ongoing speech
-    window.speechSynthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utteranceRef.current = utterance;
-
-    // Split text into words for highlight mapping
-    wordsRef.current = text.split(/\s+/);
-
-    // Apply best voice
-    if (voiceRef.current) {
-      utterance.voice = voiceRef.current;
-    }
-
-    utterance.rate = 0.92;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-
-    // Word-boundary event → highlight
-    utterance.onboundary = (event: SpeechSynthesisEvent) => {
-      if (event.name === "word") {
-        // Find which word index this charIndex corresponds to
-        const charIdx = event.charIndex;
-        const charLen = event.charLength || 1;
-        let accumulated = 0;
-        let wordIdx = 0;
-        for (let i = 0; i < wordsRef.current.length; i++) {
-          if (accumulated >= charIdx) {
-            wordIdx = i;
-            break;
-          }
-          // +1 for the space separator
-          accumulated += wordsRef.current[i].length + 1;
-          wordIdx = i + 1;
-        }
-        setHighlight({
-          wordIndex: Math.min(wordIdx, wordsRef.current.length - 1),
-          charIndex: charIdx,
-          charLength: charLen,
-        });
-      }
-    };
-
-    utterance.onstart = () => {
+    audio.onplay = () => {
       setIsSpeaking(true);
       setIsPaused(false);
     };
 
-    utterance.onend = () => {
-      setIsSpeaking(false);
-      setIsPaused(false);
-      setHighlight(null);
-      utteranceRef.current = null;
+    audio.onpause = () => {
+      // Only mark paused if we haven't finished — onended fires after onpause in some browsers
+      if (audio.currentTime < audio.duration) {
+        setIsPaused(true);
+      }
     };
 
-    utterance.onerror = () => {
+    audio.onended = () => {
       setIsSpeaking(false);
       setIsPaused(false);
-      setHighlight(null);
-      utteranceRef.current = null;
+      // Resolve the speakAndWait promise
+      if (playResolveRef.current) {
+        playResolveRef.current();
+        playResolveRef.current = null;
+      }
     };
 
-    utterance.onpause = () => setIsPaused(true);
-    utterance.onresume = () => setIsPaused(false);
+    audio.onerror = () => {
+      console.error("[Cloud TTS] Audio playback error");
+      setIsSpeaking(false);
+      setIsPaused(false);
+      if (playResolveRef.current) {
+        playResolveRef.current();
+        playResolveRef.current = null;
+      }
+    };
 
-    window.speechSynthesis.speak(utterance);
+    return () => {
+      audio.pause();
+      audio.src = "";
+      audioRef.current = null;
+    };
   }, []);
 
+  /**
+   * Fetch audio from the Cloud TTS endpoint and play it.
+   * The returned Promise resolves when the audio finishes playing (or on error).
+   */
+  const speak = useCallback(
+    async (text: string, onPlay?: () => void): Promise<void> => {
+      const audio = audioRef.current;
+      if (!audio) return;
+
+      // Cancel anything currently playing
+      audio.pause();
+      audio.currentTime = 0;
+      if (playResolveRef.current) {
+        playResolveRef.current(); // resolve any previous pending promise
+        playResolveRef.current = null;
+      }
+
+      // We are starting the fetch process, but not playing audio yet
+      setIsFetchingTTS(true);
+
+      try {
+        const response = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, languageCode }),
+        });
+
+        if (!response.ok) {
+          const errBody = await response.text();
+          throw new Error(`TTS API ${response.status}: ${errBody}`);
+        }
+
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+
+        // Fetch complete, ready to play
+        setIsFetchingTTS(false);
+        setIsSpeaking(true);
+        setIsPaused(false);
+        if (onPlay) onPlay();
+
+        audio.src = audioUrl;
+
+        // Wait for the audio to finish playing
+        await new Promise<void>((resolve) => {
+          playResolveRef.current = resolve;
+          audio.play().catch((e) => {
+            console.error("[Cloud TTS] play() rejected:", e);
+            setIsSpeaking(false);
+            resolve();
+          });
+        });
+      } catch (error) {
+        console.error("[Cloud TTS] Error:", error);
+        setIsFetchingTTS(false);
+        setIsSpeaking(false);
+        if (onPlay) onPlay(); // Fallback so UI text shows up
+      }
+    },
+    [languageCode]
+  );
+
   const cancel = useCallback(() => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    if (playResolveRef.current) {
+      playResolveRef.current();
+      playResolveRef.current = null;
+    }
     setIsSpeaking(false);
     setIsPaused(false);
     setHighlight(null);
   }, []);
 
   const pause = useCallback(() => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-    window.speechSynthesis.pause();
+    audioRef.current?.pause();
   }, []);
 
   const resume = useCallback(() => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-    window.speechSynthesis.resume();
+    if (audioRef.current?.paused) {
+      audioRef.current.play().catch(console.error);
+    }
   }, []);
 
   return {
@@ -198,8 +171,9 @@ export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
     resume,
     isSpeaking,
     isPaused,
+    isFetchingTTS,
     highlight,
-    voiceName,
-    ready,
+    voiceName: "Cloud TTS",
+    ready: true,
   };
 }

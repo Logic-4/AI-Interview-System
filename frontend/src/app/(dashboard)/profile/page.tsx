@@ -5,7 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-  Loader2,
   Briefcase,
   Target,
   Clock,
@@ -15,10 +14,12 @@ import {
   Settings,
   Star,
   TrendingUp,
+  User,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/authStore";
 import userService from "@/services/userService";
@@ -33,8 +34,7 @@ export default function ProfilePage() {
     userService.getDashboard().then(setStats).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  const fallbackAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.name ?? "user")}`;
-  const avatarSrc = user?.avatar || fallbackAvatar;
+  const avatarSrc = user?.avatar || null;
   const memberSince = user?.createdAt ? new Date(user.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" }) : "N/A";
 
   return (
@@ -42,8 +42,12 @@ export default function ProfilePage() {
       {/* Hero */}
       <Card hoverEffect={false} className="p-8 border-border/40 bg-surface/30 backdrop-blur-2xl relative overflow-hidden">
         <div className="flex flex-col sm:flex-row items-center gap-6">
-          <div className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-primary/20 bg-foreground/5 shadow-lg shadow-primary/10">
-            <Image src={avatarSrc} alt={user?.name ?? "User"} width={96} height={96} className="w-full h-full object-cover" />
+          <div className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-primary/20 bg-foreground/5 shadow-lg shadow-primary/10 flex items-center justify-center">
+            {avatarSrc ? (
+              <Image src={avatarSrc} alt={user?.name ?? "User"} width={96} height={96} className="w-full h-full object-cover" />
+            ) : (
+              <User className="w-8 h-8 text-text-muted" />
+            )}
           </div>
           <div className="flex-1 text-center sm:text-left">
             <h1 className="text-xl font-semibold tracking-tight text-text-primary">{user?.name ?? "User"}</h1>
@@ -77,7 +81,7 @@ export default function ProfilePage() {
       {/* Stats */}
       {loading ? (
         <div className="flex justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          <LoadingSpinner size="lg" />
         </div>
       ) : stats ? (
         <>

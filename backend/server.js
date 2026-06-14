@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 
 const express = require('express');
 const http = require('http');
@@ -9,7 +10,7 @@ const cookieParser = require('cookie-parser');
 
 // Config & Utils
 const connectDB = require('./config/db');
-const { configureCloudinary } = require('./config/cloudinary');
+
 const { initializeSocket } = require('./config/socket');
 const { initializeSocketHandlers } = require('./sockets');
 const { generalLimiter } = require('./middleware/rateLimiter');
@@ -23,6 +24,7 @@ const interviewRoutes = require('./routes/interviewRoutes');
 const questionRoutes = require('./routes/questionRoutes');
 const feedbackRoutes = require('./routes/feedbackRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
+const kaggleRoutes = require('./routes/kaggleRoutes');
 
 // ─── Initialize Express App ─────────────────────────
 const app = express();
@@ -72,6 +74,7 @@ app.use('/api/v1/interviews', interviewRoutes);
 app.use('/api/v1/questions', questionRoutes);
 app.use('/api/v1/feedback', feedbackRoutes);
 app.use('/api/v1/uploads', uploadRoutes);
+app.use('/api/v1/kaggle', kaggleRoutes);
 
 // ─── 404 Handler ─────────────────────────────────────
 app.use('*', (req, res) => {
@@ -95,9 +98,6 @@ const startServer = async () => {
   try {
     // Connect to MongoDB
     await connectDB();
-
-    // Configure Cloudinary
-    configureCloudinary();
 
     // Start listening
     server.listen(PORT, () => {

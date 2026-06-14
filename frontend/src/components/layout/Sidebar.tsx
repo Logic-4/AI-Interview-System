@@ -9,7 +9,8 @@ import {
   LogOut, 
   Settings, 
   ChevronLeft, 
-  ChevronRight 
+  ChevronRight,
+  User as UserIcon 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -27,16 +28,14 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
   const pathname = usePathname();
 
   const displayName = user?.name ?? 'Loading...';
-  const fallbackAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.name ?? 'user')}`;
   
-  const isTrustedAvatarUrl = (value?: string): boolean => {
-    if (!value) return false;
+  const displayAvatar = (() => {
+    if (!user?.avatar) return null;
     try {
-      const parsed = new URL(value);
-      return ['http:', 'https:'].includes(parsed.protocol);
-    } catch { return false; }
-  };
-  const displayAvatar = isTrustedAvatarUrl(user?.avatar) ? user!.avatar! : fallbackAvatar;
+      const parsed = new URL(user.avatar);
+      return ['http:', 'https:'].includes(parsed.protocol) ? user.avatar : null;
+    } catch { return null; }
+  })();
 
   return (
     <motion.aside
@@ -192,7 +191,11 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
         <div className={cn("p-4 shrink-0 border-t border-border/40 bg-surface/40", isCollapsed ? "px-3" : "px-4")}>
           <div className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3")}>
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 border border-border/40 flex items-center justify-center text-sm font-semibold text-primary overflow-hidden shadow-inner shrink-0 relative">
-              <Image src={displayAvatar} alt={displayName} width={40} height={40} className="w-full h-full object-cover" />
+              {displayAvatar ? (
+                <Image src={displayAvatar} alt={displayName} width={40} height={40} className="w-full h-full object-cover" />
+              ) : (
+                <UserIcon className="w-4 h-4 text-text-muted" />
+              )}
               <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-success rounded-full border-2 border-background" />
             </div>
             {!isCollapsed && (

@@ -3,8 +3,8 @@ const Question = require('../models/Question');
 const User = require('../models/User');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
-const { generateInterviewQuestions, evaluateAnswer, transcribeAudio } = require('../services/openaiService');
-const { uploadAudio } = require('../services/cloudinaryService');
+const { parseJobDescription, generateInterviewQuestions, processInterviewTurn, transcribeAudio } = require('../services/kaggleService');
+const { uploadAudio } = require('../services/blobService');
 const logger = require('../utils/logger');
 
 /**
@@ -12,9 +12,21 @@ const logger = require('../utils/logger');
  * @route   POST /api/v1/interviews
  * @access  Private
  */
+/* ─── Normalize interview difficulty → question difficulty ── */
+const DIFFICULTY_MAP = {
+  junior: 'easy',
+  mid: 'medium',
+  senior: 'hard',
+  lead: 'hard',
+};
+
+function toQuestionDifficulty(val) {
+  return DIFFICULTY_MAP[val] || val || 'medium';
+}
+
 const createInterview = async (req, res, next) => {
   try {
-    const { title, type, difficulty, domain, duration, scheduledAt, jobRole, focusSkills, jobDescription } = req.body;
+    const { title, type, difficulty, domain, duration, scheduledAt, jobRole, focusSkills, jobDescription, language } = req.body;
 
     // Create interview
     const interview = await Interview.create({
@@ -23,6 +35,7 @@ const createInterview = async (req, res, next) => {
       type,
       difficulty,
       domain,
+      language: language || 'english',
       duration: duration || 30,
       scheduledAt: scheduledAt || new Date(),
       jobRole: jobRole || '',
@@ -30,27 +43,31 @@ const createInterview = async (req, res, next) => {
       jobDescription: jobDescription || '',
     });
 
-    // Generate AI questions
-    const questionCount = Math.min(Math.floor((duration || 30) / 5), 10);
+    // Parse job description if provided (Step 2)
+    let roleProfile = null;
+    if (jobDescription && jobDescription.trim()) {
+      try {
+        roleProfile = await parseJobDescription(jobDescription, jobRole || domain);
+        interview.roleProfile = roleProfile;
+        await interview.save();
+        logger.info(`Job description parsed for interview ${interview._id}`);
+      } catch (parseError) {
+        logger.warn(`Job description parsing failed, continuing: ${parseError.message}`);
+      }
+    }
+
+    // Generate AI questions (Step 3)
+    const questionCount = Math.max(1, Math.min(Math.floor((duration || 30) / 2.5), 16));
     let aiQuestions = [];
 
-    try {
-      aiQuestions = await generateInterviewQuestions(type, domain, difficulty, questionCount, {
-        jobRole,
-        jobDescription,
-        focusSkills,
-      });
-    } catch (aiError) {
-      logger.warn(`AI question generation failed, using fallback: ${aiError.message}`);
-      // Fallback: create placeholder questions
-      const roleLabel = jobRole || domain;
-      aiQuestions = Array.from({ length: questionCount }, (_, i) => ({
-        text: `${type} question ${i + 1} for ${roleLabel} at ${difficulty} level`,
-        category: type,
-        difficulty: 'medium',
-        expectedAnswer: 'AI-generated answer will be available when OpenAI API is configured.',
-      }));
-    }
+    aiQuestions = await generateInterviewQuestions(type, domain, difficulty, questionCount, {
+      jobRole,
+      jobDescription,
+      focusSkills,
+      roleProfile,
+      language: interview.language,
+      candidateName: req.user.name,
+    });
 
     // Create question documents
     const questions = await Question.insertMany(
@@ -58,14 +75,32 @@ const createInterview = async (req, res, next) => {
         interview: interview._id,
         text: q.text,
         category: q.category,
-        difficulty: q.difficulty,
+        difficulty: toQuestionDifficulty(q.difficulty),
         expectedAnswer: q.expectedAnswer,
         order: index,
       }))
     );
 
-    // Update interview with question references
+    // Initialize conversation history with a system prompt and the first question
+    const conversationHistory = [
+      {
+        role: 'system',
+        content: `Interview started. Role: ${jobRole || domain}. Language: ${interview.language}. Domain: ${domain}.`,
+        timestamp: new Date()
+      }
+    ];
+
+    if (questions.length > 0) {
+      conversationHistory.push({
+        role: 'interviewer',
+        content: questions[0].text,
+        timestamp: new Date()
+      });
+    }
+
+    // Update interview with question references and history
     interview.questions = questions.map((q) => q._id);
+    interview.conversationHistory = conversationHistory;
     await interview.save();
 
     // Increment user's interview count
@@ -223,32 +258,111 @@ const submitAnswer = async (req, res, next) => {
       }
     }
 
-    // Evaluate answer with AI
-    let evaluation = { score: 0, feedback: '' };
+    // Ensure the current question's text is in the conversation history.
+    // (Only the first question is seeded at creation time — subsequent questions
+    //  must be injected here so the AI model has full context of what was asked.)
+    const lastInterviewerMsg = [...interview.conversationHistory]
+      .reverse()
+      .find(m => m.role === 'interviewer');
+
+    if (!lastInterviewerMsg || lastInterviewerMsg.content !== question.text) {
+      interview.conversationHistory.push({
+        role: 'interviewer',
+        content: question.text,
+        timestamp: new Date()
+      });
+    }
+
+    // Append candidate's answer to conversation history
+    interview.conversationHistory.push({
+      role: 'candidate',
+      content: transcribedAnswer,
+      timestamp: new Date()
+    });
+
+    // Process interview turn dynamically (evaluate + next question)
+    let evaluation = { score: 0, feedback: '', strengths: [], improvements: [], suggestedAnswer: '' };
+    let nextInterviewerResponse = "Thank you. Let's move on to the next topic.";
+    let isFollowUp = false;
+
     if (transcribedAnswer) {
       try {
-        evaluation = await evaluateAnswer(question.text, question.expectedAnswer, transcribedAnswer);
+        const turnResult = await processInterviewTurn(
+          interview.conversationHistory, 
+          interview.domain, 
+          interview.jobRole, 
+          interview.language,
+          interview.type
+        );
+        
+        if (turnResult.evaluation) {
+          evaluation = {
+            score: turnResult.evaluation.score || 0,
+            feedback: turnResult.evaluation.feedback || '',
+            strengths: turnResult.evaluation.strengths || [],
+            improvements: turnResult.evaluation.improvements || [],
+            suggestedAnswer: turnResult.evaluation.suggestedAnswer || '',
+          };
+        }
+        
+        if (turnResult.nextInterviewerResponse) {
+          nextInterviewerResponse = turnResult.nextInterviewerResponse;
+        }
+        isFollowUp = turnResult.isFollowUp || false;
+
       } catch (aiError) {
-        logger.warn(`AI evaluation failed: ${aiError.message}`);
-        evaluation = {
-          score: 0,
-          feedback: 'AI evaluation unavailable. Answer recorded for manual review.',
-        };
+        logger.warn(`AI turn processing failed: ${aiError.message}`);
+        evaluation.feedback = 'AI evaluation unavailable. Answer recorded for manual review.';
       }
     }
 
-    // Update question
-    question.userAnswer = transcribedAnswer;
-    question.audioUrl = audioUrl;
-    question.score = evaluation.score;
-    question.aiFeedback = evaluation.feedback;
-    question.timeSpent = timeSpent || 0;
-    question.isAnswered = true;
-    await question.save();
+    // Only update the question record when the topic is complete (not a follow-up).
+    // During follow-ups (e.g. user asked for clarification), we preserve the original
+    // answer and keep the question open for the real answer.
+    if (!isFollowUp) {
+      // Append follow-up answers to the main answer if there were previous attempts
+      if (question.userAnswer && question.userAnswer.trim()) {
+        question.userAnswer = question.userAnswer + '\n\n[Follow-up answer]: ' + transcribedAnswer;
+      } else {
+        question.userAnswer = transcribedAnswer;
+      }
+      question.audioUrl = audioUrl;
+      question.score = typeof evaluation.score === 'number' ? evaluation.score : null;
+      question.aiFeedback = evaluation.feedback;
+      question.timeSpent = (question.timeSpent || 0) + (timeSpent || 0);
+      question.isAnswered = true;
+      await question.save();
+    }
+
+    // Check if we reached the maximum duration (in minutes) to end interview naturally
+    const interviewStartTime = interview.startedAt ? new Date(interview.startedAt).getTime() : new Date().getTime();
+    const currentTime = new Date().getTime();
+    const elapsedMinutes = (currentTime - interviewStartTime) / 60000;
+    
+    const timeLimitReached = elapsedMinutes >= (interview.duration || 30);
+
+    // Add the AI's conversational response to history for context tracking
+    if (timeLimitReached && !isFollowUp) {
+      // Time is up and we just finished a topic — override with wrap-up message
+      nextInterviewerResponse = "We are out of time. Thank you for completing this interview. You can now submit and complete the session.";
+    }
+
+    interview.conversationHistory.push({
+      role: 'interviewer',
+      content: nextInterviewerResponse,
+      timestamp: new Date()
+    });
+
+    await interview.save();
+
+    const isTimeUp = timeLimitReached && !isFollowUp;
 
     ApiResponse.success(res, {
       question,
       evaluation,
+      followUpText: isFollowUp ? nextInterviewerResponse : null,
+      isFollowUp,
+      isTimeUp
     }, 'Answer submitted and evaluated');
   } catch (error) {
     next(error);
@@ -294,7 +408,7 @@ const completeInterview = async (req, res, next) => {
 };
 
 /**
- * @desc    Delete an interview (soft delete)
+ * @desc    Delete an interview and all associated data
  * @route   DELETE /api/v1/interviews/:id
  * @access  Private
  */
@@ -309,10 +423,81 @@ const deleteInterview = async (req, res, next) => {
       return next(ApiError.notFound('Interview not found'));
     }
 
-    interview.isDeleted = true;
-    await interview.save();
+    // Cascade delete: questions, feedback, then the interview itself
+    await Promise.all([
+      Question.deleteMany({ interview: interview._id }),
+      require('../models/Feedback').deleteMany({ interview: interview._id }),
+    ]);
 
-    ApiResponse.success(res, null, 'Interview deleted');
+    await Interview.findByIdAndDelete(interview._id);
+
+    logger.info(`Interview deleted: ${interview._id} by user ${req.user._id}`);
+    ApiResponse.success(res, null, 'Interview and all associated data deleted');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Retry-evaluate a question answer (Step 7: Practice Loop)
+ * @route   POST /api/v1/interviews/:interviewId/questions/:questionId/retry
+ * @access  Private
+ */
+const retryEvaluate = async (req, res, next) => {
+  try {
+    const { interviewId, questionId } = req.params;
+    const { retryAnswer } = req.body;
+
+    if (!retryAnswer || !retryAnswer.trim()) {
+      return next(ApiError.badRequest('Please provide a retry answer'));
+    }
+
+    // Verify interview belongs to user
+    const interview = await Interview.findOne({
+      _id: interviewId,
+      user: req.user._id,
+    });
+
+    if (!interview) {
+      return next(ApiError.notFound('Interview not found'));
+    }
+
+    // Find the question
+    const question = await Question.findOne({
+      _id: questionId,
+      interview: interviewId,
+    });
+
+    if (!question) {
+      return next(ApiError.notFound('Question not found'));
+    }
+
+    // Build a minimal conversation history for re-evaluation
+    const retryHistory = [
+      { role: 'interviewer', content: question.text },
+      { role: 'candidate', content: retryAnswer },
+    ];
+
+    const turnResult = await processInterviewTurn(
+      retryHistory, interview.domain, interview.jobRole, interview.language, interview.type
+    );
+
+    const evaluation = turnResult.evaluation || { score: 0, feedback: '', strengths: [], improvements: [], suggestedAnswer: '' };
+
+    // Store retry attempt on the question
+    question.retryAnswers.push({
+      answer: retryAnswer,
+      score: typeof evaluation.score === 'number' ? evaluation.score : null,
+      feedback: evaluation.feedback || '',
+      strengths: evaluation.strengths || [],
+      improvements: evaluation.improvements || [],
+      suggestedAnswer: evaluation.suggestedAnswer || '',
+    });
+    await question.save();
+
+    logger.info(`Retry evaluated for question ${questionId} — score: ${evaluation.score}`);
+
+    ApiResponse.success(res, { evaluation }, 'Retry answer evaluated');
   } catch (error) {
     next(error);
   }
@@ -326,4 +511,5 @@ module.exports = {
   submitAnswer,
   completeInterview,
   deleteInterview,
+  retryEvaluate,
 };

@@ -1,7 +1,7 @@
 const QuestionBank = require('../models/QuestionBank');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
-const { generateInterviewQuestions } = require('../services/openaiService');
+const { generateInterviewQuestions } = require('../services/kaggleService');
 const logger = require('../utils/logger');
 
 /**
@@ -141,7 +141,13 @@ const generateQuestions = async (req, res, next) => {
   try {
     const { type, domain, difficulty, count = 5 } = req.body;
 
-    const aiQuestions = await generateInterviewQuestions(type, domain, difficulty, count);
+    let aiQuestions;
+    try {
+      aiQuestions = await generateInterviewQuestions(type, domain, difficulty, count, { jobRole: req.body.jobRole });
+    } catch (aiError) {
+      logger.warn(`AI question generation failed: ${aiError.message}`);
+      return next(ApiError.badRequest('AI question generation failed. Please try again or add questions manually.'));
+    }
 
     const questions = await QuestionBank.insertMany(
       aiQuestions.map((q) => ({

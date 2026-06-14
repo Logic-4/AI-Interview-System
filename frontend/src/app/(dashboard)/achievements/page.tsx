@@ -10,11 +10,11 @@ import {
   Flame,
   Crown,
   Shield,
-  Loader2,
   Lock,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/Card";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { cn } from "@/lib/utils";
 import userService from "@/services/userService";
 import type { DashboardStats } from "@/types/user";
@@ -103,7 +103,7 @@ export default function AchievementsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        <LoadingSpinner size="lg" />
       </div>
     );
   }

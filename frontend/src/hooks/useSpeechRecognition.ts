@@ -46,7 +46,7 @@ const SILENCE_VOLUME_THRESHOLD = 0.02;
 const VOLUME_POLL_MS = 100;
 
 /* ─── Hook ──────────────────────────────────────────────── */
-export function useSpeechRecognition(): UseSpeechRecognitionReturn {
+export function useSpeechRecognition(languageCode: string = "en-US"): UseSpeechRecognitionReturn {
   const [isListening, setIsListening] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState("");
   const [finalTranscript, setFinalTranscript] = useState("");
@@ -147,7 +147,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
 
       recognition.continuous = true;
       recognition.interimResults = true;
-      recognition.lang = "en-US";
+      recognition.lang = languageCode;
       recognition.maxAlternatives = 1;
 
       recognition.onresult = (event: { resultIndex: number; results: SpeechRecognitionResultList }) => {
@@ -193,7 +193,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
       setError(err instanceof Error ? err.message : "Microphone access denied");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supported]);
+  }, [supported, languageCode]);
 
   /* ── Stop ────────────────────────────────────────────── */
   const stopListening = useCallback(() => {

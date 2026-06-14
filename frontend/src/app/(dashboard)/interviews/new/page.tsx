@@ -15,267 +15,40 @@ import {
   X,
   Plus,
   ArrowLeft,
-  Loader2,
   AlertCircle,
   Code2,
   Stethoscope,
   DollarSign,
-  Megaphone,
   GraduationCap,
   Scale,
   Wrench,
-  Palette,
   Settings2,
   HeadphonesIcon,
   Users,
-  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import LoadingOverlay from "@/components/auth/LoadingOverlay";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  SelectGroup,
-  SelectLabel,
 } from "@/components/ui/Select";
 import { cn } from "@/lib/utils";
+import { DOMAIN_ROLES, DOMAIN_LABELS } from "@/lib/constants";
 import interviewService from "@/services/interviewService";
-import type { InterviewType, InterviewDifficulty, InterviewDomain, CreateInterviewPayload } from "@/types/interview";
+import type { InterviewType, InterviewDifficulty, InterviewDomain, InterviewLanguage, CreateInterviewPayload } from "@/types/interview";
 
-/* ─── Department → Job Roles mapping ──────────────────────────── */
-const DEPARTMENTS: {
-  id: string;
-  label: string;
-  icon: React.ElementType;
-  domains: { value: InterviewDomain; label: string }[];
-  roles: string[];
-}[] = [
-  {
-    id: "technology",
-    label: "Technology",
-    icon: Code2,
-    domains: [
-      { value: "frontend", label: "Frontend" },
-      { value: "backend", label: "Backend" },
-      { value: "fullstack", label: "Full Stack" },
-      { value: "devops", label: "DevOps" },
-      { value: "data-science", label: "Data Science" },
-      { value: "mobile", label: "Mobile" },
-      { value: "cloud", label: "Cloud" },
-      { value: "security", label: "Security" },
-      { value: "qa-testing", label: "QA / Testing" },
-      { value: "ai-ml", label: "AI / ML" },
-    ],
-    roles: [
-      "Frontend Developer",
-      "Backend Developer",
-      "Full Stack Engineer",
-      "DevOps Engineer",
-      "Data Scientist",
-      "Data Analyst",
-      "Mobile Developer (iOS)",
-      "Mobile Developer (Android)",
-      "Cloud Architect",
-      "Security Engineer",
-      "QA Engineer",
-      "Machine Learning Engineer",
-      "Software Architect",
-      "Site Reliability Engineer",
-      "Database Administrator",
-      "Systems Administrator",
-      "Technical Lead",
-      "CTO",
-      "Blockchain Developer",
-      "Embedded Systems Engineer",
-    ],
-  },
-  {
-    id: "healthcare",
-    label: "Healthcare",
-    icon: Stethoscope,
-    domains: [{ value: "healthcare", label: "Healthcare" }],
-    roles: [
-      "Registered Nurse",
-      "Medical Doctor",
-      "Pharmacist",
-      "Healthcare Administrator",
-      "Medical Technician",
-      "Physical Therapist",
-      "Dentist",
-      "Medical Lab Scientist",
-      "Radiologist",
-      "Clinical Research Coordinator",
-    ],
-  },
-  {
-    id: "finance",
-    label: "Finance & Accounting",
-    icon: DollarSign,
-    domains: [{ value: "finance", label: "Finance" }],
-    roles: [
-      "Financial Analyst",
-      "Accountant",
-      "Investment Banker",
-      "Insurance Underwriter",
-      "Auditor",
-      "Tax Consultant",
-      "Risk Analyst",
-      "Portfolio Manager",
-      "CFO",
-      "Loan Officer",
-    ],
-  },
-  {
-    id: "marketing",
-    label: "Marketing",
-    icon: Megaphone,
-    domains: [{ value: "marketing", label: "Marketing" }],
-    roles: [
-      "Digital Marketing Manager",
-      "Content Strategist",
-      "SEO Specialist",
-      "Brand Manager",
-      "Social Media Manager",
-      "Growth Hacker",
-      "Marketing Analyst",
-      "Email Marketing Specialist",
-      "CMO",
-      "Product Marketing Manager",
-    ],
-  },
-  {
-    id: "sales",
-    label: "Sales",
-    icon: BarChart3,
-    domains: [{ value: "sales", label: "Sales" }],
-    roles: [
-      "Sales Representative",
-      "Account Executive",
-      "Business Development Manager",
-      "Sales Manager",
-      "VP of Sales",
-      "Inside Sales Rep",
-      "Key Account Manager",
-      "Sales Engineer",
-    ],
-  },
-  {
-    id: "human-resources",
-    label: "Human Resources",
-    icon: Users,
-    domains: [{ value: "human-resources", label: "Human Resources" }],
-    roles: [
-      "HR Manager",
-      "Recruiter",
-      "Talent Acquisition Specialist",
-      "Training & Development Manager",
-      "Compensation Analyst",
-      "HR Business Partner",
-      "CHRO",
-      "Diversity & Inclusion Manager",
-    ],
-  },
-  {
-    id: "education",
-    label: "Education",
-    icon: GraduationCap,
-    domains: [{ value: "education", label: "Education" }],
-    roles: [
-      "Teacher",
-      "Professor",
-      "School Administrator",
-      "Instructional Designer",
-      "Curriculum Developer",
-      "Academic Advisor",
-      "Education Consultant",
-      "Tutor",
-    ],
-  },
-  {
-    id: "legal",
-    label: "Legal",
-    icon: Scale,
-    domains: [{ value: "legal", label: "Legal" }],
-    roles: [
-      "Lawyer",
-      "Paralegal",
-      "Compliance Officer",
-      "Legal Analyst",
-      "Corporate Counsel",
-      "Contract Manager",
-      "Legal Secretary",
-      "Judge Clerk",
-    ],
-  },
-  {
-    id: "engineering",
-    label: "Engineering (Non-Software)",
-    icon: Wrench,
-    domains: [{ value: "engineering", label: "Engineering" }],
-    roles: [
-      "Mechanical Engineer",
-      "Civil Engineer",
-      "Electrical Engineer",
-      "Chemical Engineer",
-      "Environmental Engineer",
-      "Industrial Engineer",
-      "Structural Engineer",
-      "Aerospace Engineer",
-    ],
-  },
-  {
-    id: "creative",
-    label: "Creative & Design",
-    icon: Palette,
-    domains: [{ value: "creative", label: "Creative" }],
-    roles: [
-      "Graphic Designer",
-      "UX/UI Designer",
-      "Product Designer",
-      "Copywriter",
-      "Art Director",
-      "Video Producer",
-      "Animator",
-      "Creative Director",
-    ],
-  },
-  {
-    id: "operations",
-    label: "Operations & Management",
-    icon: Settings2,
-    domains: [
-      { value: "operations", label: "Operations" },
-      { value: "management", label: "Management" },
-    ],
-    roles: [
-      "Project Manager",
-      "Operations Manager",
-      "Supply Chain Manager",
-      "Logistics Coordinator",
-      "Business Analyst",
-      "Product Manager",
-      "Scrum Master",
-      "COO",
-    ],
-  },
-  {
-    id: "customer-service",
-    label: "Customer Service",
-    icon: HeadphonesIcon,
-    domains: [{ value: "customer-service", label: "Customer Service" }],
-    roles: [
-      "Customer Support Specialist",
-      "Help Desk Technician",
-      "Client Success Manager",
-      "Technical Support Engineer",
-      "Call Center Manager",
-      "Customer Experience Manager",
-    ],
-  },
-];
+const DOMAIN_ICONS: Record<string, React.ElementType> = {
+  technology: Code2,
+  healthcare: Stethoscope,
+  finance: DollarSign,
+  engineering: Wrench,
+  education: GraduationCap,
+  legal: Scale,
+};
 
 const INTERVIEW_TYPES: { value: InterviewType; label: string; desc: string; icon: React.ElementType }[] = [
   { value: "technical", label: "Technical", desc: "Skills & knowledge deep-dive", icon: Code2 },
@@ -297,38 +70,26 @@ const DURATION_OPTIONS = [10, 15, 20, 30, 45, 60];
 export default function InterviewSetupPage() {
   const router = useRouter();
 
-  // Form state
-  const [department, setDepartment] = React.useState("");
   const [domain, setDomain] = React.useState<InterviewDomain | "">("");
   const [jobRole, setJobRole] = React.useState("");
   const [interviewType, setInterviewType] = React.useState<InterviewType>("technical");
   const [difficulty, setDifficulty] = React.useState<InterviewDifficulty>("junior");
+  const [language, setLanguage] = React.useState<InterviewLanguage>("english");
   const [duration, setDuration] = React.useState(30);
   const [jobDescription, setJobDescription] = React.useState("");
   const [focusSkills, setFocusSkills] = React.useState<string[]>([]);
   const [skillInput, setSkillInput] = React.useState("");
 
-  // UI state
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Derived
-  const activeDepartment = DEPARTMENTS.find((d) => d.id === department);
-  const allRolesForDept = activeDepartment?.roles ?? [];
+  const currentRoles = domain ? DOMAIN_ROLES[domain] : [];
+  const DomainIcon = domain ? DOMAIN_ICONS[domain] : Briefcase;
 
-  // Auto-set domain when department has only one
   React.useEffect(() => {
-    if (activeDepartment) {
-      if (activeDepartment.domains.length === 1) {
-        setDomain(activeDepartment.domains[0].value);
-      } else {
-        setDomain("");
-      }
-      setJobRole("");
-    }
-  }, [department, activeDepartment]);
+    setJobRole("");
+  }, [domain]);
 
-  // Skills management
   const addSkill = () => {
     const trimmed = skillInput.trim();
     if (trimmed && !focusSkills.includes(trimmed) && focusSkills.length < 10) {
@@ -348,13 +109,10 @@ export default function InterviewSetupPage() {
     }
   };
 
-  // Validation
-  const isFormValid = department && domain && jobRole && interviewType && difficulty && duration;
+  const isFormValid = domain && jobRole && interviewType && difficulty && duration;
 
-  // Auto-generate title
   const autoTitle = jobRole ? `${jobRole} — ${INTERVIEW_TYPES.find((t) => t.value === interviewType)?.label ?? "Interview"}` : "";
 
-  // Submit
   const handleGenerate = async () => {
     if (!isFormValid) return;
     setIsLoading(true);
@@ -366,6 +124,7 @@ export default function InterviewSetupPage() {
         type: interviewType,
         difficulty,
         domain: domain as InterviewDomain,
+        language,
         duration,
         jobRole,
         focusSkills: focusSkills.length > 0 ? focusSkills : undefined,
@@ -386,9 +145,9 @@ export default function InterviewSetupPage() {
 
   return (
     <div className="max-w-3xl mx-auto py-8 space-y-6 animate-in fade-in duration-700">
-      {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/interviews">
+        {isLoading && <LoadingOverlay />}
+      <Link href="/interviews">
           <button className="w-10 h-10 rounded-xl border border-border/40 flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-foreground/[0.04] transition-all">
             <ArrowLeft className="w-4 h-4" />
           </button>
@@ -399,7 +158,6 @@ export default function InterviewSetupPage() {
         </div>
       </div>
 
-      {/* Error banner */}
       <AnimatePresence>
         {error && (
           <motion.div
@@ -421,25 +179,24 @@ export default function InterviewSetupPage() {
 
       <Card hoverEffect={false} className="p-6 border-border/40 bg-surface/30 backdrop-blur-2xl relative overflow-hidden">
         <div className="space-y-6 relative z-10">
-          {/* Row 1: Department & Domain */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-3">
-              <label className="text-xs font-semibold text-text-secondary uppercase tracking-[0.2em] px-1">Department</label>
-              <Select value={department} onValueChange={setDepartment}>
+              <label className="text-xs font-semibold text-text-secondary uppercase tracking-[0.2em] px-1">Domain</label>
+              <Select value={domain} onValueChange={(v) => setDomain(v as InterviewDomain)}>
                 <SelectTrigger className="h-12 bg-foreground/5 border-border/40 rounded-xl px-5 text-sm font-semibold hover:border-primary/50 transition-colors text-text-primary">
                   <div className="flex items-center gap-3">
-                    <Briefcase className="w-4 h-4 text-primary opacity-80" />
-                    <SelectValue placeholder="Choose a department" />
+                    <DomainIcon className="w-4 h-4 text-primary opacity-80" />
+                    <SelectValue placeholder="Choose a domain" />
                   </div>
                 </SelectTrigger>
-                <SelectContent className="bg-surface border-border/40 max-h-80">
-                  {DEPARTMENTS.map((dept) => {
-                    const Icon = dept.icon;
+                <SelectContent className="bg-surface border-border/40">
+                  {Object.entries(DOMAIN_LABELS).map(([key, label]) => {
+                    const Icon = DOMAIN_ICONS[key];
                     return (
-                      <SelectItem key={dept.id} value={dept.id}>
+                      <SelectItem key={key} value={key}>
                         <div className="flex items-center gap-2">
                           <Icon className="w-3.5 h-3.5 text-text-muted" />
-                          {dept.label}
+                          {label}
                         </div>
                       </SelectItem>
                     );
@@ -448,51 +205,45 @@ export default function InterviewSetupPage() {
               </Select>
             </div>
 
-            {/* Domain (only for multi-domain depts like Technology) */}
-            {activeDepartment && activeDepartment.domains.length > 1 && (
-              <div className="space-y-3">
-                <label className="text-xs font-semibold text-text-secondary uppercase tracking-[0.2em] px-1">Specialty</label>
-                <Select value={domain} onValueChange={(v) => setDomain(v as InterviewDomain)}>
-                  <SelectTrigger className="h-12 bg-foreground/5 border-border/40 rounded-xl px-5 text-sm font-semibold hover:border-primary/50 transition-colors text-text-primary">
-                    <div className="flex items-center gap-3">
-                      <Settings2 className="w-4 h-4 text-text-muted" />
-                      <SelectValue placeholder="Select specialty" />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent className="bg-surface border-border/40">
-                    {activeDepartment.domains.map((d) => (
-                      <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
-
-          {/* Row 2: Job Role */}
-          {activeDepartment && (
             <div className="space-y-3">
-              <label className="text-xs font-semibold text-text-secondary uppercase tracking-[0.2em] px-1">Job Role</label>
-              <Select value={jobRole} onValueChange={setJobRole}>
+              <label className="text-xs font-semibold text-text-secondary uppercase tracking-[0.2em] px-1">Role</label>
+              <Select value={jobRole} onValueChange={setJobRole} disabled={!domain}>
                 <SelectTrigger className="h-12 bg-foreground/5 border-border/40 rounded-xl px-5 text-sm font-semibold hover:border-primary/50 transition-colors text-text-primary">
                   <div className="flex items-center gap-3">
                     <Briefcase className="w-4 h-4 text-primary opacity-80" />
-                    <SelectValue placeholder="Select your target role" />
+                    <SelectValue placeholder={domain ? "Select role" : "Select domain first"} />
                   </div>
                 </SelectTrigger>
-                <SelectContent className="bg-surface border-border/40 max-h-72">
-                  <SelectGroup>
-                    <SelectLabel>{activeDepartment.label} Roles</SelectLabel>
-                    {allRolesForDept.map((role) => (
-                      <SelectItem key={role} value={role}>{role}</SelectItem>
-                    ))}
-                  </SelectGroup>
+                <SelectContent className="bg-surface border-border/40">
+                  {currentRoles.map((role) => (
+                    <SelectItem key={role} value={role}>{role}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-          )}
+          </div>
 
-          {/* Interview Type */}
+          <div className="space-y-3">
+            <label className="text-xs font-semibold text-text-secondary uppercase tracking-[0.2em] px-1">Language</label>
+            <div className="grid grid-cols-2 gap-3 max-w-xs">
+              {(['english', 'somali'] as const).map((lang) => (
+                <button
+                  key={lang}
+                  type="button"
+                  onClick={() => setLanguage(lang)}
+                  className={cn(
+                    "h-12 rounded-xl border transition-all text-center flex items-center justify-center",
+                    language === lang
+                      ? "border-primary bg-primary/10 text-primary shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)]"
+                      : "border-border/40 bg-foreground/5 text-text-muted hover:bg-foreground/10 hover:border-border/60"
+                  )}
+                >
+                  <span className="text-sm font-semibold capitalize">{lang}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="space-y-3">
             <label className="text-xs font-semibold text-text-secondary uppercase tracking-[0.2em] px-1">Interview Type</label>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -520,7 +271,6 @@ export default function InterviewSetupPage() {
             </div>
           </div>
 
-          {/* Difficulty Level */}
           <div className="space-y-3">
             <label className="text-xs font-semibold text-text-secondary uppercase tracking-[0.2em] px-1">Experience Level</label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -552,7 +302,6 @@ export default function InterviewSetupPage() {
             </div>
           </div>
 
-          {/* Duration Selector */}
           <div className="space-y-3">
             <div className="flex items-center justify-between px-1">
               <label className="text-xs font-semibold text-text-secondary uppercase tracking-[0.2em]">Session Duration</label>
@@ -577,7 +326,6 @@ export default function InterviewSetupPage() {
             </div>
           </div>
 
-          {/* Focus Skills */}
           <div className="space-y-3">
             <div className="flex items-center justify-between px-1">
               <label className="text-xs font-semibold text-text-secondary uppercase tracking-[0.2em]">Focus Skills (Optional)</label>
@@ -618,7 +366,6 @@ export default function InterviewSetupPage() {
             )}
           </div>
 
-          {/* Job Description */}
           <div className="space-y-3">
             <div className="flex items-center justify-between px-1">
               <label className="text-xs font-semibold text-text-secondary uppercase tracking-[0.2em]">Job Description (Optional)</label>
@@ -632,7 +379,6 @@ export default function InterviewSetupPage() {
             />
           </div>
 
-          {/* AI Notice */}
           <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 flex gap-4">
             <Info className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
             <p className="text-xs font-semibold text-text-muted leading-relaxed">
@@ -640,7 +386,6 @@ export default function InterviewSetupPage() {
             </p>
           </div>
 
-          {/* Bottom Actions */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pt-6 border-t border-border/40">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 text-success">
@@ -663,17 +408,8 @@ export default function InterviewSetupPage() {
               disabled={isLoading || !isFormValid}
             >
               <div className="relative z-10 flex items-center gap-3">
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Generating Questions...
-                  </>
-                ) : (
-                  <>
-                    Generate Interview
-                    <Zap className="w-4 h-4 fill-white group-hover:scale-125 transition-transform duration-300" />
-                  </>
-                )}
+                Generate Interview
+                <Zap className="w-4 h-4 fill-white group-hover:scale-125 transition-transform duration-300" />
               </div>
               <div className="absolute inset-0 bg-gradient-to-r from-primary via-blue-400 to-primary opacity-0 group-hover:opacity-100 transition-opacity duration-500 animate-shimmer pointer-events-none" />
             </Button>
@@ -682,7 +418,6 @@ export default function InterviewSetupPage() {
         <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
       </Card>
 
-      {/* Feature Icons Footer */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-4">
         <div className="flex items-center gap-4 group">
           <div className="w-10 h-10 rounded-xl bg-foreground/5 border border-border/40 flex items-center justify-center text-text-muted group-hover:text-primary transition-all">

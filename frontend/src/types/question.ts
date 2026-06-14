@@ -1,6 +1,16 @@
 export type QuestionDifficulty = 'easy' | 'medium' | 'hard';
 export type QuestionCategory = 'technical' | 'behavioral' | 'system-design' | 'mixed';
 
+export interface RetryAttempt {
+  answer: string;
+  score: number | null;
+  feedback: string;
+  strengths?: string[];
+  improvements?: string[];
+  suggestedAnswer?: string;
+  createdAt: string;
+}
+
 export interface Question {
   _id: string;
   interview: string;
@@ -15,6 +25,7 @@ export interface Question {
   timeSpent: number;
   order: number;
   isAnswered: boolean;
+  retryAnswers?: RetryAttempt[];
   createdAt?: string;
   updatedAt?: string;
 }
