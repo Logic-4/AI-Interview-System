@@ -30,13 +30,24 @@ app.add_middleware(
 # ---------------------------------------------------------
 # LOAD MODEL
 # ---------------------------------------------------------
+from huggingface_hub import login
+
+# IMPORTANT: You MUST paste your Hugging Face Token here!
+HF_TOKEN = "hf_your_token_here" 
+
+try:
+    login(token=HF_TOKEN)
+except Exception as e:
+    print("Warning: Hugging Face login failed. Check your HF_TOKEN.")
+
 model_id = "Mohamud24/gemma-3-technical-interviewer-merged"
 print("Loading the massive AI model into the GPU...")
-tokenizer = AutoTokenizer.from_pretrained(model_id)
+tokenizer = AutoTokenizer.from_pretrained(model_id, token=HF_TOKEN)
 model = AutoModelForCausalLM.from_pretrained(
     model_id,
     torch_dtype=torch.bfloat16,
-    device_map="auto"
+    device_map="auto",
+    token=HF_TOKEN
 )
 print("Model loaded and dual-API is ready!")
 
