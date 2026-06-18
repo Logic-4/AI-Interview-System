@@ -559,12 +559,11 @@ export default function InterviewSessionPage() {
                   placeholder="Ku qor jawaabtaada halkaan..."
                   rows={4}
                   className="w-full bg-transparent resize-none focus:outline-none text-sm text-text-primary placeholder:text-text-muted leading-relaxed"
-                  disabled={engine.phase === "processing"}
                   autoFocus
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                       e.preventDefault();
-                      if (somaliAnswer.trim() && engine.phase !== "processing") {
+                      if (somaliAnswer.trim()) {
                         engine.handleManualSubmit(somaliAnswer);
                       }
                     }
