@@ -29,6 +29,7 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
   const [highlight, setHighlight] = useState<WordHighlight | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const browserUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   /* Stores the resolve callback for the currently-playing utterance */
   const playResolveRef = useRef<(() => void) | null>(null);
 
@@ -62,7 +63,7 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
     };
 
     audio.onerror = () => {
-      console.error("[Cloud TTS] Audio playback error");
+      console.warn("[OpenTTS] Audio playback error", audio.error);
       setIsSpeaking(false);
       setIsPaused(false);
       if (playResolveRef.current) {
@@ -79,7 +80,7 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
   }, []);
 
   /**
-   * Fetch audio from the Cloud TTS endpoint and play it.
+   * Fetch audio from the local TTS endpoint and play it.
    * The returned Promise resolves when the audio finishes playing (or on error).
    */
   const speak = useCallback(
@@ -90,6 +91,8 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
       // Cancel anything currently playing
       audio.pause();
       audio.currentTime = 0;
+      window.speechSynthesis?.cancel();
+      browserUtteranceRef.current = null;
       if (playResolveRef.current) {
         playResolveRef.current(); // resolve any previous pending promise
         playResolveRef.current = null;
@@ -97,6 +100,36 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
 
       // We are starting the fetch process, but not playing audio yet
       setIsFetchingTTS(true);
+
+      const speakWithBrowserFallback = () =>
+        new Promise<void>((resolve) => {
+          if (typeof window === "undefined" || !window.speechSynthesis) {
+            resolve();
+            return;
+          }
+
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = languageCode;
+          utterance.onstart = () => {
+            setIsSpeaking(true);
+            setIsPaused(false);
+          };
+          utterance.onend = () => {
+            setIsSpeaking(false);
+            setIsPaused(false);
+            browserUtteranceRef.current = null;
+            resolve();
+          };
+          utterance.onerror = () => {
+            setIsSpeaking(false);
+            setIsPaused(false);
+            browserUtteranceRef.current = null;
+            resolve();
+          };
+
+          browserUtteranceRef.current = utterance;
+          window.speechSynthesis.speak(utterance);
+        });
 
       try {
         const response = await fetch("/api/tts", {
@@ -111,6 +144,10 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
         }
 
         const audioBlob = await response.blob();
+        if (!audioBlob.size) {
+          throw new Error("TTS API returned an empty audio file.");
+        }
+
         const audioUrl = URL.createObjectURL(audioBlob);
 
         // Fetch complete, ready to play
@@ -125,16 +162,22 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
         await new Promise<void>((resolve) => {
           playResolveRef.current = resolve;
           audio.play().catch((e) => {
-            console.error("[Cloud TTS] play() rejected:", e);
-            setIsSpeaking(false);
-            resolve();
+            if (e.name === "AbortError") {
+              // It was paused, do not resolve the promise! The audio will resume later.
+              console.warn("[OpenTTS] play() was paused before it started.");
+            } else {
+              console.warn("[OpenTTS] play() rejected:", e);
+              setIsSpeaking(false);
+              resolve();
+            }
           });
         });
+        URL.revokeObjectURL(audioUrl);
       } catch (error) {
-        console.error("[Cloud TTS] Error:", error);
+        console.warn("[OpenTTS] Falling back to browser speech:", error);
         setIsFetchingTTS(false);
-        setIsSpeaking(false);
-        if (onPlay) onPlay(); // Fallback so UI text shows up
+        if (onPlay) onPlay();
+        await speakWithBrowserFallback();
       }
     },
     [languageCode]
@@ -145,6 +188,8 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
+    window.speechSynthesis?.cancel();
+    browserUtteranceRef.current = null;
     if (playResolveRef.current) {
       playResolveRef.current();
       playResolveRef.current = null;
@@ -155,13 +200,19 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
   }, []);
 
   const pause = useCallback(() => {
-    audioRef.current?.pause();
+    if (audioRef.current && !audioRef.current.paused) {
+      audioRef.current.pause();
+    }
+    window.speechSynthesis?.pause();
   }, []);
 
   const resume = useCallback(() => {
-    if (audioRef.current?.paused) {
-      audioRef.current.play().catch(console.error);
+    if (audioRef.current && audioRef.current.paused && audioRef.current.src && !audioRef.current.ended) {
+      audioRef.current.play().catch((e) => {
+        if (e.name !== "AbortError") console.error(e);
+      });
     }
+    window.speechSynthesis?.resume();
   }, []);
 
   return {
@@ -173,7 +224,7 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
     isPaused,
     isFetchingTTS,
     highlight,
-    voiceName: "Cloud TTS",
+    voiceName: "OpenTTS",
     ready: true,
   };
 }

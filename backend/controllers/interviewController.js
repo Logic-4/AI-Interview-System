@@ -1,6 +1,7 @@
 const Interview = require('../models/Interview');
 const Question = require('../models/Question');
 const User = require('../models/User');
+const Feedback = require('../models/Feedback');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { parseJobDescription, generateInterviewQuestions, processInterviewTurn, transcribeAudio } = require('../services/kaggleService');
@@ -503,6 +504,78 @@ const retryEvaluate = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Reset interview status and answers to restart the session
+ * @route   PUT /api/v1/interviews/:id/reset
+ * @access  Private
+ */
+const resetInterview = async (req, res, next) => {
+  try {
+    const interview = await Interview.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+    });
+
+    if (!interview) {
+      return next(ApiError.notFound('Interview not found'));
+    }
+
+    // Delete feedback associated with the interview
+    await Feedback.deleteMany({ interview: interview._id });
+
+    // Reset all questions linked to this interview
+    await Question.updateMany(
+      { interview: interview._id },
+      {
+        $set: {
+          userAnswer: '',
+          audioUrl: '',
+          score: null,
+          aiFeedback: '',
+          timeSpent: 0,
+          isAnswered: false,
+          retryAnswers: [],
+        }
+      }
+    );
+
+    // Re-initialize conversation history with a system prompt and the first question
+    const conversationHistory = [
+      {
+        role: 'system',
+        content: `Interview started. Role: ${interview.jobRole || interview.domain}. Language: ${interview.language}. Domain: ${interview.domain}.`,
+        timestamp: new Date()
+      }
+    ];
+
+    if (interview.questions && interview.questions.length > 0) {
+      const firstQuestion = await Question.findOne({ interview: interview._id }).sort({ order: 1 });
+      if (firstQuestion) {
+        conversationHistory.push({
+          role: 'interviewer',
+          content: firstQuestion.text,
+          timestamp: new Date()
+        });
+      }
+    }
+
+    interview.status = 'scheduled';
+    interview.overallScore = null;
+    interview.startedAt = undefined;
+    interview.completedAt = undefined;
+    interview.conversationHistory = conversationHistory;
+
+    await interview.save();
+
+    const populated = await Interview.findById(interview._id).populate('questions');
+
+    logger.info(`Interview reset: ${interview._id} by user ${req.user._id}`);
+    ApiResponse.success(res, { interview: populated }, 'Interview reset successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createInterview,
   getInterviews,
@@ -512,4 +585,5 @@ module.exports = {
   completeInterview,
   deleteInterview,
   retryEvaluate,
+  resetInterview,
 };

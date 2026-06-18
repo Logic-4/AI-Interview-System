@@ -50,6 +50,11 @@ const interviewService = {
     return res.data.data.interview;
   },
 
+  async resetInterview(id: string): Promise<PopulatedInterview> {
+    const res = await api.put<ApiResponse<{ interview: PopulatedInterview }>>(`/interviews/${id}/reset`);
+    return res.data.data.interview;
+  },
+
   async deleteInterview(id: string): Promise<void> {
     await api.delete(`/interviews/${id}`);
   },

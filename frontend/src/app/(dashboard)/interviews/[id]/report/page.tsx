@@ -72,6 +72,7 @@ export default function ReportPage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState(false);
+  const [retaking, setRetaking] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -140,6 +141,17 @@ export default function ReportPage() {
       // Silent fail — user can retry
     } finally {
       setRegenerating(false);
+    }
+  };
+
+  const handleRetakeInterview = async () => {
+    setRetaking(true);
+    try {
+      await interviewService.resetInterview(interviewId);
+      router.push(`/interviews/${interviewId}`);
+    } catch {
+      setError("Failed to reset interview for retaking. Please try again.");
+      setRetaking(false);
     }
   };
 
@@ -467,10 +479,17 @@ export default function ReportPage() {
             Review Answers
           </Button>
         </Link>
+        <Button
+          onClick={handleRetakeInterview}
+          disabled={retaking}
+          className="h-10 px-6 rounded-xl text-xs font-bold shadow-lg shadow-primary/20"
+        >
+          {retaking ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-3.5 h-3.5 mr-2" />}
+          {retaking ? "Resetting..." : "Retake Interview"}
+        </Button>
         <Link href="/interviews/new">
-          <Button className="h-10 px-6 rounded-xl text-xs font-bold shadow-lg shadow-primary/20">
-            <RefreshCw className="w-3.5 h-3.5 mr-2" />
-            Practice Again
+          <Button variant="outline" className="h-10 px-6 rounded-xl text-xs font-bold text-text-primary border-border/40">
+            Start New Interview
           </Button>
         </Link>
         <Link href="/interviews">

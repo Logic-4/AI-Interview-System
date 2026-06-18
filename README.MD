@@ -269,3 +269,37 @@ After multiple sessions, the candidate should:
 - Match job expectations better
 - Reduce filler words
 - Gain confidence
+
+---
+
+## Local Text-To-Speech
+
+This project uses Piper for free local text-to-speech. Piper's own docs recommend its web server for repeated use, so the app calls the local Piper HTTP server.
+
+Install Piper:
+
+```bash
+pip install "piper-tts[http]"
+```
+
+Download a voice:
+
+```bash
+python -m piper.download_voices en_US-lessac-medium
+```
+
+Start Piper on port `5001` so it does not conflict with this app's backend on port `5000`:
+
+```bash
+python -m piper.http_server -m en_US-lessac-medium --port 5001
+```
+
+Configure the root `.env`:
+
+```env
+PIPER_BASE_URL=http://localhost:5001
+PIPER_EN_VOICE=
+PIPER_SO_VOICE=
+```
+
+Restart the frontend after changing `.env`. The interview page calls `/api/tts`, which calls Piper locally and returns WAV audio. If Piper is not running, the page falls back to the browser's built-in speech synthesis.

@@ -93,6 +93,12 @@ export function useSpeechRecognition(languageCode: string = "en-US"): UseSpeechR
       return;
     }
 
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch {}
+      recognitionRef.current = null;
+    }
+    cleanupAudio();
+
     setError(null);
     stoppedRef.current = false;
 

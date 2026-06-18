@@ -10,6 +10,7 @@ import threading
 import traceback
 import json
 import re
+import socket
 
 # Allow nested event loops (required for Kaggle/Jupyter notebooks)
 nest_asyncio.apply()
@@ -33,19 +34,19 @@ app.add_middleware(
 from huggingface_hub import login
 
 # IMPORTANT: You MUST paste your Hugging Face Token here!
-HF_TOKEN = "hf_your_token_here" 
+HF_TOKEN = "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" 
 
 try:
     login(token=HF_TOKEN)
 except Exception as e:
     print("Warning: Hugging Face login failed. Check your HF_TOKEN.")
 
-model_id = "Mohamud24/gemma-3-technical-interviewer-merged"
+model_id = "Mohamud24/gemma-3-technical-interviewer"
 print("Loading the massive AI model into the GPU...")
 tokenizer = AutoTokenizer.from_pretrained(model_id, token=HF_TOKEN)
 model = AutoModelForCausalLM.from_pretrained(
     model_id,
-    torch_dtype=torch.bfloat16,
+    dtype=torch.bfloat16,
     device_map="auto",
     token=HF_TOKEN
 )
@@ -138,29 +139,38 @@ async def interview_turn(request: Request):
             else
             "IMPORTANT: Your ENTIRE nextInterviewerResponse MUST be in Somali. DO NOT use English! "
             "Ku hadal af-Soomaali dabiici ah oo aad u xirfad iyo naxwe sarreeya. "
-            "Jargon-ka farsamada (sida React, API, Database, Server) ha u turjumin af-Soomaali, "
+            f"Jargon-ka farsamada iyo erey-bixinta u gaarka ah maadada ama shaqada '{domain}' ha u turjumin af-Soomaali, "
             "balse u daa Ingiriis ahaan adigoo ku habeynaya naxwaha Soomaaliga."
         )
+
+        # Note whether the candidate's answer is in Somali (the last candidate turn)
+        somali_note = ""
+        if language.lower() == "somali":
+            somali_note = (
+                "IMPORTANT SCORING NOTE: The candidate's answer is written in Somali (af-Soomaali). "
+                "You MUST evaluate the content and meaning of the answer — NOT the language it is written in. "
+                "Do NOT penalize for writing in Somali. A correct Somali answer must receive the same score "
+                "as an equivalent English answer. Evaluate based on technical accuracy and completeness only.\n\n"
+            )
 
         system_prompt = (
             f"You are an expert {domain} interviewer hiring for a {role} position. "
             f"The interview style/type is {type_str}. "
             f"{lang_hint}\n\n"
-            f"SCORING RULES (BE EXTREMELY LENIENT AND ENCOURAGING):\n"
-            f"- DO NOT demand a 100% perfect academic or textbook answer. This is a practical practice interview.\n"
-            f"- If the candidate answers the question and demonstrates a good practical understanding of the concept, score them 90-100.\n"
-            f"- If the candidate understands the general concept but misses minor details or has small wording mistakes, score them 80-90.\n"
-            f"- If the candidate gives a partial answer showing some general understanding, score them 65-80.\n"
-            f"- Only score below 50 if the answer is completely wrong, empty, or totally unrelated.\n"
-            f"- Focus on what the candidate gets RIGHT, not what they leave out. Be highly supportive and encouraging.\n\n"
+            f"{somali_note}"
+            f"SCORING RULES:\n"
+            f"- 90-100: Great practical understanding.\n"
+            f"- 80-89: Good understanding, minor mistakes.\n"
+            f"- 65-79: Partial understanding.\n"
+            f"- Below 65: Wrong or unrelated.\n\n"
             f"BEHAVIOR RULES:\n"
-            f"1. CONFUSION: If the candidate asks for clarification or gives a confused response (under 10 words), "
-            f"set isFollowUp=true, rephrase the question simply, and score 0.\n"
-            f"2. SHALLOW ANSWER: If partial, set isFollowUp=true and ask a brief follow-up.\n"
-            f"3. GOOD ANSWER: If answered well, set isFollowUp=false and isTopicComplete=true.\n\n"
+            f"1. Keep `nextInterviewerResponse` EXTREMELY short (1-2 sentences max). React naturally, do NOT give long explanations.\n"
+            f"2. If answer is partial, set isFollowUp=true and ask ONE very short follow-up question.\n"
+            f"3. If answer is good, set isFollowUp=false and isTopicComplete=true.\n\n"
+            f"CRITICAL: Keep ALL string values in your JSON short (under 80 characters each) so the response fits within the token limit.\n\n"
             f"Return ONLY raw JSON:\n"
-            f'{{"evaluation": {{"score": 85, "feedback": "Good answer...", "strengths": ["Clear communication"], "improvements": ["More detail on X"], "suggestedAnswer": "An ideal answer..."}}, '
-            f'"nextInterviewerResponse": "Your spoken response.", '
+            f'{{"evaluation": {{"score": 85, "feedback": "Short.", "strengths": ["One strength"], "improvements": ["One improvement"], "suggestedAnswer": "Brief ideal answer."}}, '
+            f'"nextInterviewerResponse": "Short spoken response.", '
             f'"isFollowUp": false, "isTopicComplete": true}}'
         )
         
@@ -180,7 +190,7 @@ async def interview_turn(request: Request):
                 messages.append({"role": mapped_role, "content": turn["content"]})
             
         # Add instruction to the end
-        instruction = "Analyze my last answer, evaluate it, and generate your next response in the strict JSON format requested."
+        instruction = "Evaluate my last answer and respond in the strict JSON format. Keep all string values short."
         if messages[-1]["role"] == "user":
             messages[-1]["content"] += "\n\n" + instruction
         else:
@@ -190,8 +200,8 @@ async def interview_turn(request: Request):
         inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
 
         with torch.no_grad():
-            # Use lower max_tokens to reduce latency and force concise responses
-            outputs = model.generate(**inputs, max_new_tokens=512, temperature=0.6, do_sample=True)
+            # Increased max_new_tokens to 450 to avoid mid-JSON truncation on long Somali responses
+            outputs = model.generate(**inputs, max_new_tokens=450, temperature=0.6, do_sample=True)
 
         response = tokenizer.decode(
             outputs[0][inputs["input_ids"].shape[-1]:],
@@ -232,7 +242,15 @@ async def generate_question(request: Request):
         experience       = data.get("experience", "")
         job_description  = data.get("jobDescription", "")
 
-        lang_hint = "Generate the question in English." if language.lower() == "english" else "IMPORTANT: Generate the question ENTIRELY in Somali. Do not use English."
+        lang_hint = (
+            "Generate the question in English." 
+            if language.lower() == "english" 
+            else 
+            "IMPORTANT: Generate the question ENTIRELY in Somali. DO NOT use English! "
+            "Ku hadal af-Soomaali dabiici ah oo aad u xirfad iyo naxwe sarreeya. "
+            f"Jargon-ka farsamada iyo erey-bixinta u gaarka ah maadada ama shaqada '{domain}' ha u turjumin af-Soomaali, "
+            "balse u daa Ingiriis ahaan adigoo ku habeynaya naxwaha Soomaaliga."
+        )
 
         if category == "intro":
             if language.lower() == "somali":
@@ -277,12 +295,13 @@ async def generate_question(request: Request):
                 f"The interview style/type is {type_str}.\n"
                 f"{lang_hint}\n\n"
                 f"{context_block}\n"
-                f"RULES:\n"
-                f"- The question MUST be EXTREMELY DIRECT and SHORT.\n"
-                f"- DO NOT use any filler words or long background stories.\n"
-                f"- Start with direct question words like 'What is', 'How do you', 'Explain', 'Why is'.\n"
-                f"- Do NOT write multi-part questions. Ask ONE simple thing.\n"
-                f"- Keep the question under 15 words.\n\n"
+                f"RULES FOR QUESTION GENERATION:\n"
+                f"- The question MUST be natural and conversational.\n"
+                f"- If this is a technical or conceptual question, ask directly (e.g., 'What is...', 'How does X work?', 'Explain the difference between...').\n"
+                f"- If this is a behavioral question, ask for an example (e.g., 'Tell me about a time...').\n"
+                f"- DO NOT use multi-part questions. Ask ONE clear thing.\n"
+                f"- Keep it concise, similar to a real human interviewer.\n"
+                f"- Max 20 words.\n\n"
                 f"Generate a {category} interview question (style: {type_str}) for a {role} role.\n\n"
                 f"Return ONLY valid JSON with keys: question (string), expectedAnswer (string)."
             )
@@ -310,7 +329,25 @@ async def generate_question(request: Request):
                 "expectedAnswer": parsed.get("expectedAnswer") or parsed.get("expected_answer") or parsed.get("answer", "")
             }
 
-        return {"question": response.strip(), "expectedAnswer": ""}
+        # ── Fallback validation ────────────────────────────────────────────────
+        # If JSON parsing fails and the raw text doesn't look like a question
+        # (no question mark, or it reads like a constraint/instruction), do NOT
+        # save it as a real question. Instead return a safe generic question.
+        raw_fallback = response.strip()
+        looks_like_question = "?" in raw_fallback and len(raw_fallback) < 300
+        constraint_keywords = ["no code", "not allowed", "external websites", "do not", "you must", "note:", "rule:"]
+        is_constraint = any(kw in raw_fallback.lower() for kw in constraint_keywords)
+
+        if looks_like_question and not is_constraint:
+            return {"question": raw_fallback, "expectedAnswer": ""}
+
+        # Safe default question when the fallback text is a constraint, rule, or garbage
+        if language.lower() == "somali":
+            default_q = f"Maxaad ka garanaysaa shaqada {domain} iyo sida ay uga muhiimsan tahay xirfadahaaga?"
+        else:
+            default_q = f"Can you describe your experience and approach to working in the {domain} domain?"
+        print(f"[generate-question] WARNING: Raw fallback rejected (looked like constraint or garbage). Returning safe default. Raw was: {raw_fallback[:200]}")
+        return {"question": default_q, "expectedAnswer": "Candidate describes relevant experience and domain knowledge."}
 
     except Exception as e:
         traceback.print_exc()
@@ -332,9 +369,12 @@ async def parse_job_description(request: Request):
                 "role": "user",
                 "content": (
                     "You are an expert job description parser. "
-                    "Extract key skills, experience requirements, and responsibilities. "
-                    "Return ONLY raw JSON with keys: "
-                    "keySkills (array of strings), experience (string), responsibilities (array of strings).\n\n"
+                    "Extract structured data from this job description. "
+                    "IMPORTANT: Keep all arrays to a MAXIMUM of 8 items each. "
+                    "Keep all string values under 60 characters. "
+                    "Return ONLY raw JSON with EXACTLY these keys: "
+                    "requiredSkills (array of strings), preferredSkills (array of strings), "
+                    "responsibilities (array of strings), experienceLevel (string), technicalStack (array of strings).\n\n"
                     f"Parse this job description for a {role} role:\n\n{job_description}"
                 )
             }
@@ -352,7 +392,7 @@ async def parse_job_description(request: Request):
         if parsed:
             return {"data": parsed}
 
-        return {"data": {"keySkills": [], "experience": "", "responsibilities": []}}
+        return {"data": {"requiredSkills": [], "preferredSkills": [], "responsibilities": [], "experienceLevel": "", "technicalStack": []}}
 
     except Exception as e:
         traceback.print_exc()
@@ -395,6 +435,12 @@ async def generate_feedback(request: Request):
                 "content": (
                     "You are a supportive interview coach evaluating a PRACTICE interview session.\n"
                     "This is for training purposes — be encouraging and constructive.\n\n"
+                    "CRITICAL LENGTH RULES (to avoid truncation):\n"
+                    "- All feedback strings MUST be under 60 characters each.\n"
+                    "- strengths: max 3 items, each under 50 chars.\n"
+                    "- improvements: max 3 items, each under 50 chars.\n"
+                    "- recommendations: max 3 items, each under 60 chars.\n"
+                    "- detailedFeedback: max 150 characters total.\n\n"
                     "SCORING GUIDELINES (be generous):\n"
                     "- If the candidate showed understanding of most concepts: score 70-85\n"
                     "- If the candidate gave strong, detailed answers: score 85-100\n"
@@ -405,15 +451,15 @@ async def generate_feedback(request: Request):
                     '{\n'
                     '  "overallScore": 85,\n'
                     '  "categories": {\n'
-                    '    "communication": {"score": 80, "feedback": "Clear and concise."},\n'
-                    '    "technicalAccuracy": {"score": 90, "feedback": "Good technical depth."},\n'
-                    '    "problemSolving": {"score": 85, "feedback": "Strong logical approach."},\n'
-                    '    "codeQuality": {"score": 80, "feedback": "Good structure."},\n'
-                    '    "confidence": {"score": 90, "feedback": "Spoke confidently."}\n'
+                    '    "communication": {"score": 80, "feedback": "Clear."},\n'
+                    '    "technicalAccuracy": {"score": 90, "feedback": "Good depth."},\n'
+                    '    "problemSolving": {"score": 85, "feedback": "Logical."},\n'
+                    '    "codeQuality": {"score": 80, "feedback": "Structured."},\n'
+                    '    "confidence": {"score": 90, "feedback": "Confident."}\n'
                     '  },\n'
                     '  "strengths": ["strength 1", "strength 2"],\n'
                     '  "improvements": ["area 1", "area 2"],\n'
-                    '  "detailedFeedback": "Overall, the candidate performed well...",\n'
+                    '  "detailedFeedback": "Short overall summary here.",\n'
                     '  "recommendations": ["action 1", "action 2"]\n'
                     '}\n\n'
                     f"Interview data:\n{json.dumps(interview_summary, indent=1)}"
@@ -425,6 +471,8 @@ async def generate_feedback(request: Request):
         inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
 
         with torch.no_grad():
+            # 600 tokens: /feedback generates the most complex JSON (5 categories + arrays)
+            # Prompt constraints enforce brevity so this budget is almost always sufficient
             outputs = model.generate(**inputs, max_new_tokens=600, temperature=0.3)
 
         response = tokenizer.decode(outputs[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True)
@@ -474,13 +522,32 @@ async def generate_feedback(request: Request):
 # ---------------------------------------------------------
 # SERVER STARTUP (Kaggle / Jupyter notebook compatible)
 # ---------------------------------------------------------
+def is_port_free(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(1)
+        return sock.connect_ex(("127.0.0.1", port)) != 0
+
+
+def find_available_port(start_port: int = 8000, attempts: int = 20) -> int:
+    for port in range(start_port, start_port + attempts):
+        if is_port_free(port):
+            return port
+    raise RuntimeError(f"No free port found from {start_port} to {start_port + attempts - 1}")
+
+
+API_PORT = find_available_port(8000)
+if API_PORT != 8000:
+    print(f"Port 8000 is already in use, probably by a previous notebook run. Using port {API_PORT} instead.")
+
+
 def start_server():
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=API_PORT)
+
 
 # Start uvicorn in a background thread
 server_thread = threading.Thread(target=start_server, daemon=True)
 server_thread.start()
-print("FastAPI Server running on http://127.0.0.1:8000")
+print(f"FastAPI Server running on http://127.0.0.1:{API_PORT}")
 
 # ---------------------------------------------------------
 # TUNNEL SETUP (Cloudflare Tunnel & Ngrok Options)
@@ -501,7 +568,7 @@ def setup_tunnel():
         os.system("pip install -q pyngrok")
         from pyngrok import ngrok
         ngrok.set_auth_token(NGROK_AUTHTOKEN)
-        tunnel = ngrok.connect(8000, pyngrok_config=None, bind_tls=True, hostname=NGROK_DOMAIN)
+        tunnel = ngrok.connect(API_PORT, pyngrok_config=None, bind_tls=True, hostname=NGROK_DOMAIN)
         print("\n" + "="*60)
         print("🎉 Ngrok Tunnel Online (Static URL)!")
         print(f"🔗 URL: {tunnel.public_url}")
@@ -516,7 +583,7 @@ def setup_tunnel():
         
     print("Starting Cloudflare Tunnel...")
     proc = subprocess.Popen(
-        ["./cloudflared", "tunnel", "--url", "http://localhost:8000"],
+        ["./cloudflared", "tunnel", "--url", f"http://localhost:{API_PORT}"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True

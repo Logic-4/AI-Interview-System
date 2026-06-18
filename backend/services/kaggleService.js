@@ -194,7 +194,9 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
 
   // Build a concise skill list from all available sources
   const skillHints = [];
-  if (roleProfile?.keySkills?.length) skillHints.push(...roleProfile.keySkills);
+  if (roleProfile?.requiredSkills?.length) skillHints.push(...roleProfile.requiredSkills);
+  if (roleProfile?.preferredSkills?.length) skillHints.push(...roleProfile.preferredSkills);
+  if (roleProfile?.technicalStack?.length) skillHints.push(...roleProfile.technicalStack);
   if (focusSkills?.length) skillHints.push(...focusSkills);
   // Deduplicate
   const uniqueSkills = [...new Set(skillHints.map(s => s.toLowerCase()))].slice(0, 10);
@@ -237,7 +239,7 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
       type: type || 'technical',
       skills: uniqueSkills,
       responsibilities: roleProfile?.responsibilities || [],
-      experience: roleProfile?.experience || '',
+      experience: roleProfile?.experienceLevel || '',
       jobDescription: jobDescription ? jobDescription.slice(0, 800) : '',
     };
 
@@ -347,7 +349,7 @@ const parseJobDescription = async (jobDescription, jobRole) => {
     data = safeParseJSON(result.evaluation);
   }
 
-  logger.info(`Job description parsed for "${jobRole}" — ${data.keySkills?.length || 0} skills extracted`);
+  logger.info(`Job description parsed for "${jobRole}" — ${data.requiredSkills?.length || 0} skills extracted`);
   return data;
 };
 

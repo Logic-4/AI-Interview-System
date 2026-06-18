@@ -20,6 +20,7 @@ import {
   Pause,
   Play,
   StopCircle,
+  Keyboard,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -64,6 +65,7 @@ export default function InterviewSessionPage() {
   const [interview, setInterview] = useState<PopulatedInterview | null>(null);
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
+  const [somaliAnswer, setSomaliAnswer] = useState("");
 
   /* ── Fetch interview data ─────────────────────────────────── */
   useEffect(() => {
@@ -87,7 +89,7 @@ export default function InterviewSessionPage() {
     fetchInterview();
 
     return () => {
-      // Cloud TTS cleanup is handled by useSpeechSynthesis hook unmount
+      // TTS cleanup is handled by useSpeechSynthesis hook unmount
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interviewId]);
@@ -136,6 +138,11 @@ export default function InterviewSessionPage() {
     onGenerateFeedback,
   });
 
+  // Reset Somali answer textarea when question changes
+  useEffect(() => {
+    setSomaliAnswer("");
+  }, [engine.currentQuestionIndex, engine.activeFollowUpText]);
+
   /* ── Start interview (API + engine) ───────────────────────── */
   const handleStart = async () => {
     if (!interview) return;
@@ -163,6 +170,18 @@ export default function InterviewSessionPage() {
       return () => clearTimeout(t);
     }
   }, [engine.phase, interviewId, router]);
+
+  /* ── Keyboard Listeners (Space to Stop Recording) ─────────── */
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === "Space" && engine.phase === "listening") {
+        e.preventDefault();
+        engine.stopRecordingForReview();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [engine]);
 
   /* ── Toggle mic ──────────────────────────────────────────── */
   const toggleMic = useCallback(() => {
@@ -300,6 +319,9 @@ export default function InterviewSessionPage() {
   /* ── Theater Mode (active session) via React Portal ────────── */
   if (pagePhase === "active") {
     const showListening = engine.recognition.isListening && engine.phase === "listening";
+    const isSomali = interview?.language === "somali";
+    const isListeningPhase = engine.phase === "listening";
+    const showVisualizerActive = isSomali ? isListeningPhase : showListening;
     const currentQ = questions[engine.currentQuestionIndex];
     const currentQuestionText = currentQ?.text || "";
     const fullTranscript = (engine.recognition.finalTranscript + " " + engine.recognition.interimTranscript).trim();
@@ -402,25 +424,29 @@ export default function InterviewSessionPage() {
           <div className="relative w-24 h-24 mb-8 flex-shrink-0">
             <div className={cn(
               "absolute inset-0 rounded-full transition-all duration-500",
-              showListening ? "bg-danger/10 scale-110" : engine.tts.isSpeaking ? "bg-primary/10 scale-110" : "bg-foreground/[0.05]"
+              showVisualizerActive ? (isSomali ? "bg-primary/10 scale-110" : "bg-danger/10 scale-110") : engine.tts.isSpeaking ? "bg-primary/10 scale-110" : "bg-foreground/[0.05]"
             )}>
               <div className={cn(
                 "absolute inset-0 rounded-full animate-ping opacity-40",
-                showListening ? "bg-danger/20" : engine.tts.isSpeaking ? "bg-primary/20" : "bg-foreground/10"
+                showVisualizerActive ? (isSomali ? "bg-primary/20" : "bg-danger/20") : engine.tts.isSpeaking ? "bg-primary/20" : "bg-foreground/10"
               )} />
             </div>
             <div className={cn(
               "absolute inset-3 rounded-full flex items-center justify-center transition-all duration-300",
-              showListening ? "bg-danger/15 border-2 border-danger/40" :
+              showVisualizerActive ? (isSomali ? "bg-primary/15 border-2 border-primary/40" : "bg-danger/15 border-2 border-danger/40") :
               engine.tts.isSpeaking ? "bg-primary/20 border-2 border-primary/30" :
               "bg-surface border border-border"
             )}>
-              <Mic className={cn(
-                "w-8 h-8 transition-all duration-300",
-                showListening ? "text-danger" :
-                engine.tts.isSpeaking ? "text-primary" :
-                "text-text-muted"
-              )} />
+              {isSomali && isListeningPhase ? (
+                <Keyboard className="w-8 h-8 text-primary transition-all duration-300 animate-pulse" />
+              ) : (
+                <Mic className={cn(
+                  "w-8 h-8 transition-all duration-300",
+                  showListening ? "text-danger" :
+                  engine.tts.isSpeaking ? "text-primary" :
+                  "text-text-muted"
+                )} />
+              )}
             </div>
             <div className="absolute -inset-6 flex items-center justify-center pointer-events-none">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -428,11 +454,11 @@ export default function InterviewSessionPage() {
                   key={i}
                   className={cn(
                     "absolute w-[2px] rounded-full",
-                    showListening ? "bg-danger/40" : engine.tts.isSpeaking ? "bg-primary/40" : "bg-foreground/20"
+                    showVisualizerActive ? (isSomali ? "bg-primary/40" : "bg-danger/40") : engine.tts.isSpeaking ? "bg-primary/40" : "bg-foreground/20"
                   )}
                   animate={{
-                    height: showListening ? [14, 36, 14] : engine.tts.isSpeaking ? [20, 44, 20] : [14, 14, 14],
-                    opacity: showListening || engine.tts.isSpeaking ? [0.3, 0.7, 0.3] : [0.15],
+                    height: showVisualizerActive ? (isSomali ? [14, 24, 14] : [14, 36, 14]) : engine.tts.isSpeaking ? [20, 44, 20] : [14, 14, 14],
+                    opacity: showVisualizerActive || engine.tts.isSpeaking ? [0.3, 0.7, 0.3] : [0.15],
                   }}
                   transition={{
                     duration: 1 + i * 0.15,
@@ -486,7 +512,7 @@ export default function InterviewSessionPage() {
           </div>
 
           {/* Interim transcript — live mic feedback */}
-          {showListening && fullTranscript && (
+          {!isSomali && (showListening || engine.phase === "reviewing") && fullTranscript && (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
@@ -504,12 +530,50 @@ export default function InterviewSessionPage() {
                 </p>
               </div>
               <div className="flex items-center justify-center gap-2 mt-2">
-                <VolumeBar volume={engine.recognition.volume} />
-                {engine.recognition.isSpeaking ? (
-                  <span className="text-[9px] font-bold text-success uppercase tracking-widest">Speaking</span>
+                {showListening ? (
+                  <>
+                    <VolumeBar volume={engine.recognition.volume} />
+                    {engine.recognition.isSpeaking ? (
+                      <span className="text-[9px] font-bold text-success uppercase tracking-widest">Speaking</span>
+                    ) : (
+                      <span className="text-[9px] font-bold text-text-muted uppercase tracking-widest">Waiting...</span>
+                    )}
+                  </>
                 ) : (
-                  <span className="text-[9px] font-bold text-text-muted uppercase tracking-widest">Waiting...</span>
+                  <span className="text-[9px] font-bold text-text-muted uppercase tracking-widest">Recording Stopped — Review your answer</span>
                 )}
+              </div>
+            </motion.div>
+          )}
+
+          {isSomali && (engine.phase === "listening" || engine.phase === "reviewing") && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="max-w-2xl w-full px-4 mb-4 flex-shrink-0"
+            >
+              <div className="relative rounded-xl border border-border/40 bg-surface/30 backdrop-blur-md p-4 space-y-3 shadow-lg focus-within:border-primary/50 transition-all duration-300">
+                <textarea
+                  value={somaliAnswer}
+                  onChange={(e) => setSomaliAnswer(e.target.value)}
+                  placeholder="Ku qor jawaabtaada halkaan..."
+                  rows={4}
+                  className="w-full bg-transparent resize-none focus:outline-none text-sm text-text-primary placeholder:text-text-muted leading-relaxed"
+                  disabled={engine.phase === "processing"}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      if (somaliAnswer.trim() && engine.phase !== "processing") {
+                        engine.handleManualSubmit(somaliAnswer);
+                      }
+                    }
+                  }}
+                />
+                <div className="flex items-center justify-between text-[10px] text-text-muted font-semibold tracking-wide border-t border-border/20 pt-2.5">
+                  <p>Ku qor jawaabtaada af-Soomaali. Riix <kbd className="bg-foreground/5 px-1 py-0.5 rounded border border-border/40">Ctrl + Enter</kbd> si aad u gudbiso.</p>
+                  <p className="tabular-nums font-bold">{somaliAnswer.trim().length} xaraf</p>
+                </div>
               </div>
             </motion.div>
           )}
@@ -531,18 +595,18 @@ export default function InterviewSessionPage() {
         <div className="fixed bottom-0 left-0 w-full bg-background/90 backdrop-blur-md shadow-lg border-t border-border px-6 py-3 z-[10000]">
           <div className="max-w-4xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3 min-w-0">
-              {showListening ? (
+              {showListening && !isSomali ? (
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse" />
                   <span className="text-xs font-semibold text-text-secondary truncate">Listening</span>
                 </div>
-              ) : engine.recognition.error ? (
+              ) : engine.recognition.error && !isSomali ? (
                 <div className="flex items-center gap-2">
                   <MicOff className="w-4 h-4 text-danger flex-shrink-0" />
                   <span className="text-xs font-semibold text-danger truncate">Mic error</span>
                 </div>
               ) : null}
-              {engine.phase === "listening" && !showListening && isMicMuted && (
+              {engine.phase === "listening" && !showListening && isMicMuted && !isSomali && (
                 <span className="text-xs font-semibold text-warning">Mic muted</span>
               )}
             </div>
@@ -560,29 +624,43 @@ export default function InterviewSessionPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              {engine.phase === "listening" && (
-                <button
-                  onClick={engine.interruptAndContinue}
-                  className="h-8 px-3 rounded-lg text-[10px] font-bold text-foreground bg-foreground/[0.05] border border-border hover:bg-foreground/10 transition-colors"
-                >
-                  <SkipForward className="w-3 h-3 mr-1.5 inline-block align-middle" />
-                  {fullTranscript ? "Submit" : "Skip"}
-                </button>
+              {(engine.phase === "listening" || engine.phase === "reviewing") && (
+                <div className="flex items-center gap-2">
+                  {engine.phase === "listening" && !isSomali && (
+                    <button
+                      onClick={engine.stopRecordingForReview}
+                      className="h-8 px-3 rounded-lg text-[10px] font-bold text-foreground bg-warning/10 border border-warning/30 hover:bg-warning/20 transition-colors"
+                    >
+                      <Pause className="w-3 h-3 mr-1.5 inline-block align-middle" />
+                      Stop Recording (Space)
+                    </button>
+                  )}
+                  <button
+                    onClick={() => engine.handleManualSubmit(isSomali ? somaliAnswer : undefined)}
+                    disabled={isSomali && !somaliAnswer.trim()}
+                    className="h-8 px-3 rounded-lg text-[10px] font-bold text-white bg-primary hover:bg-primary/90 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <CheckCircle2 className="w-3 h-3 mr-1.5 inline-block align-middle" />
+                    Submit Answer
+                  </button>
+                </div>
               )}
 
-              <button
-                onClick={toggleMic}
-                disabled={!showListening}
-                className={cn(
-                  "w-10 h-10 rounded-full flex items-center justify-center transition-all",
-                  isMicMuted ? "bg-warning/10 text-warning border border-warning/30" :
-                  showListening ? "bg-danger/10 text-danger border border-danger/30" :
-                  "bg-foreground/[0.05] text-text-muted border border-border"
-                )}
-                title={isMicMuted ? "Unmute" : "Mute"}
-              >
-                {isMicMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-              </button>
+              {!isSomali && (
+                <button
+                  onClick={toggleMic}
+                  disabled={!showListening}
+                  className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center transition-all",
+                    isMicMuted ? "bg-warning/10 text-warning border border-warning/30" :
+                    showListening ? "bg-danger/10 text-danger border border-danger/30" :
+                    "bg-foreground/[0.05] text-text-muted border border-border"
+                  )}
+                  title={isMicMuted ? "Unmute" : "Mute"}
+                >
+                  {isMicMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+              )}
 
               <button
                 onClick={engine.isPaused ? engine.resume : engine.pause}

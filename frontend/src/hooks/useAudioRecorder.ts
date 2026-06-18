@@ -63,6 +63,10 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
       setError(null);
       chunksRef.current = [];
 
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,

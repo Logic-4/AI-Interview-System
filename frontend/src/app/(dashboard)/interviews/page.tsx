@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Plus,
   Search,
@@ -11,6 +12,7 @@ import {
   Briefcase,
   Clock,
   Trash2,
+  RotateCcw,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -49,6 +51,7 @@ function StatusBadge({ status, score }: { status: string; score: number | null }
 }
 
 export default function InterviewsPage() {
+  const router = useRouter();
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +63,7 @@ export default function InterviewsPage() {
   const [searchInput, setSearchInput] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null);
+  const [retakingId, setRetakingId] = useState<string | null>(null);
 
   const fetchInterviews = useCallback(async () => {
     setLoading(true);
@@ -103,6 +107,17 @@ export default function InterviewsPage() {
       setError("Failed to delete interview. Please try again.");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleRetake = async (id: string) => {
+    setRetakingId(id);
+    try {
+      await interviewService.resetInterview(id);
+      router.push(`/interviews/${id}`);
+    } catch {
+      setError("Failed to reset interview. Please try again.");
+      setRetakingId(null);
     }
   };
 
@@ -238,18 +253,34 @@ export default function InterviewsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-5">
-                      <button
-                        onClick={(e) => { e.preventDefault(); setConfirmDelete({ id: iv._id, title: iv.title }); }}
-                        disabled={deletingId === iv._id}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-text-muted hover:text-danger hover:bg-danger/5 transition-all disabled:opacity-30"
-                        title="Delete interview"
-                      >
-                        {deletingId === iv._id ? (
-                          <LoadingSpinner size="sm" />
-                        ) : (
-                          <Trash2 className="w-4 h-4" />
+                      <div className="flex items-center gap-1">
+                        {iv.status === "completed" && (
+                          <button
+                            onClick={(e) => { e.preventDefault(); handleRetake(iv._id); }}
+                            disabled={retakingId === iv._id}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-text-muted hover:text-primary hover:bg-primary/5 transition-all disabled:opacity-30"
+                            title="Retake interview"
+                          >
+                            {retakingId === iv._id ? (
+                              <LoadingSpinner size="sm" />
+                            ) : (
+                              <RotateCcw className="w-4 h-4" />
+                            )}
+                          </button>
                         )}
-                      </button>
+                        <button
+                          onClick={(e) => { e.preventDefault(); setConfirmDelete({ id: iv._id, title: iv.title }); }}
+                          disabled={deletingId === iv._id}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-text-muted hover:text-danger hover:bg-danger/5 transition-all disabled:opacity-30"
+                          title="Delete interview"
+                        >
+                          {deletingId === iv._id ? (
+                            <LoadingSpinner size="sm" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

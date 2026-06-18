@@ -17,6 +17,7 @@ export type ConversationPhase =
   | "transitioning"
   | "wrapping-up"
   | "analyzing"
+  | "reviewing"
   | "done";
 
 export interface ChatMessage {
@@ -66,6 +67,8 @@ export interface ConversationEngineReturn {
   start: () => void;
   pause: () => void;
   resume: () => void;
+  stopRecordingForReview: () => void;
+  handleManualSubmit: (textAnswer?: string) => void;
   interruptAndContinue: () => void;
 }
 
@@ -74,8 +77,6 @@ function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/* Silence threshold: if user is silent this long after speaking, auto-submit */
-const AUTO_SUBMIT_SILENCE_SEC = 3.5;
 /* Maximum listen time per question */
 const MAX_LISTEN_SEC = 120;
 
@@ -133,19 +134,23 @@ export function useConversationEngine(
   /* ── Pause / Resume ────────────────────────────────────── */
   const pause = useCallback(() => {
     if (isPausedRef.current) return;
+    isPausedRef.current = true;
     setIsPaused(true);
     tts.pause();
-    try { recognition.stopListening(); } catch {}
-  }, [tts, recognition]);
+    if (language.toLowerCase() !== "somali") {
+      try { recognition.stopListening(); } catch {}
+    }
+  }, [tts, recognition, language]);
 
   const resume = useCallback(() => {
     if (!isPausedRef.current) return;
+    isPausedRef.current = false;
     setIsPaused(false);
     tts.resume();
-    if (phaseRef.current === "listening") {
+    if (phaseRef.current === "listening" && language.toLowerCase() !== "somali") {
       recognition.startListening();
     }
-  }, [tts, recognition]);
+  }, [tts, recognition, language]);
 
   /* ── Speak and wait until done ─────────────────────────── */
   const speakAndWait = useCallback(
@@ -168,7 +173,7 @@ export function useConversationEngine(
     };
   }, [phase, isPaused]);
 
-  /* ── Auto-submit when user stops speaking ──────────────── */
+  /* ── Auto-submit removed, only max time guard remains ──── */
   useEffect(() => {
     if (phase !== "listening") return;
     if (isPaused) return;
@@ -176,42 +181,41 @@ export function useConversationEngine(
 
     const fullText = (recognition.finalTranscript + " " + recognition.interimTranscript).trim();
 
-    // User has spoken something and is now silent long enough → auto submit
-    if (
-      fullText.length > 0 &&
-      hasSpokenRef.current &&
-      recognition.silenceDuration >= AUTO_SUBMIT_SILENCE_SEC
-    ) {
-      handleAutoSubmit(fullText);
-      return;
-    }
-
-    // Track whether user has started speaking
-    if (recognition.isSpeaking && fullText.length > 2) {
-      hasSpokenRef.current = true;
-    }
-
     // Max time guard
     const elapsed = (Date.now() - listenStartRef.current) / 1000;
     if (elapsed > MAX_LISTEN_SEC && fullText.length > 0) {
-      handleAutoSubmit(fullText);
+      stopRecordingForReview();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     phase,
-    recognition.silenceDuration,
     recognition.finalTranscript,
     recognition.interimTranscript,
-    recognition.isSpeaking,
     recognition.isListening,
   ]);
 
-  /* ── Handle auto submit ────────────────────────────────── */
-  const handleAutoSubmit = useCallback(
-    async (transcript: string) => {
-      if (phaseRef.current !== "listening") return;
+  /* ── Stop recording for review ─────────────────────────── */
+  const stopRecordingForReview = useCallback(() => {
+    if (phaseRef.current === "listening") {
+      if (language.toLowerCase() !== "somali") {
+        recognition.stopListening();
+      }
+      setPhase("reviewing");
+    }
+  }, [recognition, language]);
+
+  /* ── Handle manual submit ────────────────────────────────── */
+  const handleManualSubmit = useCallback(
+    async (textAnswer?: string) => {
+      if (phaseRef.current !== "listening" && phaseRef.current !== "reviewing") return;
       setPhase("processing");
-      recognition.stopListening();
+      if (language.toLowerCase() !== "somali") {
+        recognition.stopListening();
+      }
+      
+      const transcript = textAnswer !== undefined
+        ? (textAnswer.trim() || "[No answer provided]")
+        : ((recognition.finalTranscript + " " + recognition.interimTranscript).trim() || "[No audio detected. The candidate submitted without speaking.]");
 
       const question = questions[currentQuestionIndex];
       if (!question) return;
@@ -251,7 +255,9 @@ export function useConversationEngine(
           hasSpokenRef.current = false;
           listenStartRef.current = Date.now();
           recognition.resetTranscript();
-          recognition.startListening();
+          if (language.toLowerCase() !== "somali") {
+            recognition.startListening();
+          }
           return;
         }
 
@@ -309,10 +315,12 @@ export function useConversationEngine(
       listenStartRef.current = Date.now();
       questionTimerRef.current = 0;
       recognition.resetTranscript();
-      recognition.startListening();
+      if (language.toLowerCase() !== "somali") {
+        recognition.startListening();
+      }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [questions, speakAndWait]
+    [questions, speakAndWait, language]
   );
 
   /* ── Wrap up ───────────────────────────────────────────── */
@@ -374,15 +382,12 @@ export function useConversationEngine(
   /* ── Manual interrupt (skip / continue) ────────────────── */
   const interruptAndContinue = useCallback(() => {
     tts.cancel();
-    recognition.stopListening();
+    if (language.toLowerCase() !== "somali") {
+      recognition.stopListening();
+    }
 
-    const fullText = (recognition.finalTranscript + " " + recognition.interimTranscript).trim();
-
-    if (phase === "listening" && fullText.length > 0) {
-      handleAutoSubmit(fullText);
-    } else if (phase === "listening") {
-      // User skips without answering, act like they submitted empty text
-      handleAutoSubmit("I don't have an answer for this.");
+    if (phase === "listening" || phase === "reviewing") {
+      handleManualSubmit();
     }
   }, [
     phase,
@@ -390,9 +395,11 @@ export function useConversationEngine(
     recognition,
     currentQuestionIndex,
     questions.length,
-    handleAutoSubmit,
+    handleManualSubmit,
+    stopRecordingForReview,
     askQuestion,
     wrapUp,
+    language,
   ]);
 
   /* ── Cleanup on unmount ────────────────────────────────── */
@@ -421,6 +428,8 @@ export function useConversationEngine(
     start,
     pause,
     resume,
+    stopRecordingForReview,
+    handleManualSubmit,
     interruptAndContinue,
   };
 }
