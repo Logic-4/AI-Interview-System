@@ -60,10 +60,12 @@ api.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
-        // Refresh failed — clear cookie via server + local state, then redirect
+        // Refresh failed — clear ALL auth state, then redirect
         if (typeof window !== 'undefined') {
           localStorage.removeItem('accessToken');
           localStorage.removeItem('auth-storage');
+          // Also clear the accessToken cookie so middleware doesn't block the login page
+          try { document.cookie = 'accessToken=; Max-Age=0; path=/;'; } catch {}
           try {
             await axios.post(
               `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1"}/auth/logout`,

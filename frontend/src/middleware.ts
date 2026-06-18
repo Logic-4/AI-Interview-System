@@ -18,33 +18,10 @@ const PROTECTED_PATHS = [
 
 const AUTH_PATHS = ['/login', '/register', '/forgot-password', '/reset-password'];
 
-async function hasValidSession(request: NextRequest): Promise<boolean> {
-  const token = request.cookies.get('accessToken')?.value;
-  
-  // Fast fail if no token
-  if (!token) return false;
-
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
-
-  try {
-    const response = await fetch(`${apiBaseUrl}/auth/me`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-      cache: 'no-store',
-    });
-
-    return response.ok;
-  } catch (error) {
-    console.error('Middleware session check failed:', error);
-    return false;
-  }
-}
-
-export async function middleware(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Skip static assets, API routes, auth callbacks
   if (pathname.startsWith('/auth/callback') || pathname.startsWith('/_next') || pathname.includes('.')) {
     return NextResponse.next();
   }
@@ -56,15 +33,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const hasSession = await hasValidSession(request);
+  // Lightweight check: only verify that the accessToken cookie exists.
+  // The client-side api.ts interceptor handles token refresh and expiry.
+  // This prevents the middleware from blocking users whose tokens expired
+  // during long-running interviews.
+  const hasToken = !!request.cookies.get('accessToken')?.value;
 
-  if (isProtected && !hasSession) {
+  if (isProtected && !hasToken) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('from', pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  if (isAuthPath && hasSession) {
+  if (isAuthPath && hasToken) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
@@ -76,3 +57,4 @@ export const config = {
     '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };
+

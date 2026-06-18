@@ -41,14 +41,15 @@ export default function LoginPage() {
 
     const syncSession = async () => {
       try {
-        const hasSession = await authService.validateSession();
-        if (!active) return;
-
-        if (!hasSession) {
+        // Check if we have an access token stored locally
+        const storedToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+        if (!storedToken) {
+          // No token at all — not logged in
           logout();
           return;
         }
 
+        // Try to get user profile — the api.ts interceptor will auto-refresh if needed
         const user = await authService.getMe();
         if (!active) return;
 
