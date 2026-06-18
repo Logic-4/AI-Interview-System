@@ -109,9 +109,10 @@ export default function SettingsPage() {
           setKaggleMsg({ type: "error", text: res.data.data.error || "Kaggle model is offline." });
         }
       }
-    } catch (err: any) {
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
       setKaggleStatus("offline");
-      setKaggleMsg({ type: "error", text: err.response?.data?.message || "Failed to contact backend config API." });
+      setKaggleMsg({ type: "error", text: error.response?.data?.message || "Failed to contact backend config API." });
     } finally {
       setCheckingStatus(false);
     }
@@ -129,8 +130,9 @@ export default function SettingsPage() {
         setKaggleError(res.data.data.error);
         setKaggleMsg({ type: "success", text: "Kaggle configuration updated." });
       }
-    } catch (err: any) {
-      setKaggleMsg({ type: "error", text: err.response?.data?.message || "Failed to update Kaggle URL." });
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setKaggleMsg({ type: "error", text: error.response?.data?.message || "Failed to update Kaggle URL." });
     } finally {
       setUpdatingKaggle(false);
     }
@@ -582,7 +584,7 @@ export default function SettingsPage() {
                 <ol className="list-decimal list-inside space-y-1 text-text-muted">
                   <li>Open your Fine-tuning / Inference notebook in Kaggle.</li>
                   <li>Paste and run the updated FastAPI python code.</li>
-                  <li>The script will automatically download Cloudflare's tunnel agent in the background and start the tunnel.</li>
+                  <li>The script will automatically download Cloudflare&apos;s tunnel agent in the background and start the tunnel.</li>
                   <li>Copy the generated <code className="bg-foreground/10 px-1 py-0.5 rounded text-primary">trycloudflare.com</code> URL and paste it in the field above.</li>
                 </ol>
               </div>
