@@ -27,19 +27,15 @@ async function hasValidSession(request: NextRequest): Promise<boolean> {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
   try {
-    const response = await fetch(`${apiBaseUrl}/auth/session`, {
+    const response = await fetch(`${apiBaseUrl}/auth/me`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Cookie': request.headers.get('cookie') || '',
       },
       cache: 'no-store',
     });
 
-    if (!response.ok) return false;
-
-    const payload = await response.json();
-    return Boolean(payload?.data?.authenticated);
+    return response.ok;
   } catch (error) {
     console.error('Middleware session check failed:', error);
     return false;
