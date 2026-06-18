@@ -14,7 +14,7 @@ const getRefreshDuration = (rememberMe) => (rememberMe ? REMEMBER_REFRESH_EXPIRE
 const getRefreshCookieOptions = (expiresIn) => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
   maxAge: getExpiryMs(expiresIn),
 });
 
@@ -195,7 +195,7 @@ const logout = async (req, res, next) => {
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     });
 
     ApiResponse.success(res, null, 'Logout successful');
@@ -229,7 +229,7 @@ const validateSession = async (req, res, next) => {
     const clearCookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     };
 
     if (!token) {
