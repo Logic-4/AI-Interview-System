@@ -1,29 +1,8 @@
-"use client";
-
 import * as React from "react";
-import { cva, type VariantProps } from "class-variance-authority";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 
-const inputVariants = cva(
-  "flex h-12 w-full rounded-lg border border-input bg-surface-2 px-4 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200",
-  {
-    variants: {
-      variant: {
-        default: "border-border hover:border-border-light",
-        filled: "bg-surface-3 border-transparent hover:bg-surface-3/80",
-        floating: "pt-6 pb-2", // Custom padding for floating label
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-    },
-  }
-);
-
-export interface InputProps
-  extends React.InputHTMLAttributes<HTMLInputElement>,
-    VariantProps<typeof inputVariants> {
+export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   error?: string;
   label?: string;
   leftIcon?: React.ReactNode;
@@ -32,36 +11,35 @@ export interface InputProps
 }
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, error, label, leftIcon, rightIcon, success, variant, ...props }, ref) => {
-
+  ({ className, type, error, label, leftIcon, rightIcon, success, ...props }, ref) => {
     return (
-      <div className="w-full space-y-1.5 group">
+      <div className={cn("w-full space-y-1.5 group", error && "has-error", success && "has-success")}>
         {label && (
-          <label className="text-sm font-medium text-text-secondary leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+          <label className="text-sm font-semibold text-text-secondary dark:text-white-dark mb-1.5 block">
             {label}
           </label>
         )}
         <div className="relative">
           {leftIcon && (
-            <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted transition-colors group-focus-within:text-primary">
+            <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted transition-colors group-focus-within:text-primary z-10">
               {leftIcon}
             </div>
           )}
           <input
             type={type}
             className={cn(
-              inputVariants({ variant, className }),
+              "form-input",
               leftIcon && "pl-11",
               rightIcon && "pr-11",
-              error && "border-danger ring-danger focus-visible:ring-danger",
-              success && "border-success ring-success focus-visible:ring-success",
-              "group-hover:shadow-[0_0_10px_rgba(108,92,231,0.05)]"
+              error && "border-danger focus:border-danger text-danger bg-danger/[0.08] placeholder-danger/70",
+              success && "border-success focus:border-success text-success bg-success/[0.08] placeholder-success/70",
+              className
             )}
             ref={ref}
             {...props}
           />
           {rightIcon && (
-            <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-text-muted transition-colors group-focus-within:text-primary">
+            <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-text-muted transition-colors group-focus-within:text-primary z-10">
               {rightIcon}
             </div>
           )}
@@ -72,7 +50,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="text-xs font-medium text-danger"
+              className="text-xs font-semibold text-danger mt-1"
             >
               {error}
             </motion.p>

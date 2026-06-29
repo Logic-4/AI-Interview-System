@@ -1,5 +1,4 @@
 import React from "react";
-import Image from "next/image";
 
 export function LiveVideoFeed() {
   return (
@@ -13,12 +12,10 @@ export function LiveVideoFeed() {
 
           {/* AI Avatar */}
           <div className="w-48 h-48 rounded-full border-4 border-[#1A2234]/50 overflow-hidden relative shadow-[0_0_40px_rgba(59,130,246,0.1)]">
-             <Image 
+             <img 
                src="/ai-avatar.png" 
                alt="AI Interviewer" 
-               fill 
-               className="object-cover" 
-               priority
+               className="w-full h-full object-cover" 
              />
              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#090C15]/40 mix-blend-overlay" />
           </div>

@@ -1,34 +1,23 @@
-"use client";
-
-import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
-import { Moon, Sun } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/utils";
+import { useDispatch, useSelector } from 'react-redux';
+import { IRootState } from '../../store';
+import { toggleTheme } from '../../store/themeConfigSlice';
+import { Moon, Sun } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { cn } from '../../lib/utils';
 
 export default function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const themeConfig = useSelector((state: IRootState) => state.themeConfig);
+  const dispatch = useDispatch();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return (
-      <div className="w-10 h-10 rounded-xl bg-surface-2 border border-border animate-pulse" />
-    );
-  }
-
-  const isDark = theme === "dark";
+  const isDark = themeConfig.theme === 'dark';
 
   return (
     <button
-      onClick={() => setTheme(isDark ? "light" : "dark")}
+      onClick={() => dispatch(toggleTheme(isDark ? 'light' : 'dark'))}
       className={cn(
         "relative w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300",
-        "bg-surface-2 hover:bg-surface-3 border border-border overflow-hidden group",
-        "hover:scale-105 active:scale-95 hover:shadow-lg hover:shadow-primary/10"
+        "bg-white-light/30 dark:bg-[#1a2941]/50 border border-white-light dark:border-[#1b2e4b] overflow-hidden group",
+        "hover:scale-105 active:scale-95 hover:shadow-lg"
       )}
       aria-label="Toggle theme"
     >
@@ -42,18 +31,12 @@ export default function ThemeToggle() {
           className="relative z-10"
         >
           {isDark ? (
-            <Moon className="w-5 h-5 text-primary group-hover:text-primary transition-colors" />
+            <Moon className="w-5 h-5 text-primary" />
           ) : (
-            <Sun className="w-5 h-5 text-tertiary group-hover:text-tertiary transition-colors" />
+            <Sun className="w-5 h-5 text-warning" />
           )}
         </motion.div>
       </AnimatePresence>
-      
-      {/* Background glow effect */}
-      <div className={cn(
-        "absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500",
-        isDark ? "bg-gradient-to-tr from-primary/10 to-transparent" : "bg-gradient-to-tr from-tertiary/10 to-transparent"
-      )} />
     </button>
   );
 }

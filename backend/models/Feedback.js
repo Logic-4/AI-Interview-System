@@ -63,6 +63,10 @@ const feedbackSchema = new mongoose.Schema(
         trim: true,
       },
     ],
+    visualMetrics: {
+      type: mongoose.Schema.Types.Mixed,
+      default: undefined,
+    },
     aiModel: {
       type: String,
       default: 'gemma-3-technical-interviewer',

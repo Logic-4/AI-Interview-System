@@ -63,6 +63,10 @@ const interviewSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    resumeText: {
+      type: String,
+      default: '',
+    },
     roleProfile: {
       type: mongoose.Schema.Types.Mixed,
       default: null,
@@ -130,6 +134,10 @@ const interviewSchema = new mongoose.Schema(
         },
       },
     ],
+    visualMetrics: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
     isDeleted: {
       type: Boolean,
       default: false,

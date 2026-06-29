@@ -1,42 +1,12 @@
-"use client";
-
 import * as React from "react";
-import { cva, type VariantProps } from "class-variance-authority";
 import { motion, HTMLMotionProps } from "framer-motion";
 import { Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
-
-const buttonVariants = cva(
-  "inline-flex items-center justify-center rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 active:scale-95",
-  {
-    variants: {
-      variant: {
-        primary: "bg-primary text-primary-foreground shadow-[0_0_15px_rgba(108,92,231,0.2)] hover:shadow-[0_0_25px_rgba(108,92,231,0.4)] hover:bg-primary/90",
-        secondary: "bg-secondary text-secondary-foreground shadow-[0_0_15px_rgba(0,210,255,0.2)] hover:shadow-[0_0_25px_rgba(0,210,255,0.4)] hover:bg-secondary/90",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        danger: "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-[0_0_15px_rgba(255,82,82,0.2)] hover:shadow-[0_0_25px_rgba(255,82,82,0.4)]",
-        outline: "border border-border bg-background hover:bg-accent hover:text-accent-foreground",
-        premium: "bg-gradient-primary text-primary-foreground shadow-[0_0_20px_rgba(108,92,231,0.4)] hover:shadow-[0_0_30px_rgba(108,92,231,0.6)] border-none",
-      },
-      size: {
-        xs: "h-7 px-2 text-xs",
-        sm: "h-9 px-3",
-        md: "h-11 px-6",
-        lg: "h-12 px-8 text-base",
-        xl: "h-14 px-10 text-lg",
-        icon: "h-11 w-11",
-      },
-    },
-    defaultVariants: {
-      variant: "primary",
-      size: "md",
-    },
-  }
-);
+import { cn } from "../../lib/utils";
 
 export interface ButtonProps
-  extends Omit<HTMLMotionProps<"button">, "onDrag" | "onDragStart" | "onDragEnd" | "onAnimationStart" | "children">,
-    VariantProps<typeof buttonVariants> {
+  extends Omit<HTMLMotionProps<"button">, "onDrag" | "onDragStart" | "onDragEnd" | "onAnimationStart" | "children"> {
+  variant?: "primary" | "secondary" | "ghost" | "danger" | "outline" | "premium";
+  size?: "xs" | "sm" | "md" | "lg" | "xl" | "icon";
   isLoading?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
@@ -45,13 +15,38 @@ export interface ButtonProps
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, isLoading, leftIcon, rightIcon, noMotion = false, children, ...props }, ref) => {
+  ({ className, variant = "primary", size = "md", isLoading, leftIcon, rightIcon, noMotion = false, children, ...props }, ref) => {
+    
+    // Map variants directly to Vristo template styles
+    const variantClass = (() => {
+      switch (variant) {
+        case "secondary": return "btn btn-secondary shadow-secondary/20";
+        case "danger": return "btn btn-danger shadow-danger/20";
+        case "outline": return "btn btn-outline-primary";
+        case "ghost": return "btn hover:bg-primary/10 hover:text-primary border-transparent shadow-none";
+        case "premium": return "btn btn-primary bg-gradient-primary border-transparent text-white shadow-primary/20";
+        default: return "btn btn-primary shadow-primary/20";
+      }
+    })();
+
+    // Map sizes to Vristo sizes
+    const sizeClass = (() => {
+      switch (size) {
+        case "xs": return "btn-sm py-1 px-2 text-[10px]";
+        case "sm": return "btn-sm";
+        case "lg": return "btn-lg";
+        case "xl": return "btn-lg py-3 px-8 text-base";
+        case "icon": return "p-2 rounded-full";
+        default: return "";
+      }
+    })();
+
     return (
       <motion.button
         ref={ref}
-        whileHover={noMotion ? undefined : { y: -2 }}
-        whileTap={noMotion ? undefined : { scale: 0.96 }}
-        className={cn(buttonVariants({ variant, size, className }))}
+        whileHover={noMotion || props.disabled || isLoading ? undefined : { y: -2 }}
+        whileTap={noMotion || props.disabled || isLoading ? undefined : { scale: 0.96 }}
+        className={cn(variantClass, sizeClass, className)}
         disabled={isLoading || props.disabled}
         {...props}
       >
@@ -68,4 +63,4 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 );
 Button.displayName = "Button";
 
-export { Button, buttonVariants };
+export { Button };

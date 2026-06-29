@@ -17,6 +17,7 @@ export interface Interview {
   jobRole?: string;
   focusSkills?: string[];
   jobDescription?: string;
+  resumeText?: string;
   scheduledAt?: string;
   startedAt?: string;
   completedAt?: string;
@@ -47,6 +48,7 @@ export interface CreateInterviewPayload {
   jobRole?: string;
   focusSkills?: string[];
   jobDescription?: string;
+  resumeText?: string;
   scheduledAt?: string;
   questionCount?: number;
   tags?: string[];

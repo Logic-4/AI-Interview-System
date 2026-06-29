@@ -8,7 +8,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   setUser: (user: User | null) => void;
-  login: (user: User, accessToken: string) => void;
+  login: (user: User, accessToken: string, rememberMe?: boolean) => void;
   logout: () => void;
   setLoading: (loading: boolean) => void;
 }
@@ -20,11 +20,15 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: false,
       setUser: (user) => set({ user, isAuthenticated: !!user }),
-      login: (user, accessToken) => {
+      login: (user, accessToken, rememberMe = false) => {
         if (typeof window !== 'undefined') {
           localStorage.setItem('accessToken', accessToken);
-          // Sync with cookie for middleware (expires in 7 days)
-          Cookies.set('accessToken', accessToken, { expires: 7, secure: true, sameSite: 'strict' });
+          // Sync with cookie for middleware (expires in 7 days if rememberMe is true, else session only)
+          const cookieOptions: any = { secure: true, sameSite: 'strict' };
+          if (rememberMe) {
+            cookieOptions.expires = 7;
+          }
+          Cookies.set('accessToken', accessToken, cookieOptions);
         }
         set({ user, isAuthenticated: true });
       },

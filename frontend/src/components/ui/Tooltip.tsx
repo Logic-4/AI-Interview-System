@@ -1,9 +1,7 @@
-"use client";
-
 import * as React from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { motion } from "framer-motion";
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 
 const TooltipProvider = TooltipPrimitive.Provider;
 const Tooltip = TooltipPrimitive.Root;
@@ -19,7 +17,7 @@ const TooltipContent = React.forwardRef<
       asChild
       sideOffset={sideOffset}
       className={cn(
-        "z-50 overflow-hidden rounded-lg bg-surface-2 border border-white/5 px-3 py-1.5 text-xs font-semibold text-text-primary shadow-[0_4px_20px_rgba(0,0,0,0.4)] backdrop-blur-md animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+        "z-50 overflow-hidden rounded-md bg-white border border-white-light dark:border-[#17263c] dark:bg-[#121e32] px-3 py-1.5 text-xs font-semibold text-black dark:text-white shadow-md backdrop-blur-md animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
         className
       )}
       {...props}
@@ -30,7 +28,7 @@ const TooltipContent = React.forwardRef<
         exit={{ opacity: 0, scale: 0.9 }}
       >
         {props.children}
-        <TooltipPrimitive.Arrow className="fill-surface-2" />
+        <TooltipPrimitive.Arrow className="fill-white dark:fill-[#121e32]" />
       </motion.div>
     </TooltipPrimitive.Content>
   </TooltipPrimitive.Portal>

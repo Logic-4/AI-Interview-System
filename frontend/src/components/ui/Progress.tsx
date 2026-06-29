@@ -1,9 +1,7 @@
-"use client";
-
 import * as React from "react";
 import * as ProgressPrimitive from "@radix-ui/react-progress";
 import { motion } from "framer-motion";
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 
 interface ProgressProps extends React.ComponentPropsWithoutRef<typeof ProgressPrimitive.Root> {
   variant?: "bar" | "circular" | "ring";
@@ -35,9 +33,8 @@ const Progress = React.forwardRef<
     return (
       <div className={cn("relative flex items-center justify-center", dimensions, className)}>
         <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
-          {/* Background circle */}
           <circle
-            className="text-surface-3"
+            className="text-white-light dark:text-[#1b2e4b]"
             strokeWidth={strokeWidth}
             stroke="currentColor"
             fill="transparent"
@@ -45,18 +42,7 @@ const Progress = React.forwardRef<
             cx="50"
             cy="50"
           />
-          {/* Progress circle */}
           <motion.circle
-            className={cn(
-              !gradient && {
-                primary: "text-primary",
-                secondary: "text-secondary",
-                success: "text-success",
-                warning: "text-warning",
-                danger: "text-danger",
-                info: "text-info",
-              }[color]
-            )}
             strokeWidth={strokeWidth}
             strokeDasharray={circumference}
             initial={{ strokeDashoffset: circumference }}
@@ -64,6 +50,7 @@ const Progress = React.forwardRef<
             transition={{ duration: 1, ease: "easeInOut" }}
             strokeLinecap="round"
             stroke={gradient ? "url(#progressGradient)" : "currentColor"}
+            className={cn(!gradient && `text-${color}`)}
             fill="transparent"
             r={radius}
             cx="50"
@@ -72,8 +59,8 @@ const Progress = React.forwardRef<
           {gradient && (
             <defs>
               <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor={`hsl(var(--${color}-gradient-start))`} />
-                <stop offset="100%" stopColor={`hsl(var(--${color}-gradient-end))`} />
+                <stop offset="0%" stopColor={`hsl(var(--${color}-gradient-start))` || "#2563EB"} />
+                <stop offset="100%" stopColor={`hsl(var(--${color}-gradient-end))` || "#0F172A"} />
               </linearGradient>
             </defs>
           )}
@@ -108,7 +95,7 @@ const Progress = React.forwardRef<
       <ProgressPrimitive.Root
         ref={ref}
         className={cn(
-          "relative h-2 w-full overflow-hidden rounded-full bg-surface-3",
+          "relative h-2 w-full overflow-hidden rounded-full bg-white-light dark:bg-[#1b2e4b]",
           {
             sm: "h-1",
             md: "h-2",

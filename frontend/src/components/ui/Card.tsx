@@ -1,37 +1,23 @@
-"use client";
-
 import * as React from "react";
-import { cva, type VariantProps } from "class-variance-authority";
 import { motion } from "framer-motion";
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 
-const cardVariants = cva(
-  "rounded-2xl border transition-all duration-300 relative overflow-hidden",
-  {
-    variants: {
-      variant: {
-        default: "bg-surface border-border hover:border-border-light shadow-sm hover:shadow-md hover:-translate-y-1",
-        elevated: "bg-surface border-transparent shadow-[0_4px_25px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_40px_rgba(0,0,0,0.12)] hover:-translate-y-1",
-        bordered: "bg-surface border-border-light shadow-none hover:border-primary/40",
-        glass: "glass-effect backdrop-blur-xl bg-surface/10 border-border/10 hover:border-border/20 hover:shadow-[0_0_50px_hsla(var(--primary),0.1)]",
-        gradient: "bg-surface group",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-    },
-  }
-);
-
-export interface CardProps
-  extends Omit<React.ComponentPropsWithoutRef<typeof motion.div>, "children">,
-    VariantProps<typeof cardVariants> {
+export interface CardProps extends Omit<React.ComponentPropsWithoutRef<typeof motion.div>, "children"> {
+  variant?: "default" | "elevated" | "bordered" | "glass" | "gradient";
   hoverEffect?: boolean;
   children?: React.ReactNode;
 }
 
 const Card = React.forwardRef<HTMLDivElement, CardProps>(
-  ({ className, variant, hoverEffect = true, children, ...props }, ref) => {
+  ({ className, variant = "default", hoverEffect = true, children, ...props }, ref) => {
+    // Map card classes to Vristo panel and shadows
+    const cardClass = cn(
+      "panel transition-all duration-300 relative overflow-hidden",
+      variant === "glass" && "glass-effect",
+      variant === "gradient" && "group",
+      className
+    );
+
     return (
       <motion.div
         ref={ref}
@@ -40,11 +26,10 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
             ? {
                 y: -4,
                 scale: 1.01,
-                boxShadow: "0 20px 25px -5px hsla(var(--foreground), 0.05), 0 8px 10px -6px hsla(var(--foreground), 0.05)",
               }
             : {}
         }
-        className={cn(cardVariants({ variant, className }))}
+        className={cardClass}
         {...props}
       >
         {variant === "gradient" && (
@@ -58,11 +43,11 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
 Card.displayName = "Card";
 
 const CardHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("p-6 flex flex-col space-y-1.5", className)} {...props} />
+  <div className={cn("flex flex-col space-y-1.5 mb-4", className)} {...props} />
 );
 
 const CardTitle = ({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => (
-  <h3 className={cn("text-xl font-semibold leading-none tracking-tight text-text-primary", className)} {...props} />
+  <h3 className={cn("text-xl font-bold leading-none tracking-tight text-text-primary", className)} {...props} />
 );
 
 const CardDescription = ({ className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) => (
@@ -70,11 +55,11 @@ const CardDescription = ({ className, ...props }: React.HTMLAttributes<HTMLParag
 );
 
 const CardContent = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("p-6 pt-0 text-text-secondary", className)} {...props} />
+  <div className={cn("text-text-secondary", className)} {...props} />
 );
 
 const CardFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex items-center p-6 pt-0 mt-auto", className)} {...props} />
+  <div className={cn("flex items-center mt-4 pt-4 border-t border-white-light dark:border-[#1b2e4b]", className)} {...props} />
 );
 
 export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter };

@@ -11,12 +11,17 @@ const REMEMBER_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_REMEMBER_EXPIRES_IN 
 
 const getRefreshDuration = (rememberMe) => (rememberMe ? REMEMBER_REFRESH_EXPIRES_IN : DEFAULT_REFRESH_EXPIRES_IN);
 
-const getRefreshCookieOptions = (expiresIn) => ({
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-  maxAge: getExpiryMs(expiresIn),
-});
+const getRefreshCookieOptions = (expiresIn, rememberMe = true) => {
+  const options = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  };
+  if (rememberMe) {
+    options.maxAge = getExpiryMs(expiresIn);
+  }
+  return options;
+};
 
 /**
  * @desc    Register a new user
@@ -51,7 +56,7 @@ const register = async (req, res, next) => {
     await user.save();
 
     // Set refresh token in httpOnly cookie
-    res.cookie('refreshToken', refreshToken, getRefreshCookieOptions(refreshExpiresIn));
+    res.cookie('refreshToken', refreshToken, getRefreshCookieOptions(refreshExpiresIn, shouldRemember));
 
     logger.info(`New user registered: ${email}`);
 
@@ -102,7 +107,7 @@ const login = async (req, res, next) => {
     await user.save();
 
     // Set refresh token cookie
-    res.cookie('refreshToken', refreshToken, getRefreshCookieOptions(refreshExpiresIn));
+    res.cookie('refreshToken', refreshToken, getRefreshCookieOptions(refreshExpiresIn, shouldRemember));
 
     logger.info(`User logged in: ${email}`);
 
@@ -160,7 +165,7 @@ const refreshTokenHandler = async (req, res, next) => {
     });
     await user.save();
 
-    res.cookie('refreshToken', newRefreshToken, getRefreshCookieOptions(refreshExpiresIn));
+    res.cookie('refreshToken', newRefreshToken, getRefreshCookieOptions(refreshExpiresIn, shouldRemember));
 
     ApiResponse.success(res, { accessToken: newAccessToken }, 'Token refreshed');
   } catch (error) {

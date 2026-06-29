@@ -105,6 +105,7 @@ const generateFeedback = async (req, res, next) => {
       improvements: aiFeedback.improvements,
       detailedFeedback: aiFeedback.detailedFeedback,
       recommendations: aiFeedback.recommendations,
+      visualMetrics: interview.visualMetrics || undefined,
       aiModel: 'gemma-3-technical-interviewer',
     });
 

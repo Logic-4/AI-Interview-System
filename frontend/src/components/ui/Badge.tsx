@@ -1,118 +1,69 @@
-"use client";
-
 import * as React from "react";
-import { cva, type VariantProps } from "class-variance-authority";
 import { X } from "lucide-react";
 import { motion } from "framer-motion";
-import { cn } from "@/lib/utils";
-
-const badgeVariants = cva(
-  "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-  {
-    variants: {
-      variant: {
-        filled: "border-transparent",
-        outlined: "bg-transparent",
-        soft: "border-transparent bg-opacity-10",
-      },
-      color: {
-        primary: "bg-primary text-primary-foreground hover:bg-primary/80 border-primary",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 border-secondary",
-        success: "bg-success text-success-foreground hover:bg-success/80 border-success",
-        warning: "bg-warning text-warning-foreground hover:bg-warning/80 border-warning",
-        danger: "bg-danger text-danger-foreground hover:bg-danger/80 border-danger",
-        info: "bg-info text-info-foreground hover:bg-info/80 border-info",
-        muted: "bg-muted text-muted-foreground hover:bg-muted/80 border-border",
-      },
-    },
-    compoundVariants: [
-      {
-        variant: "soft",
-        color: "primary",
-        className: "bg-primary/10 text-primary border-transparent",
-      },
-      {
-        variant: "soft",
-        color: "secondary",
-        className: "bg-secondary/10 text-secondary border-transparent",
-      },
-      {
-        variant: "soft",
-        color: "success",
-        className: "bg-success/10 text-success border-transparent",
-      },
-      {
-        variant: "soft",
-        color: "warning",
-        className: "bg-warning/10 text-warning border-transparent",
-      },
-      {
-        variant: "soft",
-        color: "danger",
-        className: "bg-danger/10 text-danger border-transparent",
-      },
-      {
-        variant: "soft",
-        color: "info",
-        className: "bg-info/10 text-info border-transparent",
-      },
-      {
-        variant: "outlined",
-        color: "primary",
-        className: "text-primary border-primary hover:bg-primary/5",
-      },
-      {
-        variant: "outlined",
-        color: "secondary",
-        className: "text-secondary border-secondary hover:bg-secondary/5",
-      },
-      {
-        variant: "outlined",
-        color: "success",
-        className: "text-success border-success hover:bg-success/5",
-      },
-      {
-        variant: "outlined",
-        color: "warning",
-        className: "text-warning border-warning hover:bg-warning/5",
-      },
-      {
-        variant: "outlined",
-        color: "danger",
-        className: "text-danger border-danger hover:bg-danger/5",
-      },
-      {
-        variant: "outlined",
-        color: "info",
-        className: "text-info border-info hover:bg-info/5",
-      },
-    ],
-    defaultVariants: {
-      variant: "filled",
-      color: "primary",
-    },
-  }
-);
+import { cn } from "../../lib/utils";
 
 export interface BadgeProps
-  extends Omit<React.ComponentPropsWithoutRef<typeof motion.div>, "children" | "color">,
-    VariantProps<typeof badgeVariants> {
+  extends Omit<React.ComponentPropsWithoutRef<typeof motion.div>, "children" | "color"> {
+  variant?: "filled" | "outlined" | "soft";
+  color?: "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "muted";
   onClose?: () => void;
   icon?: React.ReactNode;
   children?: React.ReactNode;
 }
 
-function Badge({ className, variant, color, onClose, icon, children, ...props }: BadgeProps) {
+function Badge({ className, variant = "filled", color = "primary", onClose, icon, children, ...props }: BadgeProps) {
+  
+  // Map color + variant to Vristo badge styles
+  const badgeClass = (() => {
+    const isOutlined = variant === "outlined";
+    const isSoft = variant === "soft";
+    
+    if (isOutlined) {
+      switch (color) {
+        case "secondary": return "badge badge-outline-secondary";
+        case "success": return "badge badge-outline-success";
+        case "warning": return "badge badge-outline-warning";
+        case "danger": return "badge badge-outline-danger";
+        case "info": return "badge badge-outline-info";
+        case "muted": return "badge badge-outline-dark";
+        default: return "badge badge-outline-primary";
+      }
+    } else if (isSoft) {
+      // Vristo doesn't have native soft badges, so we use background opacity or local css variables
+      switch (color) {
+        case "secondary": return "badge bg-secondary/10 text-secondary border-transparent";
+        case "success": return "badge bg-success/10 text-success border-transparent";
+        case "warning": return "badge bg-warning/10 text-warning border-transparent";
+        case "danger": return "badge bg-danger/10 text-danger border-transparent";
+        case "info": return "badge bg-info/10 text-info border-transparent";
+        case "muted": return "badge bg-dark-light text-dark border-transparent";
+        default: return "badge bg-primary/10 text-primary border-transparent";
+      }
+    } else {
+      // filled
+      switch (color) {
+        case "secondary": return "badge bg-secondary text-white";
+        case "success": return "badge bg-success text-white";
+        case "warning": return "badge bg-warning text-white";
+        case "danger": return "badge bg-danger text-white";
+        case "info": return "badge bg-info text-white";
+        case "muted": return "badge bg-dark text-white";
+        default: return "badge bg-primary text-white";
+      }
+    }
+  })();
+
   return (
     <motion.div
       layout
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       exit={{ scale: 0.9, opacity: 0 }}
-      className={cn(badgeVariants({ variant, color: color as BadgeProps["color"] }), className)}
+      className={cn(badgeClass, className)}
       {...props}
     >
-      {icon && <span className="mr-1.5">{icon}</span>}
+      {icon && <span className="mr-1.5 shrink-0">{icon}</span>}
       {children}
       {onClose && (
         <button
@@ -129,4 +80,4 @@ function Badge({ className, variant, color, onClose, icon, children, ...props }:
   );
 }
 
-export { Badge, badgeVariants };
+export { Badge };

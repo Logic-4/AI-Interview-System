@@ -45,8 +45,8 @@ const interviewService = {
     return res.data.data;
   },
 
-  async completeInterview(id: string): Promise<Interview> {
-    const res = await api.put<ApiResponse<{ interview: Interview }>>(`/interviews/${id}/complete`);
+  async completeInterview(id: string, payload?: { visualMetrics: any }): Promise<Interview> {
+    const res = await api.put<ApiResponse<{ interview: Interview }>>(`/interviews/${id}/complete`, payload);
     return res.data.data.interview;
   },
 

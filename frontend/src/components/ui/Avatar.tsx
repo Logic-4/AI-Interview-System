@@ -1,13 +1,11 @@
-"use client";
-
 import * as React from "react";
 import * as AvatarPrimitive from "@radix-ui/react-avatar";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Sparkles } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 
 const avatarVariants = cva(
-  "relative flex shrink-0 overflow-hidden rounded-full border border-border bg-surface-2",
+  "relative flex shrink-0 overflow-hidden rounded-full border border-white-light bg-white dark:border-[#1b2e4b] dark:bg-[#121e32]",
   {
     variants: {
       size: {
@@ -18,7 +16,7 @@ const avatarVariants = cva(
         xl: "h-20 w-20",
       },
       premium: {
-        true: "border-primary/50 shadow-[0_0_15px_rgba(108,92,231,0.3)]",
+        true: "border-primary/50 shadow-[0_0_15px_rgba(67,97,238,0.3)]",
         false: "",
       },
     },
@@ -55,7 +53,7 @@ const Avatar = React.forwardRef<
         className="aspect-square h-full w-full object-cover"
       />
       <AvatarPrimitive.Fallback
-        className="flex h-full w-full items-center justify-center rounded-full bg-surface-3 text-text-secondary font-semibold text-xs uppercase"
+        className="flex h-full w-full items-center justify-center rounded-full bg-white-light dark:bg-[#1b2e4b] text-text-secondary dark:text-white-dark font-bold text-xs uppercase"
       >
         {fallback || (alt ? alt.substring(0, 2) : "??")}
       </AvatarPrimitive.Fallback>
@@ -64,7 +62,7 @@ const Avatar = React.forwardRef<
     {status && (
       <span
         className={cn(
-          "absolute bottom-[5%] right-[5%] block rounded-full ring-2 ring-background ring-offset-background",
+          "absolute bottom-[5%] right-[5%] block rounded-full ring-2 ring-white dark:ring-black",
           {
             xs: "h-1.5 w-1.5",
             sm: "h-2 w-2",
@@ -73,17 +71,17 @@ const Avatar = React.forwardRef<
             xl: "h-5 w-5",
           }[size || "md"],
           {
-            online: "bg-success shadow-[0_0_8px_rgba(0,230,118,0.6)]",
+            online: "bg-success shadow-[0_0_8px_rgba(0,171,85,0.6)]",
             offline: "bg-text-muted",
-            away: "bg-warning shadow-[0_0_8px_rgba(255,179,0,0.6)]",
-            busy: "bg-danger shadow-[0_0_8px_rgba(255,82,82,0.6)]",
+            away: "bg-warning shadow-[0_0_8px_rgba(226,160,63,0.6)]",
+            busy: "bg-danger shadow-[0_0_8px_rgba(231,81,90,0.6)]",
           }[status]
         )}
       />
     )}
 
     {isPremium && (
-      <div className="absolute -top-1 -right-1 z-10 p-0.5 rounded-full bg-gradient-primary shadow-lg ring-1 ring-background">
+      <div className="absolute -top-1 -right-1 z-10 p-0.5 rounded-full bg-gradient-primary shadow-lg ring-1 ring-white dark:ring-black">
         <Sparkles className="h-2 w-2 text-white" />
       </div>
     )}

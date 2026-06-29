@@ -189,7 +189,7 @@ function getCategoryForIndex(i, count) {
  *   Payload:  { language, domain, role, category }
  */
 const generateInterviewQuestions = async (type, domain, difficulty, count = 1, context = {}) => {
-  const { jobRole, language, candidateName, jobDescription, focusSkills, roleProfile } = context;
+  const { jobRole, language, candidateName, jobDescription, resumeText, focusSkills, roleProfile } = context;
   const questions = [];
 
   // Build a concise skill list from all available sources
@@ -240,7 +240,8 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
       skills: uniqueSkills,
       responsibilities: roleProfile?.responsibilities || [],
       experience: roleProfile?.experienceLevel || '',
-      jobDescription: jobDescription ? jobDescription.slice(0, 800) : '',
+      jobDescription: (resumeText ? `[Candidate Resume]:\n${resumeText.slice(0, 1000)}\n\n` : '') + 
+                      (jobDescription ? `[Job Description]:\n${jobDescription.slice(0, 800)}` : ''),
     };
 
     const result = await callKaggle('/generate-question', payload);

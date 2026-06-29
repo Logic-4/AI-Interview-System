@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import { MicOff, Mic, ChevronRight, Wifi } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function LiveFooter() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [isMuted, setIsMuted] = useState(false);
   const [time, setTime] = useState(225);
 
@@ -74,7 +74,7 @@ export function LiveFooter() {
             </button>
 
             <button 
-              onClick={() => router.push("/processing")}
+              onClick={() => navigate("/processing")}
               className="h-14 bg-primary hover:bg-primary/90 text-white rounded-xl px-8 flex items-center gap-3 shadow-[0_0_20px_rgba(var(--primary-rgb),0.25)] transition-all transform hover:scale-[1.02]"
             >
                <div className="w-5 h-5 rounded-full border-2 border-white flex items-center justify-center">

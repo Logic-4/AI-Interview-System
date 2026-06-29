@@ -27,7 +27,7 @@ function toQuestionDifficulty(val) {
 
 const createInterview = async (req, res, next) => {
   try {
-    const { title, type, difficulty, domain, duration, scheduledAt, jobRole, focusSkills, jobDescription, language } = req.body;
+    const { title, type, difficulty, domain, duration, scheduledAt, jobRole, focusSkills, jobDescription, resumeText, language } = req.body;
 
     // Create interview
     const interview = await Interview.create({
@@ -42,6 +42,7 @@ const createInterview = async (req, res, next) => {
       jobRole: jobRole || '',
       focusSkills: focusSkills || [],
       jobDescription: jobDescription || '',
+      resumeText: resumeText || '',
     });
 
     // Parse job description if provided (Step 2)
@@ -64,6 +65,7 @@ const createInterview = async (req, res, next) => {
     aiQuestions = await generateInterviewQuestions(type, domain, difficulty, questionCount, {
       jobRole,
       jobDescription,
+      resumeText,
       focusSkills,
       roleProfile,
       language: interview.language,
@@ -398,6 +400,11 @@ const completeInterview = async (req, res, next) => {
 
     interview.status = 'completed';
     interview.overallScore = overallScore;
+    
+    if (req.body.visualMetrics) {
+      interview.visualMetrics = req.body.visualMetrics;
+    }
+    
     await interview.save();
 
     logger.info(`Interview completed: ${interview._id} — score: ${overallScore}`);
