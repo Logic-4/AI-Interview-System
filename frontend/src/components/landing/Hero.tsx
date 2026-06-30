@@ -2,8 +2,6 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Play, Sparkles, Mic, Pause } from "lucide-react";
 import { Link } from "react-router-dom";
-import heroImg from "@revamp-assets/hero-character.png";
-
 export function Hero() {
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -142,7 +140,7 @@ export function Hero() {
           </div>
 
           <motion.img
-            src={heroImg}
+            src="/assets/cartoon-interviewer.png"
             alt="Candidate practicing with the InterviewAI Pro coach"
             width={1280}
             height={1280}
