@@ -13,6 +13,7 @@ export interface AudioRecorderState {
 export interface AudioRecorderActions {
   startRecording: () => Promise<void>;
   stopRecording: () => void;
+  stopRecordingAsync: () => Promise<Blob | null>;
   pauseRecording: () => void;
   resumeRecording: () => void;
   resetRecording: () => void;
@@ -34,6 +35,7 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number>();
   const audioContextRef = useRef<AudioContext | null>(null);
+  const stopResolverRef = useRef<((blob: Blob | null) => void) | null>(null);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -102,6 +104,10 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
         const blob = new Blob(chunksRef.current, { type: mimeType });
         setAudioBlob(blob);
         setAudioUrl(URL.createObjectURL(blob));
+        if (stopResolverRef.current) {
+          stopResolverRef.current(blob);
+          stopResolverRef.current = null;
+        }
 
         stream.getTracks().forEach((t) => t.stop());
         if (audioContext.state !== 'closed') audioContext.close();
@@ -135,6 +141,20 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
     setIsRecording(false);
     setIsPaused(false);
   }, []);
+
+  const stopRecordingAsync = useCallback((): Promise<Blob | null> => {
+    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') {
+      return Promise.resolve(audioBlob);
+    }
+
+    return new Promise((resolve) => {
+      stopResolverRef.current = resolve;
+      mediaRecorderRef.current?.stop();
+      if (timerRef.current) clearInterval(timerRef.current);
+      setIsRecording(false);
+      setIsPaused(false);
+    });
+  }, [audioBlob]);
 
   const pauseRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -172,6 +192,10 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
     setAudioUrl(null);
     setAnalyserData(null);
     setError(null);
+    if (stopResolverRef.current) {
+      stopResolverRef.current(null);
+      stopResolverRef.current = null;
+    }
   }, [audioUrl]);
 
   return {
@@ -184,6 +208,7 @@ export function useAudioRecorder(): AudioRecorderState & AudioRecorderActions {
     analyserData,
     startRecording,
     stopRecording,
+    stopRecordingAsync,
     pauseRecording,
     resumeRecording,
     resetRecording,

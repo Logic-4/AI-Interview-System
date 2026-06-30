@@ -6,10 +6,12 @@ import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
 import { PreparationHeader } from "../../components/preparation/PreparationHeader";
 import { PreSessionChecklist } from "../../components/preparation/PreSessionChecklist";
 import { MicrophoneCheck } from "../../components/preparation/MicrophoneCheck";
+import { useInterviewStore } from "../../stores/interviewStore";
 
 export default function PreparationPage() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const { activeInterview } = useInterviewStore();
   const [checks, setChecks] = useState({
     audio: true,
     environment: false,
@@ -18,8 +20,13 @@ export default function PreparationPage() {
 
   const handleStart = () => {
     setIsLoading(true);
+    const interviewId = activeInterview?._id;
     setTimeout(() => {
-      navigate("/session");
+      if (interviewId) {
+        navigate(`/session?id=${interviewId}`);
+      } else {
+        navigate("/session");
+      }
     }, 1000);
   };
 
@@ -66,7 +73,7 @@ export default function PreparationPage() {
 
       <footer className="py-8 text-center border-t border-white/5 bg-[#0A0C10]/50 mt-auto">
         <p className="text-[11px] text-text-muted font-semibold">
-          © {new Date().getFullYear()} AI Interview Pro. Professional Training Environment.
+          &copy; {new Date().getFullYear()} AI Interview Pro. Professional Training Environment.
         </p>
       </footer>
     </div>

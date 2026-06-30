@@ -57,7 +57,7 @@ export interface CreateInterviewPayload {
 export interface SubmitAnswerPayload {
   userAnswer?: string;
   timeSpent?: number;
-  audio?: File;
+  audio?: File | Blob;
 }
 
 export interface AnswerEvaluation {

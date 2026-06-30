@@ -4,7 +4,8 @@ const User = require('../models/User');
 const Feedback = require('../models/Feedback');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
-const { parseJobDescription, generateInterviewQuestions, processInterviewTurn, transcribeAudio } = require('../services/kaggleService');
+const { parseJobDescription, generateInterviewQuestions, processInterviewTurn } = require('../services/kaggleService');
+const { transcribeAudio } = require('../services/somaliSpeechService');
 const { uploadAudio } = require('../services/blobService');
 const logger = require('../utils/logger');
 
@@ -251,13 +252,18 @@ const submitAnswer = async (req, res, next) => {
       try {
         const audioResult = await uploadAudio(req.file.buffer, req.user._id.toString(), questionId);
         audioUrl = audioResult.url;
-
-        // Transcribe audio if no text answer provided
-        if (!userAnswer) {
-          transcribedAnswer = await transcribeAudio(req.file.buffer, req.file.originalname);
-        }
       } catch (uploadError) {
-        logger.warn(`Audio processing failed: ${uploadError.message}`);
+        logger.warn(`Audio upload failed, continuing with transcription: ${uploadError.message}`);
+      }
+
+      // Transcribe audio if no text answer provided
+      if (!userAnswer) {
+        try {
+          transcribedAnswer = await transcribeAudio(req.file.buffer, req.file.originalname, req.file.mimetype);
+        } catch (transcriptionError) {
+          logger.warn(`Somali audio transcription failed: ${transcriptionError.message}`);
+          return next(ApiError.badRequest('Could not transcribe the Somali audio answer. Please try recording again.'));
+        }
       }
     }
 

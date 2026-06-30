@@ -16,7 +16,6 @@ import {
   Pause,
   Play,
   StopCircle,
-  Keyboard,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -60,7 +59,6 @@ export default function InterviewSessionPage() {
   const [interview, setInterview] = useState<PopulatedInterview | null>(null);
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
-  const [somaliAnswer, setSomaliAnswer] = useState("");
 
   const faceTracker = useFaceTracker();
 
@@ -88,10 +86,17 @@ export default function InterviewSessionPage() {
 
   /* ── Callbacks for conversation engine ─────────────────── */
   const onSubmitAnswer = useCallback(
-    async (questionId: string, answer: string, timeSpent: number) => {
+    async (questionId: string, answer: string, timeSpent: number, audio?: Blob | File) => {
+      const audioFile = audio
+        ? audio instanceof File
+          ? audio
+          : new File([audio], `somali-answer-${questionId}.webm`, { type: audio.type || "audio/webm" })
+        : undefined;
+
       const result = await interviewService.submitAnswer(interviewId, questionId, {
-        userAnswer: answer,
+        userAnswer: answer || undefined,
         timeSpent,
+        audio: audioFile,
       });
       recordAnswer(questionId, result.question);
 
@@ -131,11 +136,6 @@ export default function InterviewSessionPage() {
     onComplete,
     onGenerateFeedback,
   });
-
-  // Reset Somali answer textarea when question changes
-  useEffect(() => {
-    setSomaliAnswer("");
-  }, [engine.currentQuestionIndex, engine.activeFollowUpText]);
 
   /* ── Start interview (API + engine) ───────────────────────── */
   const handleStart = async () => {
@@ -316,9 +316,11 @@ export default function InterviewSessionPage() {
 
   /* ── Theater Mode (active session) via React Portal ────────── */
   if (pagePhase === "active") {
-    const showListening = engine.recognition.isListening && engine.phase === "listening";
     const isSomali = interview?.language === "somali";
     const isListeningPhase = engine.phase === "listening";
+    const showListening = isSomali
+      ? engine.audioRecorder.isRecording && isListeningPhase
+      : engine.recognition.isListening && isListeningPhase;
     const showVisualizerActive = isSomali ? isListeningPhase : showListening;
     const currentQ = questions[engine.currentQuestionIndex];
     const currentQuestionText = currentQ?.text || "";
@@ -453,16 +455,12 @@ export default function InterviewSessionPage() {
               engine.tts.isSpeaking ? "bg-primary/20 border-2 border-primary/30" :
               "bg-white dark:bg-black border border-white-light dark:border-[#1b2e4b]"
             )}>
-              {isSomali && isListeningPhase ? (
-                <Keyboard className="w-8 h-8 text-primary transition-all duration-300 animate-pulse" />
-              ) : (
-                <Mic className={cn(
-                  "w-8 h-8 transition-all duration-300",
-                  showListening ? "text-danger" :
-                  engine.tts.isSpeaking ? "text-primary" :
-                  "text-text-muted"
-                )} />
-              )}
+              <Mic className={cn(
+                "w-8 h-8 transition-all duration-300",
+                showListening || (isSomali && isListeningPhase) ? "text-danger" :
+                engine.tts.isSpeaking ? "text-primary" :
+                "text-text-muted"
+              )} />
             </div>
             <div className="absolute -inset-6 flex items-center justify-center pointer-events-none">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -566,28 +564,19 @@ export default function InterviewSessionPage() {
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              className="max-w-2xl w-full px-4 mb-4 flex-shrink-0"
+              className="max-w-lg w-full text-center px-4 mb-4 flex-shrink-0"
             >
-              <div className="relative rounded-md border border-white-light dark:border-[#1b2e4b] bg-white-light/30 dark:bg-black/60 p-4 space-y-3 shadow-lg focus-within:border-primary/50 transition-all duration-300">
-                <textarea
-                  value={somaliAnswer}
-                  onChange={(e) => setSomaliAnswer(e.target.value)}
-                  placeholder="Ku qor jawaabtaada halkaan..."
-                  rows={4}
-                  className="w-full bg-transparent resize-none focus:outline-none text-sm text-text-primary dark:text-white placeholder:text-text-muted leading-relaxed"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                      e.preventDefault();
-                      if (somaliAnswer.trim()) {
-                        engine.handleManualSubmit(somaliAnswer);
-                      }
-                    }
-                  }}
-                />
-                <div className="flex items-center justify-between text-[10px] text-text-muted font-semibold tracking-wide border-t border-white-light/20 dark:border-[#191e3a] pt-2.5">
-                  <p>Ku qor jawaabtaada af-Soomaali. Riix <kbd className="bg-foreground/5 px-1 py-0.5 rounded border border-white-light dark:border-[#1b2e4b]">Ctrl + Enter</kbd> si aad u gudbiso.</p>
-                  <p className="tabular-nums font-bold">{somaliAnswer.trim().length} xaraf</p>
+              <div className="rounded-md border border-primary/20 bg-primary/10 px-4 py-3 inline-block">
+                <p className="text-sm font-semibold text-foreground dark:text-white">
+                  {engine.phase === "listening"
+                    ? "Hadalkaga waa la duubayaa..."
+                    : "Duubista waa la joojiyay. Gudbi jawaabta markaad diyaar tahay."}
+                </p>
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <VolumeBar volume={engine.audioRecorder.analyserData ? 0.12 : 0} />
+                  <span className="text-[9px] font-bold text-text-muted uppercase tracking-widest">
+                    {engine.phase === "listening" ? "Recording" : "Ready"}
+                  </span>
                 </div>
               </div>
             </motion.div>
@@ -641,7 +630,7 @@ export default function InterviewSessionPage() {
             <div className="flex items-center gap-2">
               {(engine.phase === "listening" || engine.phase === "reviewing") && (
                 <div className="flex items-center gap-2">
-                  {engine.phase === "listening" && !isSomali && (
+                  {engine.phase === "listening" && (
                     <button
                       onClick={engine.stopRecordingForReview}
                       className="h-8 px-3 rounded-md text-[10px] font-bold text-foreground dark:text-white bg-warning/10 border border-warning/30 hover:bg-warning/20 transition-colors"
@@ -651,8 +640,7 @@ export default function InterviewSessionPage() {
                     </button>
                   )}
                   <button
-                    onClick={() => engine.handleManualSubmit(isSomali ? somaliAnswer : undefined)}
-                    disabled={isSomali && !somaliAnswer.trim()}
+                    onClick={() => engine.handleManualSubmit()}
                     className="h-8 px-3 rounded-md text-[10px] font-bold text-white bg-primary hover:bg-primary/90 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <CheckCircle2 className="w-3 h-3 mr-1.5 inline-block align-middle" />

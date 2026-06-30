@@ -25,6 +25,7 @@ const questionRoutes = require('./routes/questionRoutes');
 const feedbackRoutes = require('./routes/feedbackRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const kaggleRoutes = require('./routes/kaggleRoutes');
+const ttsRoutes = require('./routes/ttsRoutes');
 
 // ─── Initialize Express App ─────────────────────────
 const app = express();
@@ -75,6 +76,7 @@ app.use('/api/v1/questions', questionRoutes);
 app.use('/api/v1/feedback', feedbackRoutes);
 app.use('/api/v1/uploads', uploadRoutes);
 app.use('/api/v1/kaggle', kaggleRoutes);
+app.use('/api/v1/tts', ttsRoutes);
 
 // ─── 404 Handler ─────────────────────────────────────
 app.use('*', (req, res) => {

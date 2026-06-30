@@ -132,7 +132,8 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
         });
 
       try {
-        const response = await fetch("/api/tts", {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+        const response = await fetch(`${apiBase.replace(/\/+$/, "")}/tts`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text, languageCode }),

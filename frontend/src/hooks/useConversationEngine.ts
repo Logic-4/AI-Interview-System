@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useSpeechSynthesis } from "./useSpeechSynthesis";
 import { useSpeechRecognition } from "./useSpeechRecognition";
+import { useAudioRecorder } from "./useAudioRecorder";
 import type { Question } from "@/types/question";
 
 /* ─── Types ─────────────────────────────────────────────── */
@@ -38,7 +39,7 @@ export interface ConversationEngineConfig {
   interviewType: string;
   language?: string;
   questions: Question[];
-  onSubmitAnswer: (questionId: string, answer: string, timeSpent: number) => Promise<{
+  onSubmitAnswer: (questionId: string, answer: string, timeSpent: number, audio?: Blob | File) => Promise<{
     score: number;
     feedback: string;
     strengths: string[];
@@ -59,6 +60,7 @@ export interface ConversationEngineReturn {
   answeredCount: number;
   tts: ReturnType<typeof useSpeechSynthesis>;
   recognition: ReturnType<typeof useSpeechRecognition>;
+  audioRecorder: ReturnType<typeof useAudioRecorder>;
   analysisStage: AnalysisStage;
   timer: number;
   isPaused: boolean;
@@ -116,6 +118,7 @@ export function useConversationEngine(
   const languageCode = getLanguageCode(language);
   const tts = useSpeechSynthesis(languageCode);
   const recognition = useSpeechRecognition(languageCode);
+  const audioRecorder = useAudioRecorder();
 
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
@@ -139,8 +142,10 @@ export function useConversationEngine(
     tts.pause();
     if (language.toLowerCase() !== "somali") {
       try { recognition.stopListening(); } catch {}
+    } else {
+      audioRecorder.pauseRecording();
     }
-  }, [tts, recognition, language]);
+  }, [tts, recognition, audioRecorder.pauseRecording, language]);
 
   const resume = useCallback(() => {
     if (!isPausedRef.current) return;
@@ -149,8 +154,10 @@ export function useConversationEngine(
     tts.resume();
     if (phaseRef.current === "listening" && language.toLowerCase() !== "somali") {
       recognition.startListening();
+    } else if (phaseRef.current === "listening") {
+      audioRecorder.resumeRecording();
     }
-  }, [tts, recognition, language]);
+  }, [tts, recognition, audioRecorder.resumeRecording, language]);
 
   /* ── Speak and wait until done ─────────────────────────── */
   const speakAndWait = useCallback(
@@ -199,10 +206,12 @@ export function useConversationEngine(
     if (phaseRef.current === "listening") {
       if (language.toLowerCase() !== "somali") {
         recognition.stopListening();
+      } else {
+        audioRecorder.stopRecording();
       }
       setPhase("reviewing");
     }
-  }, [recognition, language]);
+  }, [recognition, audioRecorder.stopRecording, language]);
 
   /* ── Handle manual submit ────────────────────────────────── */
   const handleManualSubmit = useCallback(
@@ -212,10 +221,20 @@ export function useConversationEngine(
       if (language.toLowerCase() !== "somali") {
         recognition.stopListening();
       }
+
+      const isSomali = language.toLowerCase() === "somali";
+      let audioAnswer: Blob | null = null;
+      if (isSomali) {
+        audioAnswer = audioRecorder.isRecording
+          ? await audioRecorder.stopRecordingAsync()
+          : audioRecorder.audioBlob;
+      }
       
       const transcript = textAnswer !== undefined
         ? (textAnswer.trim() || "[No answer provided]")
-        : ((recognition.finalTranscript + " " + recognition.interimTranscript).trim() || "[No audio detected. The candidate submitted without speaking.]");
+        : isSomali
+          ? ""
+          : ((recognition.finalTranscript + " " + recognition.interimTranscript).trim() || "[No audio detected. The candidate submitted without speaking.]");
 
       const question = questions[currentQuestionIndex];
       if (!question) return;
@@ -228,7 +247,8 @@ export function useConversationEngine(
         const result = await onSubmitAnswer(
           question._id,
           transcript,
-          timeSpent
+          timeSpent,
+          audioAnswer || undefined
         );
 
         // Time is up — wrap up the interview
@@ -257,6 +277,9 @@ export function useConversationEngine(
           recognition.resetTranscript();
           if (language.toLowerCase() !== "somali") {
             recognition.startListening();
+          } else {
+            audioRecorder.resetRecording();
+            await audioRecorder.startRecording();
           }
           return;
         }
@@ -288,7 +311,16 @@ export function useConversationEngine(
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [currentQuestionIndex, questions]
+    [
+      currentQuestionIndex,
+      questions,
+      language,
+      audioRecorder.isRecording,
+      audioRecorder.audioBlob,
+      audioRecorder.stopRecordingAsync,
+      audioRecorder.resetRecording,
+      audioRecorder.startRecording,
+    ]
   );
 
   /* ── Ask a question ────────────────────────────────────── */
@@ -317,10 +349,13 @@ export function useConversationEngine(
       recognition.resetTranscript();
       if (language.toLowerCase() !== "somali") {
         recognition.startListening();
+      } else {
+        audioRecorder.resetRecording();
+        await audioRecorder.startRecording();
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [questions, speakAndWait, language]
+    [questions, speakAndWait, language, audioRecorder.resetRecording, audioRecorder.startRecording]
   );
 
   /* ── Wrap up ───────────────────────────────────────────── */
@@ -384,6 +419,8 @@ export function useConversationEngine(
     tts.cancel();
     if (language.toLowerCase() !== "somali") {
       recognition.stopListening();
+    } else {
+      audioRecorder.stopRecording();
     }
 
     if (phase === "listening" || phase === "reviewing") {
@@ -393,6 +430,7 @@ export function useConversationEngine(
     phase,
     tts,
     recognition,
+    audioRecorder.stopRecording,
     currentQuestionIndex,
     questions.length,
     handleManualSubmit,
@@ -408,8 +446,10 @@ export function useConversationEngine(
       abortRef.current = true;
       tts.cancel();
       recognition.stopListening();
+      audioRecorder.resetRecording();
       if (timerRef.current) clearInterval(timerRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -420,6 +460,7 @@ export function useConversationEngine(
     answeredCount,
     tts,
     recognition,
+    audioRecorder,
     analysisStage,
     timer,
     isPaused,
