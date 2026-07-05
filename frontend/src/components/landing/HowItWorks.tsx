@@ -78,7 +78,7 @@ export function HowItWorks() {
                     initial={false}
                     animate={done ? { scale: 1, opacity: 1 } : { scale: 0.4, opacity: 0 }}
                     transition={{ type: "spring", stiffness: 320, damping: 18 }}
-                    className="absolute inset-0 grid place-items-center text-primary-foreground"
+                    className="absolute inset-0 grid place-items-center text-white"
                   >
                     <Check className="h-9 w-9" strokeWidth={3} />
                   </motion.span>

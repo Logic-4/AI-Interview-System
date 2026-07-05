@@ -12,6 +12,7 @@ import { getGoogleAuthUrl } from '../../lib/apiConfig';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import ThemeToggle from '../../components/layout/ThemeToggle';
+import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 
 const LoginPage = () => {
     const dispatch = useDispatch();
@@ -182,7 +183,7 @@ const LoginPage = () => {
                                 >
                                     {isLoading || isCheckingSession ? (
                                         <>
-                                            <span className="animate-spin border-2 border-white border-l-transparent rounded-full w-5 h-5 ltr:mr-4 rtl:ml-4 inline-block align-middle shrink-0"></span>
+                                            <LoadingSpinner size="sm" className="mr-2 inline-block text-white" />
                                             {isCheckingSession ? 'Checking...' : 'Signing in...'}
                                         </>
                                     ) : (

@@ -18,10 +18,10 @@ export function CTA() {
           <div className="absolute inset-0 grid-pattern opacity-15" />
 
           <div className="relative">
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-primary-foreground leading-tight">
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight">
               Ready to ace your next interview?
             </h2>
-            <p className="mt-5 text-lg text-primary-foreground/85 max-w-xl mx-auto">
+            <p className="mt-5 text-lg text-white/85 max-w-xl mx-auto">
               Join thousands of candidates using InterviewAI Pro to land roles at the world's most ambitious companies.
             </p>
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
@@ -34,7 +34,7 @@ export function CTA() {
               </Link>
               <a
                 href="#features"
-                className="inline-flex items-center gap-2 h-12 px-6 rounded-full border border-white/40 text-primary-foreground font-semibold hover:bg-white/10 transition"
+                className="inline-flex items-center gap-2 h-12 px-6 rounded-full border border-white/40 text-white font-semibold hover:bg-white/10 transition"
               >
                 View features
               </a>

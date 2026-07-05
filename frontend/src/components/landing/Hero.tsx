@@ -66,7 +66,7 @@ export function Hero() {
             transition={{ duration: 0.6, delay: 0.1 }}
             className="mt-6 text-5xl sm:text-6xl lg:text-7xl font-bold leading-[1.02]"
           >
-            Ace your next{" "}
+            Master your next{" "}
             <span className="text-gradient">interview</span> with an AI coach
           </motion.h1>
 
