@@ -1,5 +1,3 @@
-import { motion } from "framer-motion";
-import { Bot } from "lucide-react";
 import { cn } from "../../lib/utils";
 
 interface LoadingSpinnerProps {
@@ -9,40 +7,40 @@ interface LoadingSpinnerProps {
 
 const LoadingSpinner = ({ size = "md", className }: LoadingSpinnerProps) => {
   const sizes = {
-    sm: "h-8 w-8",
-    md: "h-14 w-14",
-    lg: "h-20 w-20",
-    xl: "h-32 w-32",
-  };
-
-  const iconSizes = {
-    sm: "h-4 w-4",
-    md: "h-7 w-7",
-    lg: "h-10 w-10",
-    xl: "h-16 w-16",
+    sm: "w-5 h-5",
+    md: "w-8 h-8",
+    lg: "w-14 h-14",
+    xl: "w-20 h-20",
   };
 
   return (
-    <div className={cn("relative flex items-center justify-center", sizes[size], className)}>
-      {/* Background ring */}
-      <div className="absolute inset-0 rounded-full border-4 border-primary/10" />
-      
-      {/* Animated spinning border */}
-      <motion.div
-        className="absolute inset-0 rounded-full border-t-4 border-primary"
-        animate={{ rotate: 360 }}
-        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-      />
-
-      {/* Floating logo icon */}
-      <motion.div
-        animate={{ scale: [1, 1.1, 1], opacity: [0.7, 1, 0.7] }}
-        transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-        className="text-primary z-10"
-      >
-        <Bot className={iconSizes[size]} />
-      </motion.div>
-    </div>
+    <svg
+      className={cn("text-primary inline-block", sizes[size], className)}
+      viewBox="0 0 135 135"
+      xmlns="http://www.w3.org/2000/svg"
+      fill="currentColor"
+    >
+      <path d="M67.447 58c5.523 0 10-4.477 10-10s-4.477-10-10-10-10 4.477-10 10 4.477 10 10 10zm9.448 9.447c0 5.523 4.477 10 10 10 5.522 0 10-4.477 10-10s-4.478-10-10-10c-5.523 0-10 4.477-10 10zm-9.448 9.448c-5.523 0-10 4.477-10 10 0 5.522 4.477 10 10 10s10-4.478 10-10c0-5.523-4.477-10-10-10zM58 67.447c0-5.523-4.477-10-10-10s-10 4.477-10 10 4.477 10 10 10 10-4.477 10-10z">
+        <animateTransform
+          attributeName="transform"
+          type="rotate"
+          from="0 67 67"
+          to="-360 67 67"
+          dur="2.5s"
+          repeatCount="indefinite"
+        />
+      </path>
+      <path d="M28.19 40.31c6.627 0 12-5.374 12-12 0-6.628-5.373-12-12-12-6.628 0-12 5.372-12 12 0 6.626 5.372 12 12 12zm30.72-19.825c4.686 4.687 12.284 4.687 16.97 0 4.686-4.686 4.686-12.284 0-16.97-4.686-4.687-12.284-4.687-16.97 0-4.687 4.686-4.687 12.284 0 16.97zm35.74 7.705c0 6.627 5.37 12 12 12 6.626 0 12-5.373 12-12 0-6.628-5.374-12-12-12-6.63 0-12 5.372-12 12zm19.822 30.72c-4.686 4.686-4.686 12.284 0 16.97 4.687 4.686 12.285 4.686 16.97 0 4.687-4.686 4.687-12.284 0-16.97-4.685-4.687-12.283-4.687-16.97 0zm-7.704 35.74c-6.627 0-12 5.37-12 12 0 6.626 5.373 12 12 12s12-5.374 12-12c0-6.63-5.373-12-12-12zm-30.72 19.822c-4.686-4.686-12.284-4.686-16.97 0-4.686 4.687-4.686 12.285 0 16.97 4.686 4.687 12.284 4.687 16.97 0 4.687-4.685 4.687-12.283 0-16.97zm-35.74-7.704c0-6.627-5.372-12-12-12-6.626 0-12 5.373-12 12s5.374 12 12 12c6.628 0 12-5.373 12-12zm-19.823-30.72c4.687-4.686 4.687-12.284 0-16.97-4.686-4.686-12.284-4.686-16.97 0-4.687 4.686-4.687 12.284 0 16.97 4.686 4.687 12.284 4.687 16.97 0z">
+        <animateTransform
+          attributeName="transform"
+          type="rotate"
+          from="0 67 67"
+          to="360 67 67"
+          dur="8s"
+          repeatCount="indefinite"
+        />
+      </path>
+    </svg>
   );
 };
 
