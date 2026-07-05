@@ -1,0 +1,13 @@
+{
+  "name": "ai-interview-system-root",
+  "version": "1.0.0",
+  "description": "Root delegation for Heroku backend deployment",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "heroku-postbuild": "npm install --prefix backend"
+  },
+  "engines": {
+    "node": "20.x"
+  }
+}
