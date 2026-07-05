@@ -78,7 +78,7 @@ const DefaultLayout = ({ children }: PropsWithChildren) => {
                     </div>
                 )}
 
-                {!isImmersive && <Setting />}
+                {/* {!isImmersive && <Setting />} */}
 
                 <div className={`${themeConfig.navbar} main-container text-black dark:text-white-dark min-h-screen`}>
                     {!isImmersive && <Sidebar />}
