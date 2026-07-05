@@ -2,7 +2,7 @@ const User = require('../models/User');
 const { generateAccessToken, generateRefreshToken, getTokenExpiry } = require('../utils/tokenUtils');
 const logger = require('../utils/logger');
 
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
+const CLIENT_URL = (process.env.CLIENT_URL || 'http://localhost:3000').split(',')[0].trim();
 
 /**
  * Helper — finish OAuth login: find-or-create user, generate tokens, redirect to frontend
