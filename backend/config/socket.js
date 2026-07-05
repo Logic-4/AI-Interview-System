@@ -8,9 +8,19 @@ const { verifyAccessToken } = require('../utils/tokenUtils');
  * @returns {Server} Socket.io server instance
  */
 const initializeSocket = (httpServer) => {
+  const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:3000')
+    .split(',')
+    .map((url) => url.trim().replace(/\/+$/, ''));
+
   const io = new Server(httpServer, {
     cors: {
-      origin: process.env.CLIENT_URL || 'http://localhost:3000',
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+          return callback(null, true);
+        }
+        return callback(new Error(`Origin ${origin} not allowed by CORS`));
+      },
       methods: ['GET', 'POST'],
       credentials: true,
     },
