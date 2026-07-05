@@ -1,0 +1,72 @@
+# Staging stack for AI Interview System
+# Gemma inference (RunPod serverless worker) and Piper TTS run separately — set RUNPOD_API_URL and PIPER_BASE_URL in .env
+
+services:
+  mongodb:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  asr:
+    build:
+      context: .
+      dockerfile: services/asr/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      ASR_MODEL_ID: skydheere/wav2vec2-large-mms-1b-somalia
+    volumes:
+      - huggingface_cache:/root/.cache/huggingface
+    # First start downloads ~3.9 GB model; allow long health start period
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 600s
+
+  tts:
+    build:
+      context: .
+      dockerfile: services/tts/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    volumes:
+      - huggingface_cache:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 300s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    environment:
+      MONGO_URI: mongodb://mongodb:27017/interviewai_pro
+      SOMALI_ASR_URL: http://asr:8001
+      SOMALI_TTS_URL: http://tts:8002
+      NODE_ENV: production
+    depends_on:
+      mongodb:
+        condition: service_started
+      asr:
+        condition: service_healthy
+      tts:
+        condition: service_healthy
+
+volumes:
+  mongo_data:
+  huggingface_cache:

@@ -1,0 +1,7 @@
+torch
+transformers>=4.33
+accelerate
+scipy
+soundfile
+fastapi
+uvicorn[standard]

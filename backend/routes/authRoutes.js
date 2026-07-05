@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { register, login, refreshToken, logout, getMe, validateSession, forgotPassword, resetPassword } = require('../controllers/authController');
-const { googleRedirect, googleCallback, githubRedirect, githubCallback } = require('../controllers/oauthController');
+const { googleRedirect, googleCallback } = require('../controllers/oauthController');
 const { registerValidator, loginValidator, refreshTokenValidator, forgotPasswordValidator, resetPasswordValidator } = require('../validators/authValidator');
 const validate = require('../middleware/validate');
 const { protect } = require('../middleware/auth');
@@ -15,11 +15,9 @@ router.get('/session', validateSession);
 router.post('/forgot-password', authLimiter, forgotPasswordValidator, validate, forgotPassword);
 router.post('/reset-password/:token', authLimiter, resetPasswordValidator, validate, resetPassword);
 
-// OAuth routes
+// Google OAuth
 router.get('/google', googleRedirect);
 router.get('/google/callback', googleCallback);
-router.get('/github', githubRedirect);
-router.get('/github/callback', githubCallback);
 
 // Logout (public — clears cookie even without valid token)
 router.post('/logout', logout);

@@ -25,7 +25,7 @@ import feedbackService from "../../services/feedbackService";
 import { useInterviewStore } from "../../stores/interviewStore";
 import { useAuthStore } from "../../stores/authStore";
 import { useConversationEngine } from "../../hooks/useConversationEngine";
-import { useFaceTracker } from "../../hooks/useFaceTracker";
+
 import type { Question } from "../../types/question";
 import type { PopulatedInterview } from "../../types/interview";
 
@@ -49,7 +49,7 @@ export default function SessionPage() {
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
 
-  const faceTracker = useFaceTracker();
+
 
   /* ── Resolve interview ─────────────────────────── */
   useEffect(() => {
@@ -92,10 +92,16 @@ export default function SessionPage() {
   const getInterviewId = () => interview?._id || activeInterview?._id || "";
 
   const onSubmitAnswer = useCallback(
-    async (questionId: string, answer: string, timeSpent: number, audio?: Blob | File) => {
-      const id = getInterviewId();
+    async (
+      questionId: string,
+      answer: string,
+      timeSpent: number,
+      extras?: { audio?: Blob | File; activePromptText?: string }
+    ) => {
+      const id = interview?._id || activeInterview?._id || "";
       if (!id) throw new Error("No interview ID");
 
+      const audio = extras?.audio;
       const audioFile = audio
         ? audio instanceof File
           ? audio
@@ -106,6 +112,7 @@ export default function SessionPage() {
         userAnswer: answer || undefined,
         timeSpent,
         audio: audioFile,
+        activePromptText: extras?.activePromptText,
       });
       recordAnswer(questionId, result.question);
 
@@ -114,18 +121,17 @@ export default function SessionPage() {
         isTimeUp: result.isTimeUp,
         isFollowUp: result.isFollowUp,
         followUpText: result.followUpText,
+        answeredCandidateQuestion: result.answeredCandidateQuestion,
       };
     },
-    [recordAnswer]
+    [recordAnswer, interview]
   );
 
   const onComplete = useCallback(async () => {
     const id = getInterviewId();
     if (!id) return;
-    faceTracker.stopTracking();
-    const visualMetrics = faceTracker.getMetrics();
-    await interviewService.completeInterview(id, { visualMetrics });
-  }, [faceTracker]);
+    await interviewService.completeInterview(id);
+  }, []);
 
   const onGenerateFeedback = useCallback(async () => {
     const id = getInterviewId();
@@ -159,7 +165,7 @@ export default function SessionPage() {
       setInterview(started);
       setActiveInterview(started);
       setPagePhase("active");
-      faceTracker.startTracking();
+
       setTimeout(() => engine.start(), 300);
     } catch {
       setError("Failed to start interview.");
@@ -207,11 +213,9 @@ export default function SessionPage() {
     setIsEnding(true);
     engine.tts.cancel();
     engine.recognition.stopListening();
-    faceTracker.stopTracking();
-    const visualMetrics = faceTracker.getMetrics();
     const id = getInterviewId();
     if (id) {
-      try { await interviewService.completeInterview(id, { visualMetrics }); } catch {}
+      try { await interviewService.completeInterview(id); } catch {}
     }
     navigate(`/processing`);
   };
@@ -370,16 +374,7 @@ export default function SessionPage() {
 
     return createPortal(
       <div className="fixed top-0 left-0 w-screen h-screen z-[9999] bg-background text-text-primary flex flex-col">
-        {/* PIP Webcam */}
-        {faceTracker.isActive && (
-          <div className="absolute bottom-6 right-6 w-48 h-36 bg-black rounded-lg overflow-hidden border-2 border-white/10 shadow-2xl z-50">
-            <video ref={faceTracker.videoRef} autoPlay playsInline muted className="w-full h-full object-cover transform -scale-x-100" />
-            <div className="absolute inset-0 pointer-events-none border border-primary/20 rounded-lg">
-              <div className="w-full h-[1px] bg-primary/40 animate-[scan_3s_ease-in-out_infinite]" />
-            </div>
-            <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/60 rounded text-[8px] font-mono text-primary/80 uppercase">AI Tracking</div>
-          </div>
-        )}
+
 
         {/* Top bar */}
         <div className="flex items-center justify-between px-6 py-3 flex-shrink-0 border-b border-white-light dark:border-[#1b2e4b]">

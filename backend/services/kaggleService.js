@@ -12,16 +12,14 @@ const initKaggleUrl = async () => {
       currentKaggleUrl = config.value.trim().replace(/\/+$/, '');
       logger.info(`Loaded Kaggle API URL from MongoDB: ${currentKaggleUrl}`);
     } else {
-      currentKaggleUrl = process.env.KAGGLE_API_URL
-        ? process.env.KAGGLE_API_URL.trim().replace(/\/+$/, '')
-        : '';
-      logger.info(`Loaded Kaggle API URL from env: ${currentKaggleUrl}`);
+      currentKaggleUrl = (process.env.RUNPOD_API_URL || process.env.GEMMA_API_URL || process.env.KAGGLE_API_URL || '')
+        .trim().replace(/\/+$/, '');
+      logger.info(`Loaded API URL from env: ${currentKaggleUrl}`);
     }
   } catch (error) {
     logger.error(`Error initializing Kaggle URL: ${error.message}`);
-    currentKaggleUrl = process.env.KAGGLE_API_URL
-      ? process.env.KAGGLE_API_URL.trim().replace(/\/+$/, '')
-      : '';
+    currentKaggleUrl = (process.env.RUNPOD_API_URL || process.env.GEMMA_API_URL || process.env.KAGGLE_API_URL || '')
+      .trim().replace(/\/+$/, '');
   }
 };
 
@@ -44,6 +42,37 @@ async function checkKaggleStatus() {
   if (!url) {
     return { status: 'offline', error: 'Kaggle URL is not configured.' };
   }
+
+  // RunPod Serverless: POST /runsync with /health (cold start may take minutes)
+  if (isRunPodUrl(url)) {
+    try {
+      const base = getRunPodEndpointBase(url);
+      const res = await fetch(`${base}/runsync`, {
+        method: 'POST',
+        headers: runPodHeaders(),
+        body: JSON.stringify({ input: { endpoint: '/health', payload: {} } }),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        return { status: 'offline', url, error: `RunPod HTTP ${res.status}: ${text.slice(0, 120)}` };
+      }
+      const data = await res.json();
+      if (data.status === 'FAILED' || data.error) {
+        return { status: 'offline', url, error: data.error || data.status };
+      }
+      const output = data.output || data;
+      return {
+        status: 'online',
+        url,
+        model: output.model || 'Gemma 3 (RunPod)',
+        provider: 'runpod',
+      };
+    } catch (error) {
+      return { status: 'offline', url, error: error.message };
+    }
+  }
+
   try {
     const res = await fetch(`${url}/health`, {
       method: 'GET',
@@ -59,12 +88,126 @@ async function checkKaggleStatus() {
   }
 }
 
-const HEADERS = {
-  'Content-Type': 'application/json',
-  'Bypass-Tunnel-Reminder': 'true',
+const HEADERS = () => {
+  const headers = {
+    'Content-Type': 'application/json',
+    'Bypass-Tunnel-Reminder': 'true',
+  };
+  const apiKey = process.env.GEMMA_API_KEY;
+  if (apiKey) {
+    headers['X-Api-Key'] = apiKey;
+  }
+  return headers;
 };
 
-const TIMEOUT_MS = 60000;
+/** True when KAGGLE_API_URL points at RunPod Serverless (api.runpod.ai/v2/...). */
+function isRunPodUrl(url) {
+  return typeof url === 'string' && /api\.runpod\.ai\/v2\//i.test(url);
+}
+
+function getRunPodApiKey() {
+  return (process.env.RUNPOD_API_KEY || process.env.RUNPOD_API_TOKEN || '').trim();
+}
+
+function runPodHeaders() {
+  const key = getRunPodApiKey();
+  if (!key) {
+    throw new Error(
+      'RUNPOD_API_KEY is required when KAGGLE_API_URL is a RunPod Serverless endpoint.'
+    );
+  }
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${key}`,
+  };
+}
+
+/** Base URL without trailing slash, e.g. https://api.runpod.ai/v2/abc123 */
+function getRunPodEndpointBase(url) {
+  return url.replace(/\/+$/, '').replace(/\/(runsync|run|health|status)$/i, '');
+}
+
+const TIMEOUT_MS = 120000; // RunPod cold start can exceed 60s
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 1500;
+const HISTORY_WINDOW = 8;
+const IS_PROD = process.env.NODE_ENV === 'production';
+
+const PLACEHOLDER_ANSWER_RE = /^\[(No |Transcription)/i;
+
+function clampScore(value) {
+  const n = Number(value);
+  if (Number.isNaN(n)) return null;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+function isPlaceholderAnswer(text) {
+  if (!text || !text.trim()) return true;
+  return PLACEHOLDER_ANSWER_RE.test(text.trim());
+}
+
+function trimConversationHistory(history, maxTurns = HISTORY_WINDOW) {
+  if (!Array.isArray(history)) return [];
+  const trimmed = history.slice(-maxTurns);
+  const anchor = history.find((m) => m.role === 'interviewer');
+  if (anchor && !trimmed.some((m) => m.role === 'interviewer' && m.content === anchor.content)) {
+    return [anchor, ...trimmed.slice(1)];
+  }
+  return trimmed;
+}
+
+function compactRoleProfile(roleProfile) {
+  if (!roleProfile || typeof roleProfile !== 'object') return null;
+  return {
+    requiredSkills: (roleProfile.requiredSkills || []).slice(0, 5),
+    preferredSkills: (roleProfile.preferredSkills || []).slice(0, 3),
+    technicalStack: (roleProfile.technicalStack || []).slice(0, 5),
+    responsibilities: (roleProfile.responsibilities || []).slice(0, 3),
+    experienceLevel: roleProfile.experienceLevel || roleProfile.experience || '',
+  };
+}
+
+function normalizeEvaluation(evaluation) {
+  if (!evaluation || typeof evaluation !== 'object') {
+    return {
+      score: null,
+      feedback: '',
+      strengths: [],
+      improvements: [],
+      suggestedAnswer: '',
+      evaluationStatus: 'missing',
+    };
+  }
+  return {
+    score: evaluation.score != null ? clampScore(evaluation.score) : null,
+    feedback: evaluation.feedback || '',
+    strengths: Array.isArray(evaluation.strengths) ? evaluation.strengths.slice(0, 3) : [],
+    improvements: Array.isArray(evaluation.improvements) ? evaluation.improvements.slice(0, 3) : [],
+    suggestedAnswer: evaluation.suggestedAnswer || '',
+    evaluationStatus: evaluation.evaluationStatus || 'ok',
+  };
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function logKaggleRequest(base, endpoint, payload) {
+  if (IS_PROD) {
+    logger.info(`[kaggleService] POST ${endpoint} (history: ${payload.conversationHistory?.length ?? 'n/a'} turns)`);
+    return;
+  }
+  console.log(`[kaggleService] >>> POST ${base}`);
+  console.log(`[kaggleService] Payload keys: ${Object.keys(payload).join(', ')}`);
+}
+
+function logKaggleResponse(status, result) {
+  if (IS_PROD) {
+    logger.info(`[kaggleService] <<< ${status}`);
+    return;
+  }
+  console.log(`[kaggleService] <<< ${status}`, JSON.stringify(result, null, 2).slice(0, 500));
+}
 
 /* ─── Safe JSON Parser ────────────────────────────────────
  *  LLMs often wrap JSON in markdown ```json ... ``` blocks
@@ -134,62 +277,156 @@ function safeParseJSON(raw) {
   }
 }
 
-/* ─── Common fetch helper ───────────────────────────────── */
-async function callKaggle(endpoint, payload) {
+/* ─── RunPod Serverless runsync ─────────────────────────── */
+async function callRunPod(endpoint, payload, attempt = 0) {
   const kaggleUrl = getKaggleBaseUrl();
-  const base = kaggleUrl
-    ? new URL(endpoint, kaggleUrl).href
-    : endpoint;
+  const base = getRunPodEndpointBase(kaggleUrl);
+  const runsyncUrl = `${base}/runsync`;
+  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
 
-  console.log('═══════════════════════════════════════════════════');
-  console.log('[kaggleService] >>> Sending request to Kaggle API');
-  console.log(`  URL:    ${base}`);
-  console.log(`  Method: POST`);
-  console.log(`  Headers: ${JSON.stringify(HEADERS)}`);
-  console.log(`  Payload: ${JSON.stringify(payload, null, 2)}`);
-  console.log('═══════════════════════════════════════════════════');
+  logKaggleRequest(runsyncUrl, `${path} (RunPod)`, payload);
 
-  const response = await fetch(base, {
-    method: 'POST',
-    headers: HEADERS,
-    body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
+  try {
+    const response = await fetch(runsyncUrl, {
+      method: 'POST',
+      headers: runPodHeaders(),
+      body: JSON.stringify({
+        input: {
+          endpoint: path,
+          payload,
+        },
+      }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
 
-  console.log(`[kaggleService] <<< Response status: ${response.status} ${response.statusText}`);
+    if (!response.ok) {
+      const text = await response.text();
+      const retryable = response.status >= 500 || response.status === 429;
+      if (retryable && attempt < MAX_RETRIES) {
+        logger.warn(`[kaggleService] RunPod ${response.status} on ${path}, retry ${attempt + 1}/${MAX_RETRIES}`);
+        await sleep(RETRY_DELAY_MS * (attempt + 1));
+        return callRunPod(endpoint, payload, attempt + 1);
+      }
+      throw new Error(`RunPod API error! status: ${response.status} — ${text.slice(0, 200)}`);
+    }
 
-  if (!response.ok) {
-    const text = await response.text();
-    console.error(`[kaggleService] Response body (first 500 chars): ${text.slice(0, 500)}`);
-    throw new Error(`Kaggle API error! status: ${response.status} — ${response.statusText}`);
+    const data = await response.json();
+
+    if (data.status === 'FAILED' || data.status === 'CANCELLED' || data.status === 'TIMED_OUT') {
+      const errMsg = data.error || data.status || 'RunPod job failed';
+      throw new Error(`RunPod job ${data.status}: ${errMsg}`);
+    }
+
+    // IN_QUEUE / IN_PROGRESS should not happen with runsync, but handle gracefully
+    if (data.status && data.status !== 'COMPLETED' && !data.output) {
+      if (attempt < MAX_RETRIES) {
+        await sleep(RETRY_DELAY_MS * (attempt + 1));
+        return callRunPod(endpoint, payload, attempt + 1);
+      }
+      throw new Error(`RunPod job incomplete: ${data.status}`);
+    }
+
+    const result = data.output ?? data;
+    if (result && result.error) {
+      throw new Error(`RunPod worker error: ${result.error}`);
+    }
+
+    logKaggleResponse('RunPod OK', result);
+    return result;
+  } catch (error) {
+    if (attempt < MAX_RETRIES && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+      logger.warn(`[kaggleService] RunPod timeout on ${path}, retry ${attempt + 1}/${MAX_RETRIES}`);
+      await sleep(RETRY_DELAY_MS * (attempt + 1));
+      return callRunPod(endpoint, payload, attempt + 1);
+    }
+    throw error;
   }
-
-  const result = await response.json();
-  console.log(`[kaggleService] Response JSON: ${JSON.stringify(result, null, 2)}`);
-
-  return result;
 }
 
-/* ─── Category sequence for question flow ─────────────────
- *   - First question (i === 0)         → "intro"
- *   - Last question  (i === count - 1) → "outro"
- *   - Middle questions                 → alternate between
- *     "conceptual", "situational", "behavioral"
- */
-const CATEGORY_CYCLE = ['conceptual', 'situational', 'behavioral'];
+/* ─── Common fetch helper with retry ───────────────────── */
+async function callKaggle(endpoint, payload, attempt = 0) {
+  const kaggleUrl = getKaggleBaseUrl();
+  if (!kaggleUrl) {
+    throw new Error('Kaggle API URL is not configured.');
+  }
 
-function getCategoryForIndex(i, count) {
-  if (i === 0) return 'intro';
-  if (i === count - 1) return 'outro';
-  return CATEGORY_CYCLE[(i - 1) % CATEGORY_CYCLE.length];
+  if (isRunPodUrl(kaggleUrl)) {
+    return callRunPod(endpoint, payload, attempt);
+  }
+
+  const base = new URL(endpoint, kaggleUrl).href;
+
+  logKaggleRequest(base, endpoint, payload);
+
+  try {
+    const response = await fetch(base, {
+      method: 'POST',
+      headers: HEADERS(),
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      const retryable = response.status >= 500 || response.status === 429;
+      if (retryable && attempt < MAX_RETRIES) {
+        logger.warn(`[kaggleService] ${response.status} on ${endpoint}, retry ${attempt + 1}/${MAX_RETRIES}`);
+        await sleep(RETRY_DELAY_MS * (attempt + 1));
+        return callKaggle(endpoint, payload, attempt + 1);
+      }
+      throw new Error(`Kaggle API error! status: ${response.status} — ${text.slice(0, 200)}`);
+    }
+
+    const result = await response.json();
+    logKaggleResponse(`${response.status} OK`, result);
+    return result;
+  } catch (error) {
+    if (attempt < MAX_RETRIES && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+      logger.warn(`[kaggleService] Timeout on ${endpoint}, retry ${attempt + 1}/${MAX_RETRIES}`);
+      await sleep(RETRY_DELAY_MS * (attempt + 1));
+      return callKaggle(endpoint, payload, attempt + 1);
+    }
+    throw error;
+  }
 }
 
 /* ─── Generate Interview Questions ────────────────────────
  *   Endpoint: /generate-question (called multiple times for multiple questions)
  *   Payload:  { language, domain, role, category }
  */
+function resolveQuestionCategory(type, absoluteIndex, totalCount) {
+  if (absoluteIndex === 0) return 'intro';
+  if (absoluteIndex === totalCount - 1) return 'outro';
+
+  let categoryCycle;
+  const lowerType = (type || 'mixed').toLowerCase();
+
+  if (lowerType === 'hr') {
+    categoryCycle = ['motivation', 'strengths/weaknesses', 'culture fit', 'experience'];
+  } else if (lowerType === 'technical') {
+    categoryCycle = ['core skills', 'scenario tasks', 'debugging', 'fundamentals'];
+  } else if (lowerType === 'behavioral') {
+    categoryCycle = ['STAR-based situation', 'past experience', 'problem solving'];
+  } else {
+    categoryCycle = ['conceptual', 'situational', 'behavioral', 'technical'];
+  }
+
+  return categoryCycle[(absoluteIndex - 1) % categoryCycle.length];
+}
+
 const generateInterviewQuestions = async (type, domain, difficulty, count = 1, context = {}) => {
-  const { jobRole, language, candidateName, jobDescription, resumeText, focusSkills, roleProfile } = context;
+  const {
+    jobRole,
+    language,
+    candidateName,
+    jobDescription,
+    resumeText,
+    focusSkills,
+    roleProfile,
+    _forcedCategory,
+    _forcedIndex,
+    _forcedCount,
+  } = context;
   const questions = [];
 
   // Build a concise skill list from all available sources
@@ -204,44 +441,26 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
   console.log(`\n[kaggleService] 🎯 Fetching ${count} interview questions...`);
   if (uniqueSkills.length) console.log(`[kaggleService] 📋 Focus skills: ${uniqueSkills.join(', ')}`);
 
+  const totalCount = _forcedCount ?? count;
+
   // Generate questions one by one with appropriate categories
   for (let i = 0; i < count; i++) {
-    // Determine category based on position
-    let category;
-    if (i === 0) {
-      category = 'intro'; // First question
-    } else if (i === count - 1) {
-      category = 'outro'; // Last question
-    } else {
-      let CATEGORY_CYCLE;
-      const lowerType = (type || 'mixed').toLowerCase();
-      
-      if (lowerType === 'hr') {
-        CATEGORY_CYCLE = ['motivation', 'strengths/weaknesses', 'culture fit', 'experience'];
-      } else if (lowerType === 'technical') {
-        CATEGORY_CYCLE = ['core skills', 'scenario tasks', 'debugging', 'fundamentals'];
-      } else if (lowerType === 'behavioral') {
-        CATEGORY_CYCLE = ['STAR-based situation', 'past experience', 'problem solving'];
-      } else {
-        // Mixed type
-        CATEGORY_CYCLE = ['conceptual', 'situational', 'behavioral', 'technical'];
-      }
-      
-      category = CATEGORY_CYCLE[(i - 1) % CATEGORY_CYCLE.length];
-    }
+    const absoluteIndex = _forcedIndex !== undefined ? _forcedIndex : i;
+    const category = _forcedCategory || resolveQuestionCategory(type, absoluteIndex, totalCount);
 
     const payload = {
       language: language || 'english',
       domain: domain || 'general',
       role: jobRole || 'candidate',
       candidateName: candidateName || 'Candidate',
-      category: category,
+      category,
       type: type || 'technical',
+      difficulty: difficulty || 'mid',
       skills: uniqueSkills,
       responsibilities: roleProfile?.responsibilities || [],
       experience: roleProfile?.experienceLevel || '',
-      jobDescription: (resumeText ? `[Candidate Resume]:\n${resumeText.slice(0, 1000)}\n\n` : '') + 
-                      (jobDescription ? `[Job Description]:\n${jobDescription.slice(0, 800)}` : ''),
+      jobDescription: (jobDescription ? `[Job Description]:\n${jobDescription.slice(0, 800)}` : '')
+        + (resumeText ? `\n\n[Candidate Resume]:\n${resumeText.slice(0, 500)}` : ''),
     };
 
     const result = await callKaggle('/generate-question', payload);
@@ -253,7 +472,7 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
         category: category,
         difficulty: difficulty || 'medium',
         expectedAnswer: result.expectedAnswer || result.expected_answer || result.answer || '',
-        order: i,
+        order: absoluteIndex,
       });
     }
   }
@@ -270,65 +489,73 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
 const processInterviewTurn = async (
   conversationHistory,
   domain = 'general',
-  role = 'candidate',
+  jobRole = '',
   language = 'english',
-  type = 'technical'
+  type = 'technical',
+  options = {}
 ) => {
+  const {
+    difficulty = 'mid',
+    currentQuestion = null,
+    roleProfile = null,
+    candidateAnswer = '',
+  } = options;
+
+  if (isPlaceholderAnswer(candidateAnswer)) {
+    return {
+      evaluation: normalizeEvaluation({
+        score: 0,
+        feedback: 'No substantive answer was detected. Please try again.',
+        strengths: [],
+        improvements: ['Provide a clear spoken or typed answer.'],
+        suggestedAnswer: '',
+        evaluationStatus: 'placeholder',
+      }),
+      nextInterviewerResponse: language === 'somali'
+        ? 'Ma aanan helin jawaab. Fadlan isku day mar kale.'
+        : "I didn't catch a substantive answer. Please try again.",
+      isFollowUp: true,
+      evaluationStatus: 'placeholder',
+    };
+  }
+
   const payload = {
-    conversationHistory,
+    conversationHistory: trimConversationHistory(conversationHistory),
     domain,
-    role,
+    role: jobRole || domain,
+    jobRole,
     language,
     type,
+    difficulty,
+    currentQuestion: currentQuestion
+      ? {
+          text: currentQuestion.text || '',
+          expectedAnswer: currentQuestion.expectedAnswer || '',
+          category: currentQuestion.category || 'general',
+          difficulty: currentQuestion.difficulty || difficulty,
+        }
+      : {},
+    roleProfile: compactRoleProfile(roleProfile),
   };
 
   const result = await callKaggle('/interview-turn', payload);
-  logger.info(`Turn processed — Next response: "${result.nextInterviewerResponse?.slice(0, 50)}..."`);
-  return result;
+
+  const evaluation = normalizeEvaluation({
+    ...(result.evaluation || {}),
+    evaluationStatus: result.evaluationStatus,
+  });
+
+  return {
+    ...result,
+    evaluation,
+    isFollowUp: Boolean(result.isFollowUp),
+    answeredCandidateQuestion: Boolean(result.answeredCandidateQuestion),
+  };
 };
 
-/* ─── Evaluate a Single Answer (Legacy - kept for retry/fallback) ────────── */
-const evaluateAnswer = async (
-  questionText,
-  expectedAnswer,
-  userAnswer,
-  domain = 'general',
-  role = 'candidate',
-  language = 'english'
-) => {
-  const payload = {
-    question: questionText,
-    candidate_answer: userAnswer,
-    expected_answer: expectedAnswer,
-    domain,
-    role,
-    language,
-    instruction:
-      'OUTPUT STRICTLY AS RAW JSON. Do not use markdown formatting. Do not wrap in ```json blocks. ' +
-      'Return ONLY a JSON object with keys: score (0-100), feedback (string), ' +
-      'strengths (array of strings), improvements (array of strings), suggestedAnswer (string).',
-  };
-
-  const result = await callKaggle('/evaluate', payload);
-
-  let parsed;
-
-  if (result.score !== undefined) {
-    parsed = result;
-  } else if (result.evaluation && typeof result.evaluation === 'string') {
-    parsed = safeParseJSON(result.evaluation);
-  } else if (result.evaluation && typeof result.evaluation === 'object') {
-    parsed = result.evaluation;
-  } else {
-    try {
-      parsed = safeParseJSON(JSON.stringify(result));
-    } catch {
-      throw new Error(`Unexpected evaluation response format.`);
-    }
-  }
-
-  logger.info(`Answer evaluated — score: ${parsed.score}`);
-  return parsed;
+/* ─── Legacy evaluate — use processInterviewTurn instead ─── */
+const evaluateAnswer = async () => {
+  throw new Error('evaluateAnswer is deprecated. Use processInterviewTurn instead.');
 };
 
 /* ─── Parse Job Description ───────────────────────────────
@@ -390,4 +617,9 @@ module.exports = {
   getKaggleBaseUrl,
   setKaggleBaseUrl,
   checkKaggleStatus,
+  clampScore,
+  isPlaceholderAnswer,
+  trimConversationHistory,
+  compactRoleProfile,
+  normalizeEvaluation,
 };

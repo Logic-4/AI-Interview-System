@@ -4,16 +4,15 @@ const User = require('../models/User');
 const Feedback = require('../models/Feedback');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
-const { parseJobDescription, generateInterviewQuestions, processInterviewTurn } = require('../services/kaggleService');
+const { parseJobDescription, generateInterviewQuestions, processInterviewTurn } = require('../services/gemmaService');
 const { transcribeAudio } = require('../services/somaliSpeechService');
 const { uploadAudio } = require('../services/blobService');
 const logger = require('../utils/logger');
+const {
+  isDuplicateOfExisting,
+  ensureInterviewerPromptInHistory,
+} = require('../utils/questionHelpers');
 
-/**
- * @desc    Create a new interview with AI-generated questions
- * @route   POST /api/v1/interviews
- * @access  Private
- */
 /* ─── Normalize interview difficulty → question difficulty ── */
 const DIFFICULTY_MAP = {
   junior: 'easy',
@@ -26,11 +25,112 @@ function toQuestionDifficulty(val) {
   return DIFFICULTY_MAP[val] || val || 'medium';
 }
 
+/* ─── Category cycles by interview type ─────────────────── */
+const CATEGORY_CYCLES = {
+  hr: ['motivation', 'strengths/weaknesses', 'culture fit', 'experience'],
+  technical: ['core skills', 'scenario tasks', 'debugging', 'fundamentals'],
+  behavioral: ['STAR-based situation', 'past experience', 'problem solving'],
+  default: ['conceptual', 'situational', 'behavioral', 'technical'],
+};
+
+function getCategoryForIndex(i, totalCount, interviewType) {
+  if (i === 0) return 'intro';
+  if (i === totalCount - 1) return 'outro';
+  const cycle = CATEGORY_CYCLES[(interviewType || 'mixed').toLowerCase()] || CATEGORY_CYCLES.default;
+  return cycle[(i - 1) % cycle.length];
+}
+
+/**
+ * Generates remaining questions in the background after the first question
+ * has already been created and the response has been sent to the client.
+ * Updates the interview record incrementally as each question is saved.
+ */
+async function generateRemainingQuestionsInBackground(interview, context, startIdx, totalCount) {
+  const CONCURRENCY = 3;
+
+  try {
+    const { type, domain, difficulty, jobRole, jobDescription, resumeText, focusSkills, roleProfile, language, candidateName } = context;
+
+    logger.info(`[BG] Starting background generation for interview ${interview._id} — questions ${startIdx + 1} to ${totalCount} (concurrency ${CONCURRENCY})`);
+
+    const freshInterview = await Interview.findById(interview._id).select('roleProfile').lean();
+    if (freshInterview?.roleProfile) {
+      context.roleProfile = freshInterview.roleProfile;
+    }
+
+    async function generateOne(i) {
+      const category = getCategoryForIndex(i, totalCount, type);
+
+      try {
+        const [aiQ] = await generateInterviewQuestions(type, domain, difficulty, 1, {
+          jobRole, jobDescription, resumeText, focusSkills, roleProfile, language, candidateName,
+          _forcedCategory: category,
+          _forcedIndex: i,
+          _forcedCount: totalCount,
+        });
+
+        if (aiQ && aiQ.text) {
+          const existing = await Question.find({ interview: interview._id }).select('text').lean();
+          if (isDuplicateOfExisting(aiQ.text, existing)) {
+            logger.warn(`[BG] Skipping duplicate question ${i + 1} for interview ${interview._id}`);
+            return;
+          }
+
+          const question = await Question.create({
+            interview: interview._id,
+            text: aiQ.text,
+            category,
+            difficulty: toQuestionDifficulty(aiQ.difficulty || difficulty),
+            expectedAnswer: aiQ.expectedAnswer || '',
+            order: i,
+          });
+
+          await Interview.findByIdAndUpdate(interview._id, {
+            $push: { questions: question._id },
+          });
+
+          logger.info(`[BG] Question ${i + 1}/${totalCount} saved for interview ${interview._id}`);
+        }
+      } catch (qErr) {
+        logger.warn(`[BG] Question ${i + 1} generation failed for ${interview._id}: ${qErr.message}`);
+      }
+    }
+
+    const indices = [];
+    for (let i = startIdx; i < totalCount; i++) indices.push(i);
+
+    let cursor = 0;
+    async function worker() {
+      while (cursor < indices.length) {
+        const i = indices[cursor++];
+        await generateOne(i);
+      }
+    }
+
+    const workers = Math.min(CONCURRENCY, indices.length);
+    await Promise.all(Array.from({ length: workers }, () => worker()));
+
+    await Interview.findByIdAndUpdate(interview._id, { questionsReady: true });
+    logger.info(`[BG] All ${totalCount} questions ready for interview ${interview._id}`);
+  } catch (err) {
+    logger.error(`[BG] Background question generation failed for ${interview._id}: ${err.message}`);
+    await Interview.findByIdAndUpdate(interview._id, { questionsReady: true }).catch(() => {});
+  }
+}
+
+/**
+ * @desc    Create a new interview — responds immediately after generating the first
+ *          question, then generates the remaining questions in the background.
+ * @route   POST /api/v1/interviews
+ * @access  Private
+ */
 const createInterview = async (req, res, next) => {
   try {
     const { title, type, difficulty, domain, duration, scheduledAt, jobRole, focusSkills, jobDescription, resumeText, language } = req.body;
 
-    // Create interview
+    const totalQuestionCount = Math.max(1, Math.min(Math.floor((duration || 30) / 2.5), 16));
+
+    // ── Step 1: Create the interview record immediately ──────────────────────
     const interview = await Interview.create({
       user: req.user._id,
       title,
@@ -44,48 +144,54 @@ const createInterview = async (req, res, next) => {
       focusSkills: focusSkills || [],
       jobDescription: jobDescription || '',
       resumeText: resumeText || '',
+      questionsReady: false,
+      expectedQuestionCount: totalQuestionCount,
     });
 
-    // Parse job description if provided (Step 2)
+    // ── Step 2: Parse job description asynchronously (non-blocking) ───────────
     let roleProfile = null;
     if (jobDescription && jobDescription.trim()) {
-      try {
-        roleProfile = await parseJobDescription(jobDescription, jobRole || domain);
-        interview.roleProfile = roleProfile;
-        await interview.save();
-        logger.info(`Job description parsed for interview ${interview._id}`);
-      } catch (parseError) {
-        logger.warn(`Job description parsing failed, continuing: ${parseError.message}`);
-      }
+      parseJobDescription(jobDescription, jobRole || domain)
+        .then(async (parsed) => {
+          await Interview.findByIdAndUpdate(interview._id, { roleProfile: parsed });
+          logger.info(`Job description parsed for interview ${interview._id}`);
+        })
+        .catch((parseError) => {
+          logger.warn(`Job description parsing failed for ${interview._id}: ${parseError.message}`);
+        });
     }
 
-    // Generate AI questions (Step 3)
-    const questionCount = Math.max(1, Math.min(Math.floor((duration || 30) / 2.5), 16));
-    let aiQuestions = [];
+    // ── Step 3: Generate ONLY the first (intro) question synchronously ───────
+    let firstQuestion = null;
+    try {
+      const [firstAiQ] = await generateInterviewQuestions(type, domain, difficulty, 1, {
+        jobRole,
+        jobDescription,
+        resumeText,
+        focusSkills,
+        roleProfile,
+        language: interview.language,
+        candidateName: req.user.name,
+        _forcedCategory: 'intro',
+        _forcedIndex: 0,
+        _forcedCount: totalQuestionCount,
+      });
 
-    aiQuestions = await generateInterviewQuestions(type, domain, difficulty, questionCount, {
-      jobRole,
-      jobDescription,
-      resumeText,
-      focusSkills,
-      roleProfile,
-      language: interview.language,
-      candidateName: req.user.name,
-    });
+      if (firstAiQ && firstAiQ.text) {
+        firstQuestion = await Question.create({
+          interview: interview._id,
+          text: firstAiQ.text,
+          category: 'intro',
+          difficulty: toQuestionDifficulty(firstAiQ.difficulty || difficulty),
+          expectedAnswer: firstAiQ.expectedAnswer || '',
+          order: 0,
+        });
+      }
+    } catch (q0Err) {
+      logger.warn(`First question generation failed for ${interview._id}: ${q0Err.message}`);
+    }
 
-    // Create question documents
-    const questions = await Question.insertMany(
-      aiQuestions.map((q, index) => ({
-        interview: interview._id,
-        text: q.text,
-        category: q.category,
-        difficulty: toQuestionDifficulty(q.difficulty),
-        expectedAnswer: q.expectedAnswer,
-        order: index,
-      }))
-    );
-
-    // Initialize conversation history with a system prompt and the first question
+    // ── Step 4: Seed conversation history and save ───────────────────────────
     const conversationHistory = [
       {
         role: 'system',
@@ -94,28 +200,41 @@ const createInterview = async (req, res, next) => {
       }
     ];
 
-    if (questions.length > 0) {
+    if (firstQuestion) {
       conversationHistory.push({
         role: 'interviewer',
-        content: questions[0].text,
+        content: firstQuestion.text,
         timestamp: new Date()
       });
+      interview.questions = [firstQuestion._id];
     }
 
-    // Update interview with question references and history
-    interview.questions = questions.map((q) => q._id);
+    // If only 1 question total, it's already ready
+    if (totalQuestionCount === 1) {
+      interview.questionsReady = true;
+    }
+
     interview.conversationHistory = conversationHistory;
     await interview.save();
 
-    // Increment user's interview count
     await User.findByIdAndUpdate(req.user._id, { $inc: { interviewCount: 1 } });
 
-    // Populate for response
+    // ── Step 5: Respond immediately ──────────────────────────────────────────
     const populatedInterview = await Interview.findById(interview._id).populate('questions');
+    logger.info(`Interview created: ${interview._id} by user ${req.user._id} — responding immediately, ${totalQuestionCount - 1} questions generating in background`);
+    ApiResponse.created(res, { interview: populatedInterview }, 'Interview created — questions generating');
 
-    logger.info(`Interview created: ${interview._id} by user ${req.user._id}`);
-
-    ApiResponse.created(res, { interview: populatedInterview }, 'Interview created with AI-generated questions');
+    // ── Step 6: Generate remaining questions in the background ───────────────
+    if (totalQuestionCount > 1) {
+      const bgContext = {
+        type, domain, difficulty, jobRole, jobDescription, resumeText,
+        focusSkills, roleProfile, language: interview.language,
+        candidateName: req.user.name,
+      };
+      // Fire-and-forget — do NOT await
+      generateRemainingQuestionsInBackground(interview, bgContext, 1, totalQuestionCount)
+        .catch(err => logger.error(`[BG] Unhandled error in background generation: ${err.message}`));
+    }
   } catch (error) {
     next(error);
   }
@@ -184,6 +303,8 @@ const getInterview = async (req, res, next) => {
 
 /**
  * @desc    Start an interview session
+ *          Accepts both 'scheduled' and 'in-progress' statuses so that refreshing
+ *          during an active session doesn't break the flow.
  * @route   PUT /api/v1/interviews/:id/start
  * @access  Private
  */
@@ -198,12 +319,14 @@ const startInterview = async (req, res, next) => {
       return next(ApiError.notFound('Interview not found'));
     }
 
-    if (interview.status !== 'scheduled') {
+    if (interview.status !== 'scheduled' && interview.status !== 'in-progress') {
       return next(ApiError.badRequest(`Cannot start interview with status '${interview.status}'`));
     }
 
-    interview.status = 'in-progress';
-    await interview.save();
+    if (interview.status === 'scheduled') {
+      interview.status = 'in-progress';
+      await interview.save();
+    }
 
     const populated = await Interview.findById(interview._id).populate('questions');
 
@@ -221,17 +344,22 @@ const startInterview = async (req, res, next) => {
 const submitAnswer = async (req, res, next) => {
   try {
     const { interviewId, questionId } = req.params;
-    const { userAnswer, timeSpent } = req.body;
+    const { userAnswer, timeSpent, activePromptText } = req.body;
 
     // Verify interview belongs to user
     const interview = await Interview.findOne({
       _id: interviewId,
       user: req.user._id,
-      status: 'in-progress',
+      status: { $in: ['in-progress', 'scheduled'] },
     });
 
     if (!interview) {
       return next(ApiError.notFound('Active interview not found'));
+    }
+
+    // Coerce scheduled → in-progress on first answer
+    if (interview.status === 'scheduled') {
+      interview.status = 'in-progress';
     }
 
     // Find the question
@@ -267,20 +395,12 @@ const submitAnswer = async (req, res, next) => {
       }
     }
 
-    // Ensure the current question's text is in the conversation history.
-    // (Only the first question is seeded at creation time — subsequent questions
-    //  must be injected here so the AI model has full context of what was asked.)
     const lastInterviewerMsg = [...interview.conversationHistory]
       .reverse()
       .find(m => m.role === 'interviewer');
 
-    if (!lastInterviewerMsg || lastInterviewerMsg.content !== question.text) {
-      interview.conversationHistory.push({
-        role: 'interviewer',
-        content: question.text,
-        timestamp: new Date()
-      });
-    }
+    const promptForAnswer = (activePromptText || lastInterviewerMsg?.content || question.text || '').trim();
+    ensureInterviewerPromptInHistory(interview.conversationHistory, promptForAnswer);
 
     // Append candidate's answer to conversation history
     interview.conversationHistory.push({
@@ -293,31 +413,44 @@ const submitAnswer = async (req, res, next) => {
     let evaluation = { score: 0, feedback: '', strengths: [], improvements: [], suggestedAnswer: '' };
     let nextInterviewerResponse = "Thank you. Let's move on to the next topic.";
     let isFollowUp = false;
+    let answeredCandidateQuestion = false;
 
     if (transcribedAnswer) {
       try {
         const turnResult = await processInterviewTurn(
-          interview.conversationHistory, 
-          interview.domain, 
-          interview.jobRole, 
+          interview.conversationHistory,
+          interview.domain,
+          interview.jobRole,
           interview.language,
-          interview.type
+          interview.type,
+          {
+            difficulty: interview.difficulty || 'mid',
+            currentQuestion: {
+              text: promptForAnswer || question.text,
+              expectedAnswer: question.expectedAnswer || '',
+              category: question.category || 'general',
+              difficulty: question.difficulty || interview.difficulty || 'mid',
+            },
+            roleProfile: interview.roleProfile || null,
+            candidateAnswer: transcribedAnswer,
+          }
         );
-        
+
         if (turnResult.evaluation) {
           evaluation = {
-            score: turnResult.evaluation.score || 0,
+            score: turnResult.evaluation.score ?? 0,
             feedback: turnResult.evaluation.feedback || '',
             strengths: turnResult.evaluation.strengths || [],
             improvements: turnResult.evaluation.improvements || [],
             suggestedAnswer: turnResult.evaluation.suggestedAnswer || '',
           };
         }
-        
+
         if (turnResult.nextInterviewerResponse) {
           nextInterviewerResponse = turnResult.nextInterviewerResponse;
         }
         isFollowUp = turnResult.isFollowUp || false;
+        answeredCandidateQuestion = Boolean(turnResult.answeredCandidateQuestion);
 
       } catch (aiError) {
         logger.warn(`AI turn processing failed: ${aiError.message}`);
@@ -325,34 +458,30 @@ const submitAnswer = async (req, res, next) => {
       }
     }
 
-    // Only update the question record when the topic is complete (not a follow-up).
-    // During follow-ups (e.g. user asked for clarification), we preserve the original
-    // answer and keep the question open for the real answer.
+    // Persist answer text on every turn (including follow-ups); score only when topic completes.
+    if (question.userAnswer && question.userAnswer.trim()) {
+      question.userAnswer = question.userAnswer + '\n\n[Follow-up answer]: ' + transcribedAnswer;
+    } else {
+      question.userAnswer = transcribedAnswer;
+    }
+    if (audioUrl) question.audioUrl = audioUrl;
+    question.timeSpent = (question.timeSpent || 0) + (timeSpent || 0);
+
     if (!isFollowUp) {
-      // Append follow-up answers to the main answer if there were previous attempts
-      if (question.userAnswer && question.userAnswer.trim()) {
-        question.userAnswer = question.userAnswer + '\n\n[Follow-up answer]: ' + transcribedAnswer;
-      } else {
-        question.userAnswer = transcribedAnswer;
-      }
-      question.audioUrl = audioUrl;
       question.score = typeof evaluation.score === 'number' ? evaluation.score : null;
       question.aiFeedback = evaluation.feedback;
-      question.timeSpent = (question.timeSpent || 0) + (timeSpent || 0);
       question.isAnswered = true;
-      await question.save();
     }
+    await question.save();
 
     // Check if we reached the maximum duration (in minutes) to end interview naturally
-    const interviewStartTime = interview.startedAt ? new Date(interview.startedAt).getTime() : new Date().getTime();
+    const interviewStartTime = interview.startedAt ? new Date(interview.startedAt).getTime() : new Date(interview.createdAt).getTime();
     const currentTime = new Date().getTime();
     const elapsedMinutes = (currentTime - interviewStartTime) / 60000;
-    
+
     const timeLimitReached = elapsedMinutes >= (interview.duration || 30);
 
-    // Add the AI's conversational response to history for context tracking
     if (timeLimitReached && !isFollowUp) {
-      // Time is up and we just finished a topic — override with wrap-up message
       nextInterviewerResponse = "We are out of time. Thank you for completing this interview. You can now submit and complete the session.";
     }
 
@@ -371,7 +500,8 @@ const submitAnswer = async (req, res, next) => {
       evaluation,
       followUpText: isFollowUp ? nextInterviewerResponse : null,
       isFollowUp,
-      isTimeUp
+      isTimeUp,
+      answeredCandidateQuestion,
     }, 'Answer submitted and evaluated');
   } catch (error) {
     next(error);
@@ -379,7 +509,7 @@ const submitAnswer = async (req, res, next) => {
 };
 
 /**
- * @desc    Complete an interview
+ * @desc    Complete an interview (idempotent — safe to call twice)
  * @route   PUT /api/v1/interviews/:id/complete
  * @access  Private
  */
@@ -394,23 +524,30 @@ const completeInterview = async (req, res, next) => {
       return next(ApiError.notFound('Interview not found'));
     }
 
-    if (interview.status !== 'in-progress') {
-      return next(ApiError.badRequest('Interview is not in progress'));
+    // Idempotent — if already completed return the existing data.
+    // This handles race conditions when the frontend fires completeInterview from both
+    // the engine wrapUp and the manual "End Interview" button simultaneously.
+    if (interview.status === 'completed') {
+      logger.info(`Interview ${interview._id} already completed — returning existing data`);
+      return ApiResponse.success(res, { interview }, 'Interview already completed');
     }
 
-    // Calculate overall score from question scores
-    const answeredQuestions = interview.questions.filter((q) => q.isAnswered);
+    if (interview.status !== 'in-progress') {
+      return next(ApiError.badRequest(`Cannot complete interview with status '${interview.status}'`));
+    }
+
+    const answeredQuestions = interview.questions.filter((q) => q.isAnswered && q.score !== null);
     const overallScore = answeredQuestions.length > 0
-      ? Math.round(answeredQuestions.reduce((sum, q) => sum + (q.score || 0), 0) / answeredQuestions.length)
+      ? Math.round(answeredQuestions.reduce((sum, q) => sum + q.score, 0) / answeredQuestions.length)
       : 0;
 
     interview.status = 'completed';
     interview.overallScore = overallScore;
-    
+
     if (req.body.visualMetrics) {
       interview.visualMetrics = req.body.visualMetrics;
     }
-    
+
     await interview.save();
 
     logger.info(`Interview completed: ${interview._id} — score: ${overallScore}`);
@@ -437,7 +574,6 @@ const deleteInterview = async (req, res, next) => {
       return next(ApiError.notFound('Interview not found'));
     }
 
-    // Cascade delete: questions, feedback, then the interview itself
     await Promise.all([
       Question.deleteMany({ interview: interview._id }),
       require('../models/Feedback').deleteMany({ interview: interview._id }),
@@ -453,7 +589,7 @@ const deleteInterview = async (req, res, next) => {
 };
 
 /**
- * @desc    Retry-evaluate a question answer (Step 7: Practice Loop)
+ * @desc    Retry-evaluate a question answer (Practice Loop)
  * @route   POST /api/v1/interviews/:interviewId/questions/:questionId/retry
  * @access  Private
  */
@@ -466,7 +602,6 @@ const retryEvaluate = async (req, res, next) => {
       return next(ApiError.badRequest('Please provide a retry answer'));
     }
 
-    // Verify interview belongs to user
     const interview = await Interview.findOne({
       _id: interviewId,
       user: req.user._id,
@@ -476,7 +611,6 @@ const retryEvaluate = async (req, res, next) => {
       return next(ApiError.notFound('Interview not found'));
     }
 
-    // Find the question
     const question = await Question.findOne({
       _id: questionId,
       interview: interviewId,
@@ -486,19 +620,32 @@ const retryEvaluate = async (req, res, next) => {
       return next(ApiError.notFound('Question not found'));
     }
 
-    // Build a minimal conversation history for re-evaluation
     const retryHistory = [
       { role: 'interviewer', content: question.text },
       { role: 'candidate', content: retryAnswer },
     ];
 
     const turnResult = await processInterviewTurn(
-      retryHistory, interview.domain, interview.jobRole, interview.language, interview.type
+      retryHistory,
+      interview.domain,
+      interview.jobRole,
+      interview.language,
+      interview.type,
+      {
+        difficulty: interview.difficulty || 'mid',
+        currentQuestion: {
+          text: question.text,
+          expectedAnswer: question.expectedAnswer || '',
+          category: question.category || 'general',
+          difficulty: question.difficulty || interview.difficulty || 'mid',
+        },
+        roleProfile: interview.roleProfile || null,
+        candidateAnswer: retryAnswer,
+      }
     );
 
     const evaluation = turnResult.evaluation || { score: 0, feedback: '', strengths: [], improvements: [], suggestedAnswer: '' };
 
-    // Store retry attempt on the question
     question.retryAnswers.push({
       answer: retryAnswer,
       score: typeof evaluation.score === 'number' ? evaluation.score : null,
@@ -533,10 +680,8 @@ const resetInterview = async (req, res, next) => {
       return next(ApiError.notFound('Interview not found'));
     }
 
-    // Delete feedback associated with the interview
     await Feedback.deleteMany({ interview: interview._id });
 
-    // Reset all questions linked to this interview
     await Question.updateMany(
       { interview: interview._id },
       {
@@ -552,7 +697,6 @@ const resetInterview = async (req, res, next) => {
       }
     );
 
-    // Re-initialize conversation history with a system prompt and the first question
     const conversationHistory = [
       {
         role: 'system',

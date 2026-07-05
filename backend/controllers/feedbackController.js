@@ -2,7 +2,7 @@ const Feedback = require('../models/Feedback');
 const Interview = require('../models/Interview');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
-const { generateComprehensiveFeedback } = require('../services/kaggleService');
+const { generateComprehensiveFeedback } = require('../services/gemmaService');
 const logger = require('../utils/logger');
 
 /**
@@ -35,8 +35,16 @@ function normalizeFeedback(raw, interview) {
   const cats = raw.categories || raw.skillBreakdown || {};
   const defaultCat = { score: 0, feedback: '' };
 
+  const answeredQuestions = (interview.questions || []).filter(
+    (q) => q.isAnswered && typeof q.score === 'number'
+  );
+  const turnAverage = answeredQuestions.length > 0
+    ? Math.round(answeredQuestions.reduce((sum, q) => sum + q.score, 0) / answeredQuestions.length)
+    : null;
+  const authoritativeScore = turnAverage ?? interview.overallScore ?? 0;
+
   return {
-    overallScore: typeof raw.overallScore === 'number' ? raw.overallScore : (interview.overallScore || 0),
+    overallScore: authoritativeScore,
     categories: {
       communication: cats.communication || defaultCat,
       technicalAccuracy: cats.technicalAccuracy || cats.technical_accuracy || cats.technical || defaultCat,
@@ -109,11 +117,7 @@ const generateFeedback = async (req, res, next) => {
       aiModel: 'gemma-3-technical-interviewer',
     });
 
-    // Update interview with overall score from comprehensive feedback
-    interview.overallScore = aiFeedback.overallScore;
-    await interview.save();
-
-    logger.info(`Feedback generated for interview ${interview._id}`);
+    logger.info(`Feedback generated for interview ${interview._id} — overall score: ${aiFeedback.overallScore} (from turn average)`);
 
     ApiResponse.created(res, { feedback }, 'AI feedback generated');
   } catch (error) {

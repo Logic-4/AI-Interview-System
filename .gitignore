@@ -28,6 +28,11 @@ __pycache__/
 .ipynb_checkpoints/
 *.pyo
 *.pyd
+.venv/
+venv/
+env/
+Models/**/outputs/*.wav
+Models/Skydheere/transcription.json
 
 # OS files
 .DS_Store

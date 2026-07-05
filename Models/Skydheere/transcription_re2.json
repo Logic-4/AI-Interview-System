@@ -1,0 +1,6 @@
+{
+  "file": "audio\\Re2_from_m4a.wav",
+  "model": "skydheere/wav2vec2-large-mms-1b-somalia",
+  "device": "cpu",
+  "text": "sana alaykun waa raxmata waa balakaad setam fiicantay xaalka kawaran si tahay qeerkaaba suugu yahay waa ku salaamay waa kaa qaabay"
+}

@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import toast from "react-hot-toast";
+import { getApiBaseUrl } from "../lib/apiConfig";
+import { isSomaliLanguage } from "../lib/interviewHelpers";
 
 export interface WordHighlight {
   wordIndex: number;
@@ -30,10 +33,12 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const browserUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-  /* Stores the resolve callback for the currently-playing utterance */
   const playResolveRef = useRef<(() => void) | null>(null);
+  const languageCodeRef = useRef(languageCode);
+  languageCodeRef.current = languageCode;
 
-  // Create a single reusable Audio element on mount
+  const isSomaliTts = isSomaliLanguage(languageCode);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -46,7 +51,6 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
     };
 
     audio.onpause = () => {
-      // Only mark paused if we haven't finished — onended fires after onpause in some browsers
       if (audio.currentTime < audio.duration) {
         setIsPaused(true);
       }
@@ -55,7 +59,6 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
     audio.onended = () => {
       setIsSpeaking(false);
       setIsPaused(false);
-      // Resolve the speakAndWait promise
       if (playResolveRef.current) {
         playResolveRef.current();
         playResolveRef.current = null;
@@ -63,7 +66,7 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
     };
 
     audio.onerror = () => {
-      console.warn("[OpenTTS] Audio playback error", audio.error);
+      console.warn("[TTS] Audio playback error", audio.error);
       setIsSpeaking(false);
       setIsPaused(false);
       if (playResolveRef.current) {
@@ -79,64 +82,73 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
     };
   }, []);
 
-  /**
-   * Fetch audio from the local TTS endpoint and play it.
-   * The returned Promise resolves when the audio finishes playing (or on error).
-   */
+  const speakWithBrowserFallback = useCallback(
+    (text: string, onPlay?: () => void) =>
+      new Promise<void>((resolve) => {
+        if (typeof window === "undefined" || !window.speechSynthesis) {
+          resolve();
+          return;
+        }
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = languageCodeRef.current;
+        utterance.onstart = () => {
+          setIsSpeaking(true);
+          setIsPaused(false);
+        };
+        utterance.onend = () => {
+          setIsSpeaking(false);
+          setIsPaused(false);
+          browserUtteranceRef.current = null;
+          resolve();
+        };
+        utterance.onerror = () => {
+          setIsSpeaking(false);
+          setIsPaused(false);
+          browserUtteranceRef.current = null;
+          resolve();
+        };
+
+        browserUtteranceRef.current = utterance;
+        window.speechSynthesis.speak(utterance);
+        if (onPlay) onPlay();
+      }),
+    []
+  );
+
   const speak = useCallback(
     async (text: string, onPlay?: () => void): Promise<void> => {
       const audio = audioRef.current;
       if (!audio) return;
 
-      // Cancel anything currently playing
+      const somaliMode = isSomaliLanguage(languageCodeRef.current);
+
       audio.pause();
       audio.currentTime = 0;
       window.speechSynthesis?.cancel();
       browserUtteranceRef.current = null;
       if (playResolveRef.current) {
-        playResolveRef.current(); // resolve any previous pending promise
+        playResolveRef.current();
         playResolveRef.current = null;
       }
 
-      // We are starting the fetch process, but not playing audio yet
       setIsFetchingTTS(true);
 
-      const speakWithBrowserFallback = () =>
-        new Promise<void>((resolve) => {
-          if (typeof window === "undefined" || !window.speechSynthesis) {
-            resolve();
-            return;
-          }
-
-          const utterance = new SpeechSynthesisUtterance(text);
-          utterance.lang = languageCode;
-          utterance.onstart = () => {
-            setIsSpeaking(true);
-            setIsPaused(false);
-          };
-          utterance.onend = () => {
-            setIsSpeaking(false);
-            setIsPaused(false);
-            browserUtteranceRef.current = null;
-            resolve();
-          };
-          utterance.onerror = () => {
-            setIsSpeaking(false);
-            setIsPaused(false);
-            browserUtteranceRef.current = null;
-            resolve();
-          };
-
-          browserUtteranceRef.current = utterance;
-          window.speechSynthesis.speak(utterance);
-        });
-
       try {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
-        const response = await fetch(`${apiBase.replace(/\/+$/, "")}/tts`, {
+        const apiBase = getApiBaseUrl();
+        const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (token) headers.Authorization = `Bearer ${token}`;
+
+        const response = await fetch(`${apiBase}/tts`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, languageCode }),
+          headers,
+          body: JSON.stringify({
+            text,
+            languageCode: languageCodeRef.current,
+            language: somaliMode ? "somali" : "english",
+          }),
+          credentials: "include",
         });
 
         if (!response.ok) {
@@ -150,8 +162,6 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
         }
 
         const audioUrl = URL.createObjectURL(audioBlob);
-
-        // Fetch complete, ready to play
         setIsFetchingTTS(false);
         setIsSpeaking(true);
         setIsPaused(false);
@@ -159,15 +169,11 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
 
         audio.src = audioUrl;
 
-        // Wait for the audio to finish playing
         await new Promise<void>((resolve) => {
           playResolveRef.current = resolve;
           audio.play().catch((e) => {
-            if (e.name === "AbortError") {
-              // It was paused, do not resolve the promise! The audio will resume later.
-              console.warn("[OpenTTS] play() was paused before it started.");
-            } else {
-              console.warn("[OpenTTS] play() rejected:", e);
+            if (e.name !== "AbortError") {
+              console.warn("[TTS] play() rejected:", e);
               setIsSpeaking(false);
               resolve();
             }
@@ -175,13 +181,22 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
         });
         URL.revokeObjectURL(audioUrl);
       } catch (error) {
-        console.warn("[OpenTTS] Falling back to browser speech:", error);
+        console.warn("[TTS] Backend synthesis failed:", error);
         setIsFetchingTTS(false);
+
+        if (somaliMode) {
+          toast.error(
+            "Somali voice service is starting or unavailable. Wait 1–2 min after backend boot, or run: cd backend && npm run setup:somali-speech"
+          );
+          if (onPlay) onPlay();
+          return;
+        }
+
         if (onPlay) onPlay();
-        await speakWithBrowserFallback();
+        await speakWithBrowserFallback(text);
       }
     },
-    [languageCode]
+    [speakWithBrowserFallback]
   );
 
   const cancel = useCallback(() => {
@@ -197,6 +212,7 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
     }
     setIsSpeaking(false);
     setIsPaused(false);
+    setIsFetchingTTS(false);
     setHighlight(null);
   }, []);
 
@@ -225,7 +241,7 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
     isPaused,
     isFetchingTTS,
     highlight,
-    voiceName: "OpenTTS",
+    voiceName: isSomaliTts ? "Somali TTS" : "Piper TTS",
     ready: true,
   };
 }

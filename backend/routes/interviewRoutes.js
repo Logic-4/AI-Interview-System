@@ -28,11 +28,11 @@ router.delete('/:id', deleteInterview);
 
 // Interview lifecycle
 router.put('/:id/start', startInterview);
-router.put('/:interviewId/questions/:questionId/answer', upload.single('audio'), submitAnswerValidator, validate, submitAnswer);
+router.put('/:interviewId/questions/:questionId/answer', aiLimiter, upload.single('audio'), submitAnswerValidator, validate, submitAnswer);
 router.put('/:id/complete', completeInterview);
 router.put('/:id/reset', resetInterview);
 
 // Practice loop — retry a question after feedback (Step 7)
-router.post('/:interviewId/questions/:questionId/retry', retryEvaluate);
+router.post('/:interviewId/questions/:questionId/retry', aiLimiter, retryEvaluate);
 
 module.exports = router;

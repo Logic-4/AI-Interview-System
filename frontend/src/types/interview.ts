@@ -34,6 +34,8 @@ export interface Interview {
 export interface PopulatedInterview extends Omit<Interview, 'questions'> {
   questions: import('./question').Question[];
   feedback?: import('./feedback').Feedback;
+  questionsReady?: boolean;
+  expectedQuestionCount?: number;
 }
 
 export type InterviewLanguage = 'english' | 'somali';
@@ -58,6 +60,7 @@ export interface SubmitAnswerPayload {
   userAnswer?: string;
   timeSpent?: number;
   audio?: File | Blob;
+  activePromptText?: string;
 }
 
 export interface AnswerEvaluation {
@@ -74,6 +77,7 @@ export interface SubmitAnswerResponse {
   followUpText?: string | null;
   isFollowUp?: boolean;
   isTimeUp?: boolean;
+  answeredCandidateQuestion?: boolean;
 }
 
 export interface InterviewListParams {

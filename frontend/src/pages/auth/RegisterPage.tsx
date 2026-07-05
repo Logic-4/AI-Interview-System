@@ -3,15 +3,14 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { useEffect, useState, useMemo } from 'react';
 import { setPageTitle } from '../../store/themeConfigSlice';
-import { Github, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import authService from '../../services/authService';
 import { useAuthStore } from '../../stores/authStore';
 import { sanitizeRedirectPath } from '../../lib/authRedirect';
+import { getGoogleAuthUrl } from '../../lib/apiConfig';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import ThemeToggle from '../../components/layout/ThemeToggle';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 
 const RegisterPage = () => {
     const dispatch = useDispatch();
@@ -186,7 +185,7 @@ const RegisterPage = () => {
                             <div className="mt-4 mb-4 flex flex-col gap-3">
                                 <button
                                     type="button"
-                                    onClick={() => { window.location.href = `${API_BASE}/auth/google`; }}
+                                    onClick={() => { window.location.href = getGoogleAuthUrl(); }}
                                     className="w-full h-12 flex items-center justify-center gap-3 rounded-xl border border-primary text-primary hover:bg-primary-light dark:hover:bg-primary-dark-light hover:text-primary-hover font-bold transition-all duration-150 active:scale-95 cursor-pointer"
                                 >
                                     <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0">

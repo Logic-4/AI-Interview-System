@@ -8,6 +8,7 @@ interface InterviewState {
   sessionId: string | null;
   timeElapsed: number;
   isSessionActive: boolean;
+  isImmersive: boolean;
   answeredQuestions: Record<string, Question>;
   setActiveInterview: (interview: PopulatedInterview | null) => void;
   setCurrentQuestionIndex: (index: number) => void;
@@ -15,6 +16,7 @@ interface InterviewState {
   setSessionId: (id: string | null) => void;
   setTimeElapsed: (seconds: number) => void;
   setSessionActive: (active: boolean) => void;
+  setImmersive: (immersive: boolean) => void;
   recordAnswer: (questionId: string, question: Question) => void;
   resetSession: () => void;
 }
@@ -25,6 +27,7 @@ export const useInterviewStore = create<InterviewState>()((set, get) => ({
   sessionId: null,
   timeElapsed: 0,
   isSessionActive: false,
+  isImmersive: false,
   answeredQuestions: {},
   setActiveInterview: (interview) => set({ activeInterview: interview }),
   setCurrentQuestionIndex: (index) => set({ currentQuestionIndex: index }),
@@ -38,13 +41,13 @@ export const useInterviewStore = create<InterviewState>()((set, get) => ({
   setSessionId: (id) => set({ sessionId: id }),
   setTimeElapsed: (seconds) => set({ timeElapsed: seconds }),
   setSessionActive: (active) => set({ isSessionActive: active }),
+  setImmersive: (immersive) => set({ isImmersive: immersive }),
   recordAnswer: (questionId, question) =>
     set((state) => ({
       answeredQuestions: { ...state.answeredQuestions, [questionId]: question },
     })),
   resetSession: () =>
     set({
-      activeInterview: null,
       currentQuestionIndex: 0,
       sessionId: null,
       timeElapsed: 0,

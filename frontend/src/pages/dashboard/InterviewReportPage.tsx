@@ -17,7 +17,7 @@ import {
   FileText,
   ChevronDown,
   ChevronUp,
-  Video,
+
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -303,48 +303,7 @@ export default function InterviewReportPage() {
         </Card>
       )}
 
-      {/* Body Language & Visuals (Webcam Analytics) */}
-      {feedback?.visualMetrics && (
-        <Card hoverEffect={false} className="p-6 border border-white-light dark:border-[#1b2e4b] bg-white dark:bg-black">
-          <h3 className="text-sm font-bold text-text-primary dark:text-white mb-5 flex items-center gap-2">
-            <Video className="w-4 h-4 text-primary" />
-            Body Language & Visuals
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-text-primary dark:text-white">Eye Contact</span>
-                  <span className="text-xs font-bold text-primary">{feedback.visualMetrics.eyeContactScore}%</span>
-                </div>
-                <div className="h-2 w-full bg-white-light dark:bg-[#1b2e4b] rounded-full overflow-hidden">
-                  <div className="h-full bg-primary rounded-full" style={{ width: `${feedback.visualMetrics.eyeContactScore}%` }} />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-text-primary dark:text-white">Posture</span>
-                  <span className="text-xs font-bold text-primary">{feedback.visualMetrics.postureScore}%</span>
-                </div>
-                <div className="h-2 w-full bg-white-light dark:bg-[#1b2e4b] rounded-full overflow-hidden">
-                  <div className="h-full bg-primary rounded-full" style={{ width: `${feedback.visualMetrics.postureScore}%` }} />
-                </div>
-              </div>
-            </div>
-            
-            <div className="space-y-3">
-              <span className="text-xs font-semibold text-text-primary dark:text-white block">Detected Expressions</span>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(feedback.visualMetrics.expressionMetrics).map(([emotion, val]) => (
-                  <Badge key={emotion} className="bg-primary/10 text-primary border border-primary/20 capitalize font-medium">
-                    {emotion}: {val}%
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          </div>
-        </Card>
-      )}
+
 
       {/* Strengths & Improvements */}
       {feedback && (feedback.strengths?.length > 0 || feedback.improvements?.length > 0) && (

@@ -27,6 +27,7 @@ const interviewService = {
     const formData = new FormData();
     if (payload.userAnswer !== undefined) formData.append('userAnswer', payload.userAnswer);
     if (payload.timeSpent !== undefined) formData.append('timeSpent', String(payload.timeSpent));
+    if (payload.activePromptText) formData.append('activePromptText', payload.activePromptText);
     if (payload.audio) {
       const filename = payload.audio instanceof File ? payload.audio.name : 'answer.webm';
       formData.append('audio', payload.audio, filename);

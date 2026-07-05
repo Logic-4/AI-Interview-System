@@ -272,34 +272,54 @@ After multiple sessions, the candidate should:
 
 ---
 
-## Local Text-To-Speech
+## Local Text-To-Speech (Piper)
 
-This project uses Piper for free local text-to-speech. Piper's own docs recommend its web server for repeated use, so the app calls the local Piper HTTP server.
+English interviews use Piper. Somali uses Python ASR/TTS on ports **8001** (ASR) and **8002** (TTS).
 
-Install Piper:
+**One-time Somali setup** (required — the bundled `Skydheere/.venv` may point to another machine's Python):
+
+```bash
+cd backend && npm run setup:somali-speech
+```
+
+This creates `Models/.venv` and installs ASR + TTS dependencies.
+
+**Automatic start (dev):** With `SOMALI_AUTO_START=true` in root `.env`, the backend spawns Somali ASR/TTS when you run:
+
+```bash
+cd backend && npm run dev
+```
+
+First launch can take **1–3 minutes** while models load. Wait for backend logs: `[somali-tts] Ready at http://127.0.0.1:8002`.
+
+**English Piper — one-time setup:**
 
 ```bash
 pip install "piper-tts[http]"
-```
-
-Download a voice:
-
-```bash
 python -m piper.download_voices en_US-lessac-medium
 ```
 
-Start Piper on port `5001` so it does not conflict with this app's backend on port `5000`:
+**Option A — automatic (recommended for dev):**  
+With `PIPER_AUTO_START=true` in root `.env`, the backend starts Piper when you run:
 
 ```bash
-python -m piper.http_server -m en_US-lessac-medium --port 5001
+cd backend && npm run dev
 ```
 
-Configure the root `.env`:
+**Option B — manual:** run Piper in its own terminal:
+
+```bash
+cd backend && npm run piper
+# or: node scripts/start-piper.js
+# or: scripts/start-piper.bat   (Windows)
+```
+
+Root `.env`:
 
 ```env
 PIPER_BASE_URL=http://localhost:5001
-PIPER_EN_VOICE=
-PIPER_SO_VOICE=
+PIPER_VOICE=en_US-lessac-medium
+PIPER_AUTO_START=true
 ```
 
-Restart the frontend after changing `.env`. The interview page calls `/api/tts`, which calls Piper locally and returns WAV audio. If Piper is not running, the page falls back to the browser's built-in speech synthesis.
+If Piper is not running, English TTS falls back to the browser's built-in speech synthesis.

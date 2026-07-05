@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -17,17 +17,19 @@ import {
   Play,
   StopCircle,
 } from "lucide-react";
+import toast from "react-hot-toast";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
 import { cn } from "../../lib/utils";
+import { computeQuestionsReady, isSomaliLanguage } from "../../lib/interviewHelpers";
 import interviewService from "../../services/interviewService";
 import feedbackService from "../../services/feedbackService";
 import { useInterviewStore } from "../../stores/interviewStore";
 import { useAuthStore } from "../../stores/authStore";
 import { useConversationEngine } from "../../hooks/useConversationEngine";
-import { useFaceTracker } from "../../hooks/useFaceTracker";
+
 import type { Question } from "../../types/question";
 import type { PopulatedInterview } from "../../types/interview";
 
@@ -44,12 +46,16 @@ type PagePhase = "loading" | "ready" | "active" | "error";
 export default function InterviewDetailsPage() {
   const params = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const interviewId = params.id as string;
   const { user } = useAuthStore();
+
+  const navState = location.state as { fromCreate?: boolean; interview?: PopulatedInterview } | null;
 
   const {
     setActiveInterview,
     setSessionActive,
+    setImmersive,
     recordAnswer,
     resetSession,
   } = useInterviewStore();
@@ -59,11 +65,44 @@ export default function InterviewDetailsPage() {
   const [interview, setInterview] = useState<PopulatedInterview | null>(null);
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+  const [questionsReady, setQuestionsReady] = useState(false);
 
-  const faceTracker = useFaceTracker();
+  const hasCompletedRef = useRef(false);
+  const pollDelayRef = useRef(2000);
+  const loadedInterviewIdRef = useRef<string | null>(null);
 
-  /* ── Fetch interview data ─────────────────────────────────── */
+  const applyInterview = useCallback(
+    (data: PopulatedInterview) => {
+      setInterview(data);
+      setActiveInterview(data);
+      setQuestionsReady(computeQuestionsReady(data));
+    },
+    [setActiveInterview]
+  );
+
+
+
+  /* ── Immersive layout during live session ───────────────── */
   useEffect(() => {
+    setImmersive(pagePhase === "active");
+    return () => setImmersive(false);
+  }, [pagePhase, setImmersive]);
+
+  /* ── Fetch interview data (once per interviewId) ──────────── */
+  useEffect(() => {
+    if (loadedInterviewIdRef.current === interviewId) return;
+
+    loadedInterviewIdRef.current = interviewId;
+    hasCompletedRef.current = false;
+    pollDelayRef.current = 2000;
+    resetSession();
+
+    const navInterview =
+      navState?.fromCreate && navState.interview?._id === interviewId
+        ? navState.interview
+        : null;
+
     const fetchInterview = async () => {
       try {
         const data = await interviewService.getInterview(interviewId);
@@ -71,8 +110,7 @@ export default function InterviewDetailsPage() {
           navigate(`/interviews/${interviewId}/report`, { replace: true });
           return;
         }
-        setInterview(data);
-        setActiveInterview(data);
+        applyInterview(data);
         setPagePhase("ready");
       } catch {
         setError("Failed to load interview. Please try again.");
@@ -80,13 +118,63 @@ export default function InterviewDetailsPage() {
       }
     };
 
-    resetSession();
+    if (navInterview) {
+      if (navInterview.status === "completed") {
+        navigate(`/interviews/${interviewId}/report`, { replace: true });
+        return;
+      }
+      applyInterview(navInterview);
+      setPagePhase("ready");
+      interviewService.getInterview(interviewId).then((data) => {
+        if (data.status !== "completed") applyInterview(data);
+      }).catch(() => {});
+      return;
+    }
+
     fetchInterview();
-  }, [interviewId, navigate, setActiveInterview, resetSession]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interviewId]);
+
+  /* ── Poll until all questions are ready (exponential backoff) ─ */
+  useEffect(() => {
+    if (questionsReady || pagePhase !== "ready") return;
+
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const poll = async () => {
+      if (cancelled || questionsReady) return;
+      try {
+        const data = await interviewService.getInterview(interviewId);
+        if (cancelled) return;
+        applyInterview(data);
+        if (computeQuestionsReady(data)) {
+          setQuestionsReady(true);
+          return;
+        }
+      } catch {
+        // Silently ignore poll errors
+      }
+      pollDelayRef.current = Math.min(pollDelayRef.current * 1.5, 8000);
+      timeoutId = setTimeout(poll, pollDelayRef.current);
+    };
+
+    timeoutId = setTimeout(poll, pollDelayRef.current);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [questionsReady, pagePhase, interviewId, applyInterview]);
 
   /* ── Callbacks for conversation engine ─────────────────── */
   const onSubmitAnswer = useCallback(
-    async (questionId: string, answer: string, timeSpent: number, audio?: Blob | File) => {
+    async (
+      questionId: string,
+      answer: string,
+      timeSpent: number,
+      extras?: { audio?: Blob | File; activePromptText?: string }
+    ) => {
+      const audio = extras?.audio;
       const audioFile = audio
         ? audio instanceof File
           ? audio
@@ -97,6 +185,7 @@ export default function InterviewDetailsPage() {
         userAnswer: answer || undefined,
         timeSpent,
         audio: audioFile,
+        activePromptText: extras?.activePromptText,
       });
       recordAnswer(questionId, result.question);
 
@@ -105,16 +194,17 @@ export default function InterviewDetailsPage() {
         isTimeUp: result.isTimeUp,
         isFollowUp: result.isFollowUp,
         followUpText: result.followUpText,
+        answeredCandidateQuestion: result.answeredCandidateQuestion,
       };
     },
     [interviewId, recordAnswer]
   );
 
   const onComplete = useCallback(async () => {
-    faceTracker.stopTracking();
-    const visualMetrics = faceTracker.getMetrics();
-    await interviewService.completeInterview(interviewId, { visualMetrics });
-  }, [interviewId, faceTracker]);
+    if (hasCompletedRef.current) return;
+    hasCompletedRef.current = true;
+    await interviewService.completeInterview(interviewId);
+  }, [interviewId]);
 
   const onGenerateFeedback = useCallback(async () => {
     try {
@@ -139,19 +229,19 @@ export default function InterviewDetailsPage() {
 
   /* ── Start interview (API + engine) ───────────────────────── */
   const handleStart = async () => {
-    if (!interview) return;
+    if (!interview || isStarting) return;
+    setIsStarting(true);
+    setError(null);
     try {
-      setPagePhase("loading");
       const started = await interviewService.startInterview(interviewId);
-      setInterview(started);
-      setActiveInterview(started);
+      applyInterview(started);
       setSessionActive(true);
       setPagePhase("active");
-      faceTracker.startTracking();
-      setTimeout(() => engine.start(), 300);
+
+      setTimeout(() => engine.start({ language: started.language }), 300);
     } catch {
-      setError("Failed to start interview.");
-      setPagePhase("error");
+      toast.error("Failed to start interview. Please try again.");
+      setIsStarting(false);
     }
   };
 
@@ -179,6 +269,12 @@ export default function InterviewDetailsPage() {
 
   /* ── Toggle mic ──────────────────────────────────────────── */
   const toggleMic = useCallback(() => {
+    const canToggle =
+      !isSomaliLanguage(interview?.language) &&
+      (engine.phase === "listening" || engine.phase === "reviewing");
+
+    if (!canToggle) return;
+
     setIsMicMuted((prev) => {
       if (prev) {
         engine.recognition.startListening();
@@ -187,7 +283,7 @@ export default function InterviewDetailsPage() {
       }
       return !prev;
     });
-  }, [engine.recognition]);
+  }, [engine.recognition, engine.phase, interview?.language]);
 
   /* ── End interview ───────────────────────────────────────── */
   const handleEndInterview = async () => {
@@ -196,11 +292,11 @@ export default function InterviewDetailsPage() {
     engine.tts.cancel();
     engine.recognition.stopListening();
     
-    faceTracker.stopTracking();
-    const visualMetrics = faceTracker.getMetrics();
-    
     try {
-      await interviewService.completeInterview(interviewId, { visualMetrics });
+      if (!hasCompletedRef.current) {
+        hasCompletedRef.current = true;
+        await interviewService.completeInterview(interviewId);
+      }
     } catch {}
     navigate(`/interviews/${interviewId}/report`);
   };
@@ -290,14 +386,49 @@ export default function InterviewDetailsPage() {
             </div>
 
             <div className="flex justify-center pt-4">
-              <Button
-                size="xl"
-                className="h-14 px-12 rounded-md text-sm font-semibold uppercase tracking-wider shadow-xl shadow-primary/20 group text-white animate-pulse"
-                onClick={handleStart}
-              >
-                <Mic className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
-                Begin Interview
-              </Button>
+              {!questionsReady ? (
+                <div className="text-center space-y-4">
+                  <div className="flex items-center gap-3 px-6 py-4 rounded-md bg-primary/5 border border-primary/15">
+                    <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                    <div className="text-left">
+                      <p className="text-sm font-bold text-text-primary dark:text-white">Preparing your questions…</p>
+                      <p className="text-xs font-medium text-text-muted opacity-70">
+                        AI is generating {(interview as any).expectedQuestionCount ?? "your"} questions in the background
+                      </p>
+                    </div>
+                  </div>
+                  <div className="h-1 w-64 mx-auto bg-foreground/10 dark:bg-white/10 rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-primary/60 rounded-full"
+                      animate={{ x: ["-100%", "200%"] }}
+                      transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+                      style={{ width: "55%" }}
+                    />
+                  </div>
+                  <p className="text-xs text-text-muted opacity-60 font-medium">
+                    You&apos;ll be able to begin shortly — {questions.length} question{questions.length !== 1 ? "s" : ""} ready so far
+                  </p>
+                </div>
+              ) : (
+                <Button
+                  size="xl"
+                  className="h-14 px-12 rounded-md text-sm font-semibold uppercase tracking-wider shadow-xl shadow-primary/20 group text-white"
+                  onClick={handleStart}
+                  disabled={isStarting}
+                >
+                  {isStarting ? (
+                    <>
+                      <LoadingSpinner size="sm" className="mr-2" />
+                      Starting…
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
+                      Begin Interview
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
           </div>
           <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
@@ -316,15 +447,19 @@ export default function InterviewDetailsPage() {
 
   /* ── Theater Mode (active session) via React Portal ────────── */
   if (pagePhase === "active") {
-    const isSomali = interview?.language === "somali";
+    const isSomali = isSomaliLanguage(interview?.language);
     const isListeningPhase = engine.phase === "listening";
     const showListening = isSomali
-      ? engine.audioRecorder.isRecording && isListeningPhase
+      ? engine.phase === "listening" && engine.audioRecorder.isRecording
       : engine.recognition.isListening && isListeningPhase;
-    const showVisualizerActive = isSomali ? isListeningPhase : showListening;
+    const showVisualizerActive = isSomali
+      ? engine.phase === "listening" || engine.phase === "reviewing"
+      : showListening;
     const currentQ = questions[engine.currentQuestionIndex];
     const currentQuestionText = currentQ?.text || "";
-    const fullTranscript = (engine.recognition.finalTranscript + " " + engine.recognition.interimTranscript).trim();
+    const liveTranscript = engine.recognition.getTranscript();
+    const canToggleMic =
+      !isSomali && (engine.phase === "listening" || engine.phase === "reviewing");
 
     /* Analysis overlay */
     if (isAnalyzing) {
@@ -367,23 +502,7 @@ export default function InterviewDetailsPage() {
     /* Active session theater mode — clean single-question UI */
     return createPortal(
       <div className="fixed top-0 left-0 w-screen h-screen z-[9999] bg-background text-text-primary dark:text-white flex flex-col">
-        {/* PIP Webcam */}
-        {faceTracker.isActive && (
-          <div className="absolute bottom-6 right-6 w-48 h-36 bg-black rounded-lg overflow-hidden border-2 border-white/10 shadow-2xl z-50">
-            <video
-              ref={faceTracker.videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover transform -scale-x-100"
-            />
-            {/* Mock scanning overlay */}
-            <div className="absolute inset-0 pointer-events-none border border-primary/20 rounded-lg">
-               <div className="w-full h-[1px] bg-primary/40 animate-[scan_3s_ease-in-out_infinite]" />
-            </div>
-            <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/60 rounded text-[8px] font-mono text-primary/80 uppercase">AI Tracking Active</div>
-          </div>
-        )}
+
 
         {/* ── Top bar ──────────────────────────────────────── */}
         <div className="flex items-center justify-between px-6 py-3 flex-shrink-0 border-b border-white-light dark:border-[#1b2e4b]">
@@ -404,7 +523,15 @@ export default function InterviewDetailsPage() {
             {showListening && (
               <div className="flex items-center gap-1.5 px-2 py-0.5 bg-danger/10 border border-danger/30 rounded-md">
                 <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse" />
-                <span className="text-[10px] font-bold text-danger uppercase tracking-widest">Listening</span>
+                <span className="text-[10px] font-bold text-danger uppercase tracking-widest">
+                  {isSomali ? "Recording" : "Listening"}
+                </span>
+              </div>
+            )}
+            {engine.tts.isFetchingTTS && (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-warning/10 border border-warning/30 rounded-md">
+                <LoadingSpinner size="sm" className="w-3 h-3" />
+                <span className="text-[10px] font-bold text-warning uppercase tracking-widest">Generating voice</span>
               </div>
             )}
             {engine.tts.isSpeaking && (
@@ -526,7 +653,7 @@ export default function InterviewDetailsPage() {
           </div>
 
           {/* Interim transcript */}
-          {!isSomali && (showListening || engine.phase === "reviewing") && fullTranscript && (
+          {!isSomali && (showListening || engine.phase === "reviewing") && liveTranscript && (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
@@ -534,13 +661,7 @@ export default function InterviewDetailsPage() {
             >
               <div className="px-4 py-3 rounded-md bg-primary/10 border border-primary/20 inline-block">
                 <p className="text-sm text-foreground dark:text-white font-semibold leading-relaxed">
-                  {engine.recognition.finalTranscript}
-                  {engine.recognition.interimTranscript && (
-                    <span className="text-text-muted italic">
-                      {engine.recognition.finalTranscript ? " " : ""}
-                      {engine.recognition.interimTranscript}
-                    </span>
-                  )}
+                  {liveTranscript}
                 </p>
               </div>
               <div className="flex items-center justify-center gap-2 mt-2">
@@ -568,14 +689,20 @@ export default function InterviewDetailsPage() {
             >
               <div className="rounded-md border border-primary/20 bg-primary/10 px-4 py-3 inline-block">
                 <p className="text-sm font-semibold text-foreground dark:text-white">
-                  {engine.phase === "listening"
-                    ? "Hadalkaga waa la duubayaa..."
-                    : "Duubista waa la joojiyay. Gudbi jawaabta markaad diyaar tahay."}
+                  {engine.audioRecorder.error
+                    ? engine.audioRecorder.error
+                    : engine.phase === "listening"
+                      ? "Hadalkaga waa la duubayaa — hadal si cad cad"
+                      : "Duubista waa la joojiyay. Gudbi jawaabta markaad diyaar tahay."}
                 </p>
                 <div className="flex items-center justify-center gap-2 mt-2">
-                  <VolumeBar volume={engine.audioRecorder.analyserData ? 0.12 : 0} />
+                  <VolumeBar volume={engine.audioRecorder.volume} />
                   <span className="text-[9px] font-bold text-text-muted uppercase tracking-widest">
-                    {engine.phase === "listening" ? "Recording" : "Ready"}
+                    {engine.audioRecorder.isRecording
+                      ? `${engine.audioRecorder.duration}s`
+                      : engine.phase === "listening"
+                        ? "Starting mic…"
+                        : "Ready"}
                   </span>
                 </div>
               </div>
@@ -590,7 +717,9 @@ export default function InterviewDetailsPage() {
               className="flex items-center gap-2 px-4 py-2 justify-center flex-shrink-0"
             >
               <LoadingSpinner size="sm" />
-              <span className="text-xs font-semibold text-text-muted">Evaluating your answer...</span>
+              <span className="text-xs font-semibold text-text-muted">
+                {isSomali ? "Transcribing and evaluating your answer…" : "Evaluating your answer..."}
+              </span>
             </motion.div>
           )}
         </div>
@@ -599,6 +728,12 @@ export default function InterviewDetailsPage() {
         <div className="fixed bottom-0 left-0 w-full bg-white/95 dark:bg-black/90 backdrop-blur-md shadow-lg border-t border-white-light dark:border-[#1b2e4b] px-6 py-3 z-[10000]">
           <div className="max-w-4xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3 min-w-0">
+              {isSomali && engine.phase === "listening" && engine.audioRecorder.isRecording && (
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse" />
+                  <span className="text-xs font-semibold text-text-secondary truncate">Recording</span>
+                </div>
+              )}
               {showListening && !isSomali ? (
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse" />
@@ -652,9 +787,9 @@ export default function InterviewDetailsPage() {
               {!isSomali && (
                 <button
                   onClick={toggleMic}
-                  disabled={!showListening}
+                  disabled={!canToggleMic}
                   className={cn(
-                    "w-10 h-10 rounded-full flex items-center justify-center transition-all",
+                    "w-10 h-10 rounded-full flex items-center justify-center transition-all disabled:opacity-40",
                     isMicMuted ? "bg-warning/10 text-warning border border-warning/30" :
                     showListening ? "bg-danger/10 text-danger border border-danger/30" :
                     "bg-white-light/30 dark:bg-[#1a2941]/50 text-text-muted border border-white-light dark:border-[#1b2e4b]"

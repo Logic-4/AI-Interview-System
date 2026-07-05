@@ -138,6 +138,14 @@ const interviewSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: null,
     },
+    questionsReady: {
+      type: Boolean,
+      default: false,
+    },
+    expectedQuestionCount: {
+      type: Number,
+      default: 0,
+    },
     isDeleted: {
       type: Boolean,
       default: false,

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { IRootState } from '../../store';
 import { setPageTitle } from '../../store/themeConfigSlice';
-import { Home, DollarSign, User, Phone, Lock } from 'lucide-react';
+import { User, Lock } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import userService from '../../services/userService';
 import api from '../../services/api';
@@ -52,13 +52,7 @@ const SettingsPage = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [changingPw, setChangingPw] = useState(false);
 
-    // Kaggle state
-    const [kaggleUrl, setKaggleUrl] = useState('');
-    const [kaggleStatus, setKaggleStatus] = useState<'online' | 'offline' | 'checking'>('checking');
-    const [kaggleModel, setKaggleModel] = useState<string | null>(null);
-    const [kaggleError, setKaggleError] = useState<string | null>(null);
-    const [updatingKaggle, setUpdatingKaggle] = useState(false);
-    const [checkingStatus, setCheckingStatus] = useState(false);
+    // RunPod configuration is managed statically via environment variables (.env)
 
     useEffect(() => {
         dispatch(setPageTitle('Settings | InterviewAI'));
@@ -74,24 +68,7 @@ const SettingsPage = () => {
         }
     }, [user]);
 
-    useEffect(() => {
-        // Fetch Kaggle config on component mount
-        const fetchKaggleConfig = async () => {
-            try {
-                const res = await api.get('/kaggle/config');
-                if (res.data && res.data.success) {
-                    setKaggleUrl(res.data.data.url);
-                    setKaggleStatus(res.data.data.status);
-                    setKaggleModel(res.data.data.model);
-                    setKaggleError(res.data.data.error);
-                }
-            } catch (err) {
-                console.error('Failed to load Kaggle config:', err);
-                setKaggleStatus('offline');
-            }
-        };
-        fetchKaggleConfig();
-    }, []);
+
 
     const handleSaveProfile = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -137,46 +114,7 @@ const SettingsPage = () => {
         }
     };
 
-    const handleCheckKaggleStatus = async () => {
-        setCheckingStatus(true);
-        try {
-            const res = await api.get('/kaggle/config');
-            if (res.data && res.data.success) {
-                setKaggleStatus(res.data.data.status);
-                setKaggleModel(res.data.data.model);
-                setKaggleError(res.data.data.error);
-                if (res.data.data.status === 'online') {
-                    toast.success('Successfully connected to Kaggle API!');
-                } else {
-                    toast.error(res.data.data.error || 'Kaggle model is offline.');
-                }
-            }
-        } catch (err: any) {
-            setKaggleStatus('offline');
-            toast.error(err.response?.data?.message || 'Failed to contact backend config API.');
-        } finally {
-            setCheckingStatus(false);
-        }
-    };
-
-    const handleSaveKaggleUrl = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setUpdatingKaggle(true);
-        try {
-            const res = await api.post('/kaggle/config', { url: kaggleUrl });
-            if (res.data && res.data.success) {
-                setKaggleUrl(res.data.data.url);
-                setKaggleStatus(res.data.data.status);
-                setKaggleModel(res.data.data.model);
-                setKaggleError(res.data.data.error);
-                toast.success('Kaggle URL updated successfully.');
-            }
-        } catch (err: any) {
-            toast.error(err.response?.data?.message || 'Failed to update Kaggle URL.');
-        } finally {
-            setUpdatingKaggle(false);
-        }
-    };
+    // Dynamic config status handlers removed (Gemma URL is static)
 
     return (
         <div>
@@ -219,17 +157,7 @@ const SettingsPage = () => {
                                 Password & Security
                             </button>
                         </li>
-                        <li className="inline-block">
-                            <button
-                                onClick={() => setTabs('kaggle')}
-                                className={`flex gap-2 p-4 border-b border-transparent hover:border-primary hover:text-primary ${
-                                    tabs === 'kaggle' ? '!border-primary text-primary' : ''
-                                }`}
-                            >
-                                <DollarSign className="w-5 h-5" />
-                                AI Evaluation Engine
-                            </button>
-                        </li>
+
                     </ul>
                 </div>
 
@@ -392,73 +320,7 @@ const SettingsPage = () => {
                     </div>
                 )}
 
-                {tabs === 'kaggle' && (
-                    <div className="panel bg-white dark:bg-black p-6 rounded-md">
-                        <form onSubmit={handleSaveKaggleUrl} className="mb-6">
-                            <h6 className="text-lg font-bold mb-3 dark:text-white-light">AI Evaluation Endpoint</h6>
-                            <p className="text-xs text-white-dark mb-4 leading-relaxed max-w-xl">
-                                Configure the connection URL to the Kaggle/Cloudflare model container API that handles the mock grading logic.
-                            </p>
-                            <div className="max-w-xl space-y-4 text-sm">
-                                <div>
-                                    <label htmlFor="kaggleUrl" className="font-bold dark:text-white-light">Endpoint API URL</label>
-                                    <input
-                                        id="kaggleUrl"
-                                        type="url"
-                                        value={kaggleUrl}
-                                        onChange={(e) => setKaggleUrl(e.target.value)}
-                                        className="form-input"
-                                        placeholder="https://example.trycloudflare.com"
-                                        required
-                                    />
-                                </div>
-                                <div className="flex gap-3">
-                                    <button type="submit" disabled={updatingKaggle} className="btn btn-primary">
-                                        {updatingKaggle ? 'Updating...' : 'Save Endpoint URL'}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        disabled={checkingStatus}
-                                        onClick={handleCheckKaggleStatus}
-                                        className="btn btn-outline-primary"
-                                    >
-                                        {checkingStatus ? 'Checking...' : 'Check Status'}
-                                    </button>
-                                </div>
-                            </div>
-                        </form>
 
-                        <div className="border-t border-white-light dark:border-white-light/10 pt-4">
-                            <h6 className="font-bold text-sm dark:text-white-light mb-3">Engine Connection Status</h6>
-                            <div className="space-y-3">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs text-white-dark font-semibold">Status:</span>
-                                    <span
-                                        className={`badge uppercase font-bold text-[9px] ${
-                                            kaggleStatus === 'online'
-                                                ? 'badge-outline-success'
-                                                : kaggleStatus === 'checking'
-                                                ? 'badge-outline-primary'
-                                                : 'badge-outline-danger'
-                                        }`}
-                                    >
-                                        {kaggleStatus}
-                                    </span>
-                                </div>
-                                {kaggleModel && (
-                                    <div className="text-xs text-white-dark font-semibold">
-                                        Active Model: <span className="text-primary font-bold">{kaggleModel}</span>
-                                    </div>
-                                )}
-                                {kaggleError && (
-                                    <div className="text-xs text-danger font-semibold bg-danger/10 border border-danger/25 p-3 rounded-lg max-w-xl leading-relaxed">
-                                        Connection Error: {kaggleError}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );

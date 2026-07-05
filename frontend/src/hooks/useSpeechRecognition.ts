@@ -35,6 +35,8 @@ export interface SpeechRecognitionActions {
   startListening: () => void;
   stopListening: () => void;
   resetTranscript: () => void;
+  /** Current transcript from refs — safe to call at submit time (avoids stale React state). */
+  getTranscript: () => string;
 }
 
 export type UseSpeechRecognitionReturn = SpeechRecognitionState &
@@ -46,7 +48,10 @@ const SILENCE_VOLUME_THRESHOLD = 0.02;
 const VOLUME_POLL_MS = 100;
 
 /* ─── Hook ──────────────────────────────────────────────── */
-export function useSpeechRecognition(languageCode: string = "en-US"): UseSpeechRecognitionReturn {
+export function useSpeechRecognition(
+  languageCode: string = "en-US",
+  enabled: boolean = true
+): UseSpeechRecognitionReturn {
   const [isListening, setIsListening] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState("");
   const [finalTranscript, setFinalTranscript] = useState("");
@@ -65,10 +70,11 @@ export function useSpeechRecognition(languageCode: string = "en-US"): UseSpeechR
   const lastSpeechTimeRef = useRef(Date.now());
   const stoppedRef = useRef(false);
   const finalRef = useRef("");
+  const interimRef = useRef("");
 
   const supported =
+    enabled &&
     typeof window !== "undefined" &&
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     !!(window.SpeechRecognition || (window as any).webkitSpeechRecognition);
 
   /* ── Cleanup helpers ─────────────────────────────────── */
@@ -88,6 +94,7 @@ export function useSpeechRecognition(languageCode: string = "en-US"): UseSpeechR
 
   /* ── Start ───────────────────────────────────────────── */
   const startListening = useCallback(async () => {
+    if (!enabled) return;
     if (!supported) {
       setError("Speech recognition is not supported in this browser.");
       return;
@@ -118,7 +125,7 @@ export function useSpeechRecognition(languageCode: string = "en-US"): UseSpeechR
       analyserRef.current = analyser;
 
       // Poll volume
-      const dataArr = new Uint8Array(analyser.frequencyBinCount);
+      const dataArr = new Uint8Array(analyser.fftSize);
       volumeIntervalRef.current = setInterval(() => {
         if (!analyserRef.current) return;
         analyserRef.current.getByteTimeDomainData(dataArr);
@@ -170,6 +177,7 @@ export function useSpeechRecognition(languageCode: string = "en-US"): UseSpeechR
         }
 
         finalRef.current = final;
+        interimRef.current = interim;
         setFinalTranscript(final);
         setInterimTranscript(interim);
         lastSpeechTimeRef.current = Date.now();
@@ -181,12 +189,12 @@ export function useSpeechRecognition(languageCode: string = "en-US"): UseSpeechR
       };
 
       recognition.onend = () => {
-        // Auto-restart if not manually stopped (continuous mode workaround)
         if (!stoppedRef.current && recognitionRef.current) {
           try {
             recognitionRef.current.start();
           } catch {
-            // Already running
+            setIsListening(false);
+            setError("Speech recognition stopped. Tap mic to restart.");
           }
         } else {
           setIsListening(false);
@@ -199,11 +207,21 @@ export function useSpeechRecognition(languageCode: string = "en-US"): UseSpeechR
       setError(err instanceof Error ? err.message : "Microphone access denied");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supported, languageCode]);
+  }, [supported, languageCode, enabled]);
 
   /* ── Stop ────────────────────────────────────────────── */
   const stopListening = useCallback(() => {
     stoppedRef.current = true;
+
+    // Commit any interim text before tearing down (Chrome may not finalize on stop)
+    const merged = (finalRef.current + " " + interimRef.current).trim();
+    if (merged) {
+      finalRef.current = merged;
+      setFinalTranscript(merged);
+    }
+    interimRef.current = "";
+    setInterimTranscript("");
+
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -222,10 +240,16 @@ export function useSpeechRecognition(languageCode: string = "en-US"): UseSpeechR
   /* ── Reset ───────────────────────────────────────────── */
   const resetTranscript = useCallback(() => {
     finalRef.current = "";
+    interimRef.current = "";
     setFinalTranscript("");
     setInterimTranscript("");
     setSilenceDuration(0);
   }, []);
+
+  const getTranscript = useCallback(
+    () => (finalRef.current + " " + interimRef.current).trim(),
+    []
+  );
 
   /* ── Cleanup on unmount ──────────────────────────────── */
   useEffect(() => {
@@ -250,5 +274,6 @@ export function useSpeechRecognition(languageCode: string = "en-US"): UseSpeechR
     startListening,
     stopListening,
     resetTranscript,
+    getTranscript,
   };
 }

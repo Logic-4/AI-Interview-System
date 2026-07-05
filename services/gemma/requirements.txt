@@ -1,0 +1,7 @@
+runpod>=1.6.0
+transformers>=4.45.0
+accelerate
+huggingface_hub
+safetensors
+sentencepiece
+protobuf

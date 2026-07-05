@@ -1,7 +1,7 @@
 const QuestionBank = require('../models/QuestionBank');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
-const { generateInterviewQuestions } = require('../services/kaggleService');
+const { generateInterviewQuestions } = require('../services/gemmaService');
 const logger = require('../utils/logger');
 
 /**

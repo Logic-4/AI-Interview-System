@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import {
-  FileText, Camera, Mic2, LineChart, Globe2, BarChart3,
+  FileText, Mic2, LineChart, Globe2, BarChart3,
   Code2, Stethoscope, TrendingUp, Wrench, GraduationCap, Scale,
 } from "lucide-react";
 
@@ -12,10 +12,10 @@ const items = [
     desc: "Upload a PDF, Word, or TXT resume. We parse your career history and generate questions that probe your actual experience and projects.",
   },
   {
-    icon: Camera,
-    tag: "Computer vision",
-    title: "Webcam & body-language feedback",
-    desc: "Real-time analysis of eye contact, posture alignment, and facial cues — quantifying confidence versus nervousness on every answer.",
+    icon: LineChart,
+    tag: "AI Evaluation",
+    title: "Gemma AI-powered grading",
+    desc: "Receive instant, detailed scoring and coaching from our specialized Gemma model, rating your technical depth, clarity, and relevance.",
   },
   {
     icon: Mic2,

@@ -16,6 +16,8 @@ const { initializeSocketHandlers } = require('./sockets');
 const { generalLimiter } = require('./middleware/rateLimiter');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
+const { startPiper, stopPiper } = require('./utils/piperProcess');
+const { startSomaliSpeech, stopSomaliSpeech } = require('./utils/somaliSpeechProcess');
 
 // Routes
 const authRoutes = require('./routes/authRoutes');
@@ -24,8 +26,9 @@ const interviewRoutes = require('./routes/interviewRoutes');
 const questionRoutes = require('./routes/questionRoutes');
 const feedbackRoutes = require('./routes/feedbackRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
-const kaggleRoutes = require('./routes/kaggleRoutes');
+// RunPod configuration is loaded directly from environment variables (.env)
 const ttsRoutes = require('./routes/ttsRoutes');
+const sttRoutes = require('./routes/sttRoutes');
 
 // ─── Initialize Express App ─────────────────────────
 const app = express();
@@ -75,8 +78,9 @@ app.use('/api/v1/interviews', interviewRoutes);
 app.use('/api/v1/questions', questionRoutes);
 app.use('/api/v1/feedback', feedbackRoutes);
 app.use('/api/v1/uploads', uploadRoutes);
-app.use('/api/v1/kaggle', kaggleRoutes);
+// Dynamic configuration endpoints are removed (loaded from env)
 app.use('/api/v1/tts', ttsRoutes);
+app.use('/api/v1/stt', sttRoutes);
 
 // ─── 404 Handler ─────────────────────────────────────
 app.use('*', (req, res) => {
@@ -101,6 +105,14 @@ const startServer = async () => {
     // Connect to MongoDB
     await connectDB();
 
+    // Start Piper TTS in development (PIPER_AUTO_START=true by default)
+    await startPiper(logger);
+
+    // Somali ASR/TTS warm up in background (models can take minutes on first load)
+    void startSomaliSpeech(logger, { waitForReady: false }).catch((err) => {
+      logger.warn(`[somali-speech] Auto-start error: ${err.message}`);
+    });
+
     // Start listening
     server.listen(PORT, () => {
       logger.info(`
@@ -121,6 +133,16 @@ const startServer = async () => {
 };
 
 startServer();
+
+function shutdown(signal) {
+  logger.info(`${signal} received — shutting down`);
+  stopSomaliSpeech(logger);
+  stopPiper(logger);
+  server.close(() => process.exit(0));
+}
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {

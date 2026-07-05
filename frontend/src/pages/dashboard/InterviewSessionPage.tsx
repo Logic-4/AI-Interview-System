@@ -27,7 +27,7 @@ import feedbackService from "../../services/feedbackService";
 import { useInterviewStore } from "../../stores/interviewStore";
 import { useAuthStore } from "../../stores/authStore";
 import { useConversationEngine } from "../../hooks/useConversationEngine";
-import { useFaceTracker } from "../../hooks/useFaceTracker";
+
 import type { Question } from "../../types/question";
 import type { PopulatedInterview } from "../../types/interview";
 
@@ -59,8 +59,12 @@ export default function InterviewSessionPage() {
   const [interview, setInterview] = useState<PopulatedInterview | null>(null);
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
+  const [questionsReady, setQuestionsReady] = useState(false);
 
-  const faceTracker = useFaceTracker();
+  // Guard against double-calling completeInterview (race between wrapUp and End button)
+  const hasCompletedRef = useRef(false);
+
+
 
   /* ── Fetch interview data ─────────────────────────────────── */
   useEffect(() => {
@@ -73,6 +77,10 @@ export default function InterviewSessionPage() {
         }
         setInterview(data);
         setActiveInterview(data);
+        // Check if background generation is already done
+        const ready = (data as any).questionsReady === true ||
+          data.questions.length >= ((data as any).expectedQuestionCount || data.questions.length);
+        setQuestionsReady(ready);
         setPagePhase("ready");
       } catch {
         setError("Failed to load interview. Please try again.");
@@ -80,13 +88,43 @@ export default function InterviewSessionPage() {
       }
     };
 
+    hasCompletedRef.current = false;
     resetSession();
     fetchInterview();
   }, [interviewId, navigate, setActiveInterview, resetSession]);
 
+  /* ── Poll until all questions are ready ──────────────────── */
+  useEffect(() => {
+    if (questionsReady || pagePhase !== "ready") return;
+
+    const poll = setInterval(async () => {
+      try {
+        const data = await interviewService.getInterview(interviewId);
+        setInterview(data);
+        setActiveInterview(data);
+        const ready = (data as any).questionsReady === true ||
+          data.questions.length >= ((data as any).expectedQuestionCount || data.questions.length);
+        if (ready) {
+          setQuestionsReady(true);
+          clearInterval(poll);
+        }
+      } catch {
+        // Silently ignore poll errors
+      }
+    }, 2000);
+
+    return () => clearInterval(poll);
+  }, [questionsReady, pagePhase, interviewId, setActiveInterview]);
+
   /* ── Callbacks for conversation engine ─────────────────── */
   const onSubmitAnswer = useCallback(
-    async (questionId: string, answer: string, timeSpent: number, audio?: Blob | File) => {
+    async (
+      questionId: string,
+      answer: string,
+      timeSpent: number,
+      extras?: { audio?: Blob | File; activePromptText?: string }
+    ) => {
+      const audio = extras?.audio;
       const audioFile = audio
         ? audio instanceof File
           ? audio
@@ -97,6 +135,7 @@ export default function InterviewSessionPage() {
         userAnswer: answer || undefined,
         timeSpent,
         audio: audioFile,
+        activePromptText: extras?.activePromptText,
       });
       recordAnswer(questionId, result.question);
 
@@ -105,16 +144,17 @@ export default function InterviewSessionPage() {
         isTimeUp: result.isTimeUp,
         isFollowUp: result.isFollowUp,
         followUpText: result.followUpText,
+        answeredCandidateQuestion: result.answeredCandidateQuestion,
       };
     },
     [interviewId, recordAnswer]
   );
 
   const onComplete = useCallback(async () => {
-    faceTracker.stopTracking();
-    const visualMetrics = faceTracker.getMetrics();
-    await interviewService.completeInterview(interviewId, { visualMetrics });
-  }, [interviewId, faceTracker]);
+    if (hasCompletedRef.current) return; // guard against double-call
+    hasCompletedRef.current = true;
+    await interviewService.completeInterview(interviewId);
+  }, [interviewId]);
 
   const onGenerateFeedback = useCallback(async () => {
     try {
@@ -147,7 +187,9 @@ export default function InterviewSessionPage() {
       setActiveInterview(started);
       setSessionActive(true);
       setPagePhase("active");
-      faceTracker.startTracking();
+
+      // Save session start to sessionStorage for recovery
+      sessionStorage.setItem(`interview_${interviewId}_started`, "1");
       setTimeout(() => engine.start(), 300);
     } catch {
       setError("Failed to start interview.");
@@ -159,6 +201,7 @@ export default function InterviewSessionPage() {
   useEffect(() => {
     if (engine.phase === "done") {
       const t = setTimeout(() => {
+        sessionStorage.removeItem(`interview_${interviewId}_started`);
         navigate(`/interviews/${interviewId}/report`);
       }, 1200);
       return () => clearTimeout(t);
@@ -196,12 +239,13 @@ export default function InterviewSessionPage() {
     engine.tts.cancel();
     engine.recognition.stopListening();
     
-    faceTracker.stopTracking();
-    const visualMetrics = faceTracker.getMetrics();
-    
     try {
-      await interviewService.completeInterview(interviewId, { visualMetrics });
+      if (!hasCompletedRef.current) {
+        hasCompletedRef.current = true;
+        await interviewService.completeInterview(interviewId);
+      }
     } catch {}
+    sessionStorage.removeItem(`interview_${interviewId}_started`);
     navigate(`/interviews/${interviewId}/report`);
   };
 
@@ -290,14 +334,39 @@ export default function InterviewSessionPage() {
             </div>
 
             <div className="flex justify-center pt-4">
-              <Button
-                size="xl"
-                className="h-14 px-12 rounded-md text-sm font-semibold uppercase tracking-wider shadow-xl shadow-primary/20 group text-white animate-pulse"
-                onClick={handleStart}
-              >
-                <Mic className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
-                Begin Interview
-              </Button>
+              {!questionsReady ? (
+                <div className="text-center space-y-4">
+                  <div className="flex items-center gap-3 px-6 py-4 rounded-md bg-primary/5 border border-primary/15">
+                    <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                    <div className="text-left">
+                      <p className="text-sm font-bold text-text-primary dark:text-white">Preparing your questions…</p>
+                      <p className="text-xs font-medium text-text-muted opacity-70">
+                        AI is generating {(interview as any).expectedQuestionCount ?? "your"} questions in the background
+                      </p>
+                    </div>
+                  </div>
+                  <div className="h-1 w-64 mx-auto bg-foreground/10 dark:bg-white/10 rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-primary/60 rounded-full"
+                      animate={{ x: ["-100%", "200%"] }}
+                      transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+                      style={{ width: "55%" }}
+                    />
+                  </div>
+                  <p className="text-xs text-text-muted opacity-60 font-medium">
+                    You'll be able to begin shortly — {questions.length} question{questions.length !== 1 ? "s" : ""} ready so far
+                  </p>
+                </div>
+              ) : (
+                <Button
+                  size="xl"
+                  className="h-14 px-12 rounded-md text-sm font-semibold uppercase tracking-wider shadow-xl shadow-primary/20 group text-white animate-pulse"
+                  onClick={handleStart}
+                >
+                  <Mic className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
+                  Begin Interview
+                </Button>
+              )}
             </div>
           </div>
           <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
@@ -367,23 +436,7 @@ export default function InterviewSessionPage() {
     /* Active session theater mode — clean single-question UI */
     return createPortal(
       <div className="fixed top-0 left-0 w-screen h-screen z-[9999] bg-background text-text-primary dark:text-white flex flex-col">
-        {/* PIP Webcam */}
-        {faceTracker.isActive && (
-          <div className="absolute bottom-6 right-6 w-48 h-36 bg-black rounded-lg overflow-hidden border-2 border-white/10 shadow-2xl z-50">
-            <video
-              ref={faceTracker.videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover transform -scale-x-100"
-            />
-            {/* Mock scanning overlay */}
-            <div className="absolute inset-0 pointer-events-none border border-primary/20 rounded-lg">
-               <div className="w-full h-[1px] bg-primary/40 animate-[scan_3s_ease-in-out_infinite]" />
-            </div>
-            <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/60 rounded text-[8px] font-mono text-primary/80 uppercase">AI Tracking Active</div>
-          </div>
-        )}
+
 
         {/* ── Top bar ──────────────────────────────────────── */}
         <div className="flex items-center justify-between px-6 py-3 flex-shrink-0 border-b border-white-light dark:border-[#1b2e4b]">

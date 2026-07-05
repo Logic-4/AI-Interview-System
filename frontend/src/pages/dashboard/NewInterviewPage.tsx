@@ -3,11 +3,14 @@ import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "../../lib/utils";
 import { DOMAIN_ROLES, DOMAIN_LABELS } from "../../lib/constants";
+import { estimateQuestionCount } from "../../lib/interviewHelpers";
 import interviewService from "../../services/interviewService";
+import { useInterviewStore } from "../../stores/interviewStore";
 import type { InterviewType, InterviewDifficulty, InterviewDomain, InterviewLanguage, CreateInterviewPayload } from "../../types/interview";
 
 import { Code, User, Users, Settings, Zap, Clock, MessageSquare, Video, Plus, X, ArrowLeft, AlertCircle, DollarSign, BookOpen, Heart, CheckCheck, Upload, FileText } from "lucide-react";
 import { parseResumeFile } from "../../lib/fileParser";
+import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
 
 const DOMAIN_ICONS: Record<string, React.ElementType> = {
   technology: Code,
@@ -37,6 +40,7 @@ const DURATION_OPTIONS = [10, 15, 20, 30, 45, 60];
 
 export default function NewInterviewPage() {
   const navigate = useNavigate();
+  const setActiveInterview = useInterviewStore((s) => s.setActiveInterview);
 
   // Wizard state (1, 2, or 3)
   const [step, setStep] = React.useState(1);
@@ -136,16 +140,37 @@ export default function NewInterviewPage() {
       };
 
       const interview = await interviewService.createInterview(payload);
-      navigate(`/interviews/${interview._id}`);
+      setActiveInterview(interview);
+      navigate(`/interviews/${interview._id}`, {
+        state: { fromCreate: true, interview },
+      });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to create interview. Please try again.";
       setError(msg);
-    } finally {
       setIsLoading(false);
     }
   };
 
-  const questionEstimate = Math.min(Math.floor(duration / 5), 10);
+  const questionEstimate = estimateQuestionCount(duration);
+
+  /* ─── Fullscreen Loading Overlay ──────────────────────── */
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 z-[9999] bg-background flex items-center justify-center text-text-primary dark:text-white">
+        <div className="max-w-md w-full text-center space-y-6 px-6">
+          <LoadingSpinner size="lg" className="mx-auto text-primary" />
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold text-foreground dark:text-white">
+              Creating your interview…
+            </h2>
+            <p className="text-sm font-medium text-text-muted">
+              Generating your first question. Remaining questions will load in the background.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto py-8 space-y-6 animate-in fade-in duration-700 text-black dark:text-white-dark">
@@ -183,11 +208,11 @@ export default function NewInterviewPage() {
       </AnimatePresence>
 
       {/* Vristo Official Wizard Layout Panel */}
-      <div className="panel lg:col-span-2 p-8">
-        <div className="mb-5">
+      <div className="panel lg:col-span-2 p-6 md:p-10 min-h-[72vh]">
+        <div className="mb-5 max-w-4xl mx-auto">
           <div className="inline-block w-full">
             {/* Stepper Navigation Progress Line */}
-            <div className="relative z-[1] max-w-xl mx-auto w-full py-4 mb-8">
+            <div className="relative z-[1] max-w-2xl mx-auto w-full py-4 mb-8">
               {/* Grey background track path */}
               <div className="absolute left-[16.6%] top-[48px] w-[66.6%] h-1 bg-[#f3f2ee] dark:bg-[#1b2e4b] -z-[1] rounded-full"></div>
               {/* Blue active progress line */}
@@ -496,8 +521,9 @@ export default function NewInterviewPage() {
                         <textarea
                           value={jobDescription}
                           onChange={(e) => setJobDescription(e.target.value)}
-                          placeholder="Paste the job description here for AI to generate highly targeted questions..."
-                          className="w-full h-40 form-input p-4 resize-none custom-scrollbar bg-white dark:bg-[#121e32] border-[#ebedf2] dark:border-[#1b2e4b]"
+                          placeholder="Paste the full job description here for AI to generate highly targeted questions..."
+                          rows={12}
+                          className="w-full min-h-[240px] md:min-h-[280px] form-input p-4 resize-y custom-scrollbar bg-white dark:bg-[#121e32] border-[#ebedf2] dark:border-[#1b2e4b]"
                         />
                       </div>
 

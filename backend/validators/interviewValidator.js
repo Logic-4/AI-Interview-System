@@ -54,6 +54,11 @@ const createInterviewValidator = [
     .isInt({ min: 5, max: 120 })
     .withMessage('Duration must be between 5 and 120 minutes'),
 
+  body('language')
+    .optional()
+    .isIn(['english', 'somali'])
+    .withMessage('Language must be english or somali'),
+
   body('scheduledAt')
     .optional()
     .isISO8601()
@@ -78,6 +83,11 @@ const submitAnswerValidator = [
     .optional()
     .isInt({ min: 0 })
     .withMessage('Time spent must be a positive integer'),
+
+  body('activePromptText')
+    .optional()
+    .isString()
+    .withMessage('Active prompt text must be a string'),
 ];
 
 const listInterviewsValidator = [

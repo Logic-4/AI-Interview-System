@@ -1,0 +1,584 @@
+"""
+Gemma interview inference worker for RunPod Serverless.
+
+Loads Mohamud24/gemma-3-technical-interviewer once per worker and routes
+requests by endpoint name (same paths as kaggle_fastapi_v2.py).
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import traceback
+from typing import Any, Optional, Tuple
+
+import torch
+from huggingface_hub import login
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+MODEL_ID = os.environ.get("GEMMA_MODEL_ID", "Mohamud24/gemma-3-technical-interviewer")
+HF_TOKEN = os.environ.get("HF_TOKEN", "").strip()
+
+tokenizer = None
+model = None
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+def load_model() -> None:
+    global tokenizer, model
+    if model is not None:
+        return
+
+    if not HF_TOKEN:
+        raise RuntimeError("HF_TOKEN environment variable is required for the gated Gemma model.")
+
+    try:
+        login(token=HF_TOKEN)
+    except Exception as exc:
+        print(f"Warning: Hugging Face login failed: {exc}")
+
+    print(f"Loading {MODEL_ID} on {DEVICE}...")
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, token=HF_TOKEN)
+    model = AutoModelForCausalLM.from_pretrained(
+        MODEL_ID,
+        dtype=torch.bfloat16 if DEVICE == "cuda" else torch.float32,
+        device_map="auto" if DEVICE == "cuda" else None,
+        token=HF_TOKEN,
+    )
+    if DEVICE == "cpu":
+        model = model.to(DEVICE)
+    model.eval()
+    print("Gemma model ready.")
+
+
+def try_parse_json(text: str) -> Optional[dict]:
+    try:
+        text = re.sub(r"```[jJ]son\s*", "", text)
+        text = re.sub(r"```", "", text).strip()
+
+        first_brace = text.find("{")
+        if first_brace == -1:
+            return None
+
+        depth = 0
+        in_string = False
+        escape = False
+        last_brace = -1
+        for i in range(first_brace, len(text)):
+            ch = text[i]
+            if escape:
+                escape = False
+                continue
+            if ch == "\\" and in_string:
+                escape = True
+                continue
+            if ch == '"' and not escape:
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    last_brace = i
+                    break
+
+        if last_brace == -1:
+            return None
+
+        json_str = text[first_brace : last_brace + 1]
+        json_str = re.sub(r",\s*([}\]])", r"\1", json_str)
+        json_str = re.sub(r"\bTrue\b", "true", json_str)
+        json_str = re.sub(r"\bFalse\b", "false", json_str)
+        json_str = re.sub(r"\bNone\b", "null", json_str)
+        return json.loads(json_str)
+    except Exception as exc:
+        print("JSON parse exception:", exc)
+        return None
+
+
+def clamp_score(value) -> int:
+    try:
+        score = int(round(float(value)))
+    except (TypeError, ValueError):
+        return 0
+    return max(0, min(100, score))
+
+
+def difficulty_hint(difficulty: str) -> str:
+    mapping = {
+        "junior": "Entry-level (junior). Expect fundamentals and learning ability.",
+        "mid": "Mid-level. Expect practical experience and independent problem solving.",
+        "senior": "Senior-level. Expect depth, trade-offs, and leadership examples.",
+        "lead": "Lead/expert-level. Expect architecture, mentoring, and strategic thinking.",
+        "easy": "Entry-level. Expect fundamentals.",
+        "medium": "Mid-level. Expect practical depth.",
+        "hard": "Senior-level. Expect advanced depth.",
+    }
+    return mapping.get((difficulty or "mid").lower(), mapping["mid"])
+
+
+def category_rubric(category: str, type_str: str) -> str:
+    cat = (category or "").lower()
+    if "star" in cat or "behavioral" in cat or type_str == "behavioral":
+        return (
+            "Evaluate using STAR (Situation, Task, Action, Result). "
+            "Reward specific examples with measurable outcomes."
+        )
+    if type_str == "hr" or cat in ("motivation", "culture fit", "experience"):
+        return "Evaluate motivation, culture alignment, and role fit."
+    if type_str == "technical" or cat in ("core skills", "debugging", "fundamentals", "technical"):
+        return "Evaluate technical accuracy, clarity, and practical understanding."
+    if type_str == "system-design" or "scenario" in cat:
+        return "Evaluate structured thinking, trade-offs, and scalability awareness."
+    return "Evaluate clarity, relevance, and completeness."
+
+
+def build_role_context(role_profile: Optional[dict]) -> str:
+    if not role_profile or not isinstance(role_profile, dict):
+        return ""
+    parts = []
+    skills = (role_profile.get("requiredSkills") or [])[:5]
+    preferred = (role_profile.get("preferredSkills") or [])[:3]
+    stack = (role_profile.get("technicalStack") or [])[:5]
+    responsibilities = (role_profile.get("responsibilities") or [])[:3]
+    if skills:
+        parts.append(f"Required skills: {', '.join(skills)}.")
+    if preferred:
+        parts.append(f"Preferred skills: {', '.join(preferred)}.")
+    if stack:
+        parts.append(f"Tech stack: {', '.join(stack)}.")
+    if responsibilities:
+        parts.append(f"Key responsibilities: {', '.join(responsibilities)}.")
+    experience = role_profile.get("experienceLevel") or role_profile.get("experience")
+    if experience:
+        parts.append(f"Experience level: {experience}.")
+    return "\n".join(parts)
+
+
+def normalize_turn_response(parsed: Optional[dict], raw_text: str = "") -> dict:
+    if not parsed or "nextInterviewerResponse" not in parsed:
+        return {
+            "evaluation": {
+                "score": None,
+                "feedback": "Could not parse AI response. Answer recorded for review.",
+                "strengths": [],
+                "improvements": [],
+                "suggestedAnswer": "",
+            },
+            "nextInterviewerResponse": "Thank you. Let's continue.",
+            "isFollowUp": False,
+            "evaluationStatus": "parse_failed",
+        }
+
+    evaluation = parsed.get("evaluation") or {}
+    is_follow_up = bool(parsed.get("isFollowUp", False))
+    is_topic_complete = parsed.get("isTopicComplete")
+    if is_topic_complete is None:
+        is_topic_complete = not is_follow_up
+
+    score_raw = evaluation.get("score")
+    return {
+        "evaluation": {
+            "score": clamp_score(score_raw) if score_raw is not None else None,
+            "feedback": (evaluation.get("feedback") or "")[:200],
+            "strengths": (evaluation.get("strengths") or [])[:3],
+            "improvements": (evaluation.get("improvements") or [])[:3],
+            "suggestedAnswer": (evaluation.get("suggestedAnswer") or "")[:200],
+        },
+        "nextInterviewerResponse": (parsed.get("nextInterviewerResponse") or "Thank you.")[:300],
+        "isFollowUp": is_follow_up and not is_topic_complete,
+        "answeredCandidateQuestion": bool(parsed.get("answeredCandidateQuestion", False)),
+        "evaluationStatus": "ok",
+    }
+
+
+def run_generation(messages, max_new_tokens: int, temperature: float = 0.2, do_sample: bool = False) -> str:
+    prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    inputs = tokenizer(prompt, return_tensors="pt").to(DEVICE)
+    gen_kwargs = {
+        "max_new_tokens": max_new_tokens,
+        "do_sample": do_sample,
+    }
+    if do_sample:
+        gen_kwargs["temperature"] = temperature
+    with torch.no_grad():
+        outputs = model.generate(**inputs, **gen_kwargs)
+    return tokenizer.decode(
+        outputs[0][inputs["input_ids"].shape[-1] :],
+        skip_special_tokens=True,
+    )
+
+
+def generate_json_response(messages, max_new_tokens: int, temperature: float = 0.2) -> Tuple[Optional[dict], str]:
+    raw = run_generation(messages, max_new_tokens, temperature=temperature, do_sample=temperature > 0)
+    parsed = try_parse_json(raw)
+    if parsed:
+        return parsed, raw
+    if temperature > 0:
+        raw_retry = run_generation(messages, max_new_tokens, temperature=0.0, do_sample=False)
+        parsed_retry = try_parse_json(raw_retry)
+        return parsed_retry, raw_retry
+    return None, raw
+
+
+def handle_health(_data: dict) -> dict:
+    return {"status": "ok", "model": MODEL_ID, "device": DEVICE}
+
+
+def handle_interview_turn(data: dict) -> dict:
+    conversation_history = data.get("conversationHistory", [])
+    domain = data.get("domain", "general")
+    role = data.get("role") or data.get("jobRole") or "the open role"
+    language = data.get("language", "english")
+    type_str = data.get("type", "technical")
+    difficulty = data.get("difficulty", "mid")
+    current_question = data.get("currentQuestion") or {}
+    role_profile = data.get("roleProfile") or {}
+
+    question_text = current_question.get("text", "")
+    expected_answer = current_question.get("expectedAnswer", "")
+    category = current_question.get("category", "general")
+    question_difficulty = current_question.get("difficulty") or difficulty
+
+    lang_hint = (
+        "Respond in English. You are a real human hiring manager. "
+        "Be direct, conversational, and professional. "
+        if language.lower() == "english"
+        else
+        "IMPORTANT: Your ENTIRE nextInterviewerResponse MUST be in Somali. DO NOT use English! "
+        "Ku hadal af-Soomaali dabiici ah oo aad u xirfad iyo naxwe sarreeya. "
+        f"Technical jargon for '{domain}' may stay in English within Somali grammar."
+    )
+
+    somali_note = ""
+    if language.lower() == "somali":
+        somali_note = (
+            "SCORING: The candidate answered in Somali. Evaluate content and meaning only — "
+            "never penalize the language. Somali and English answers with the same meaning get the same score.\n\n"
+        )
+
+    role_context = build_role_context(role_profile)
+    rubric = category_rubric(category, type_str)
+
+    system_prompt = (
+        f"You are an expert {domain} interviewer for: {role}.\n"
+        f"Interview type: {type_str}. Difficulty: {difficulty_hint(question_difficulty)}.\n"
+        f"{lang_hint}\n\n"
+        f"{somali_note}"
+        f"CURRENT QUESTION: {question_text}\n"
+        f"EXPECTED ANSWER RUBRIC: {expected_answer or 'Judge relevance, depth, and clarity for this question category.'}\n"
+        f"CATEGORY: {category}. {rubric}\n"
+    )
+    if role_context:
+        system_prompt += f"\nJOB CONTEXT:\n{role_context}\n"
+
+    system_prompt += (
+        "\nSCORING (use consistently):\n"
+        "- 90-100: Excellent — accurate, complete, strong examples.\n"
+        "- 80-89: Good — mostly correct, minor gaps.\n"
+        "- 65-79: Partial — some understanding, missing key points.\n"
+        "- 40-64: Weak — significant gaps or vague.\n"
+        "- Below 40: Off-topic, incorrect, or no substantive answer.\n\n"
+        "BEHAVIOR:\n"
+        "1. nextInterviewerResponse: 1-2 short sentences max.\n"
+        "2. Partial answer → isFollowUp=true, isTopicComplete=false, one short follow-up.\n"
+        "3. Good complete answer → isFollowUp=false, isTopicComplete=true.\n"
+        "4. If the candidate asks YOU a question (role, team, process, expectations), "
+        "answer it briefly and professionally in nextInterviewerResponse, set answeredCandidateQuestion=true. "
+        "For outro category, always answer their questions. Stay on topic after answering.\n"
+        "5. If they ask for clarification on YOUR question, rephrase briefly — do not repeat the full original question.\n"
+        "6. Never ask the same question twice verbatim; if already answered, acknowledge and move on.\n\n"
+        "Keep JSON string values under 120 characters.\n"
+        "Return ONLY raw JSON:\n"
+        '{"evaluation": {"score": 85, "feedback": "...", "strengths": ["..."], '
+        '"improvements": ["..."], "suggestedAnswer": "..."}, '
+        '"nextInterviewerResponse": "...", "isFollowUp": false, "isTopicComplete": true, '
+        '"answeredCandidateQuestion": false}'
+    )
+
+    messages = [{"role": "user", "content": system_prompt}]
+    for turn in conversation_history:
+        role_map = {"interviewer": "assistant", "candidate": "user", "system": "user"}
+        mapped_role = role_map.get(turn.get("role"), "user")
+        content = turn.get("content", "")
+        if not content:
+            continue
+        if messages[-1]["role"] == mapped_role:
+            messages[-1]["content"] += "\n\n" + content
+        else:
+            messages.append({"role": mapped_role, "content": content})
+
+    instruction = "Evaluate the candidate's LAST answer only. Return strict JSON."
+    if messages[-1]["role"] == "user":
+        messages[-1]["content"] += "\n\n" + instruction
+    else:
+        messages.append({"role": "user", "content": instruction})
+
+    parsed, raw = generate_json_response(messages, max_new_tokens=280, temperature=0.2)
+    return normalize_turn_response(parsed, raw)
+
+
+def handle_generate_question(data: dict) -> dict:
+    language = data.get("language", "english")
+    domain = data.get("domain", "general")
+    role = data.get("role", "candidate")
+    category = data.get("category", "intro")
+    type_str = data.get("type", "technical")
+    candidate_name = data.get("candidateName", "Candidate")
+    difficulty = data.get("difficulty", "mid")
+    skills = data.get("skills", [])
+    responsibilities = data.get("responsibilities", [])
+    experience = data.get("experience", "")
+    job_description = data.get("jobDescription", "")
+
+    lang_hint = (
+        "Generate the question in English."
+        if language.lower() == "english"
+        else
+        "IMPORTANT: Generate the question ENTIRELY in Somali. DO NOT use English! "
+        "Ku hadal af-Soomaali dabiici ah oo aad u xirfad iyo naxwe sarreeya. "
+        f"Jargon-ka farsamada iyo erey-bixinta u gaarka ah maadada ama shaqada '{domain}' ha u turjumin af-Soomaali, "
+        "balse u daa Ingiriis ahaan adigoo ku habeynaya naxwaha Soomaaliga."
+    )
+
+    if category == "intro":
+        if language.lower() == "somali":
+            question = f"Soo dhawoow {candidate_name}! Aniga ayaa ku wareysan doona maanta. Ma iska kay warami kartaa?"
+        else:
+            question = f"Hello {candidate_name}! I will be your interviewer today. Could you tell me a little bit about yourself?"
+        return {
+            "question": question,
+            "expectedAnswer": "Candidate provides a brief overview of their background and experience.",
+        }
+
+    if category == "outro":
+        if language.lower() == "somali":
+            question = "Waad ku mahadsantahay wakhtigaaga maanta. Ma qabtaa wax su'aalo ah oo aad iwaydiiso ka hor intaanan soo afjarin?"
+        else:
+            question = "Thank you for your time today. Do you have any questions for me before we wrap up?"
+        return {
+            "question": question,
+            "expectedAnswer": "Candidate asks questions about the role, company culture, or next steps.",
+        }
+
+    context_block = ""
+    if skills:
+        context_block += f"The job requires these skills: {', '.join(skills)}.\n"
+        context_block += "Your question MUST test one of these specific skills.\n"
+    if responsibilities:
+        context_block += f"Key responsibilities for this role include: {', '.join(responsibilities[:5])}.\n"
+    if experience:
+        context_block += f"Required experience level: {experience}.\n"
+    if job_description:
+        context_block += f"Job description details: {job_description[:400]}\n"
+        context_block += "Ensure the question aligns with the context and requirements provided above.\n"
+
+    prompt_content = (
+        f"You are an expert {domain} interviewer hiring for a {role} position.\n"
+        f"Interview style: {type_str}. Difficulty: {difficulty_hint(difficulty)}.\n"
+        f"{lang_hint}\n\n"
+        f"{context_block}\n"
+        "RULES FOR QUESTION GENERATION:\n"
+        "- Match difficulty to the level above.\n"
+        f"- Category focus: {category}.\n"
+        "- Natural and conversational; ONE clear question only.\n"
+        "- Technical: ask 'What is...', 'How does...', 'Explain...'.\n"
+        "- Behavioral: ask 'Tell me about a time...'.\n"
+        "- Max 25 words.\n\n"
+        f"Generate a {category} question for a {role} role.\n\n"
+        'Return ONLY valid JSON: {"question": "...", "expectedAnswer": "..."}'
+    )
+
+    messages = [{"role": "user", "content": prompt_content}]
+    parsed, raw = generate_json_response(messages, max_new_tokens=150, temperature=0.4)
+    if parsed and ("question" in parsed or "text" in parsed):
+        return {
+            "question": parsed.get("question") or parsed.get("text", ""),
+            "expectedAnswer": parsed.get("expectedAnswer") or parsed.get("expected_answer") or parsed.get("answer", ""),
+        }
+
+    raw_fallback = raw.strip()
+    looks_like_question = "?" in raw_fallback and len(raw_fallback) < 300
+    constraint_keywords = ["no code", "not allowed", "external websites", "do not", "you must", "note:", "rule:"]
+    is_constraint = any(kw in raw_fallback.lower() for kw in constraint_keywords)
+
+    if looks_like_question and not is_constraint:
+        return {"question": raw_fallback, "expectedAnswer": ""}
+
+    if language.lower() == "somali":
+        default_q = f"Maxaad ka garanaysaa shaqada {domain} iyo sida ay uga muhiimsan tahay xirfadahaaga?"
+    else:
+        default_q = f"Can you describe your experience and approach to working in the {domain} domain?"
+    print(f"[generate-question] WARNING: Raw fallback rejected. Raw was: {raw_fallback[:200]}")
+    return {
+        "question": default_q,
+        "expectedAnswer": "Candidate describes relevant experience and domain knowledge.",
+    }
+
+
+def handle_parse(data: dict) -> dict:
+    job_description = data.get("job_description", "")
+    role = data.get("role", "")
+    job_description = job_description[:6000] if job_description else ""
+
+    messages = [
+        {
+            "role": "user",
+            "content": (
+                "You are an expert job description parser. "
+                "Extract structured data from this job description. "
+                "IMPORTANT: Keep all arrays to a MAXIMUM of 8 items each. "
+                "Keep all string values under 60 characters. "
+                "Return ONLY raw JSON with EXACTLY these keys: "
+                "requiredSkills (array of strings), preferredSkills (array of strings), "
+                "responsibilities (array of strings), experienceLevel (string), technicalStack (array of strings).\n\n"
+                f"Parse this job description for a {role} role:\n\n{job_description}"
+            ),
+        }
+    ]
+
+    parsed, _raw = generate_json_response(messages, max_new_tokens=256, temperature=0.0)
+    if parsed:
+        return {"data": parsed}
+    return {
+        "data": {
+            "requiredSkills": [],
+            "preferredSkills": [],
+            "responsibilities": [],
+            "experienceLevel": "",
+            "technicalStack": [],
+        }
+    }
+
+
+def handle_feedback(data: dict) -> dict:
+    interview_data = data.get("interview_data", {})
+    turn_average = interview_data.get("overallScore")
+
+    questions_summary = []
+    for q in interview_data.get("questions", []):
+        questions_summary.append({
+            "question": q.get("text", "")[:200],
+            "answer": q.get("userAnswer", "")[:300],
+            "score": q.get("score"),
+            "category": q.get("category", ""),
+            "aiFeedback": q.get("aiFeedback", "")[:200],
+        })
+
+    interview_summary = {
+        "title": interview_data.get("title", ""),
+        "type": interview_data.get("type", ""),
+        "domain": interview_data.get("domain", ""),
+        "difficulty": interview_data.get("difficulty", ""),
+        "jobRole": interview_data.get("jobRole", ""),
+        "overallScoreFromTurns": turn_average,
+        "questions": questions_summary,
+    }
+
+    score_anchor = (
+        f"The per-question average score is {turn_average}. "
+        f"Use the SAME 0-100 scale for category scores. overallScore should be close to {turn_average} (±5).\n\n"
+        if turn_average is not None
+        else ""
+    )
+
+    messages = [
+        {
+            "role": "user",
+            "content": (
+                "You are an interview coach providing post-session feedback for a PRACTICE interview.\n"
+                "Be constructive and specific. Use the per-question scores as ground truth.\n\n"
+                f"{score_anchor}"
+                "SCORING (same scale as per-question evaluation):\n"
+                "- 90-100: Excellent\n"
+                "- 80-89: Good\n"
+                "- 65-79: Partial\n"
+                "- 40-64: Weak\n"
+                "- Below 40: Off-topic or incorrect\n\n"
+                "LENGTH LIMITS:\n"
+                "- feedback strings under 80 chars; detailedFeedback under 200 chars.\n"
+                "- max 3 strengths, 3 improvements, 3 recommendations.\n"
+                "- For non-technical interviews, set codeQuality score from communication/structure, not coding.\n\n"
+                "Return ONLY raw JSON with keys: overallScore, categories "
+                "(communication, technicalAccuracy, problemSolving, codeQuality, confidence — each with score and feedback), "
+                "strengths, improvements, detailedFeedback, recommendations.\n\n"
+                f"Interview data:\n{json.dumps(interview_summary, indent=1)}"
+            ),
+        }
+    ]
+
+    parsed, raw = generate_json_response(messages, max_new_tokens=550, temperature=0.2)
+    if parsed:
+        normalized = {
+            "overallScore": clamp_score(
+                turn_average if turn_average is not None else parsed.get("overallScore", 0)
+            ),
+            "categories": {
+                "communication": parsed.get("categories", {}).get("communication", {"score": 0, "feedback": ""}),
+                "technicalAccuracy": parsed.get("categories", {}).get("technicalAccuracy", {"score": 0, "feedback": ""}),
+                "problemSolving": parsed.get("categories", {}).get("problemSolving", {"score": 0, "feedback": ""}),
+                "codeQuality": parsed.get("categories", {}).get("codeQuality", {"score": 0, "feedback": ""}),
+                "confidence": parsed.get("categories", {}).get("confidence", {"score": 0, "feedback": ""}),
+            },
+            "strengths": parsed.get("strengths", [])[:3],
+            "improvements": parsed.get("improvements", [])[:3],
+            "detailedFeedback": parsed.get("detailedFeedback", parsed.get("summary", ""))[:300],
+            "recommendations": parsed.get("recommendations", [])[:3],
+        }
+        for key in normalized["categories"]:
+            cat = normalized["categories"][key]
+            if isinstance(cat, dict) and cat.get("score") is not None:
+                cat["score"] = clamp_score(cat["score"])
+        return {"feedback": normalized}
+
+    fallback_score = clamp_score(turn_average) if turn_average is not None else 0
+    return {
+        "feedback": {
+            "overallScore": fallback_score,
+            "categories": {
+                "communication": {"score": 0, "feedback": ""},
+                "technicalAccuracy": {"score": 0, "feedback": ""},
+                "problemSolving": {"score": 0, "feedback": ""},
+                "codeQuality": {"score": 0, "feedback": ""},
+                "confidence": {"score": 0, "feedback": ""},
+            },
+            "strengths": [],
+            "improvements": ["AI could not generate structured feedback for this session."],
+            "detailedFeedback": raw.strip()[:300],
+            "recommendations": [],
+        }
+    }
+
+
+ROUTES = {
+    "/health": handle_health,
+    "health": handle_health,
+    "/interview-turn": handle_interview_turn,
+    "interview-turn": handle_interview_turn,
+    "/generate-question": handle_generate_question,
+    "generate-question": handle_generate_question,
+    "/parse": handle_parse,
+    "parse": handle_parse,
+    "/feedback": handle_feedback,
+    "feedback": handle_feedback,
+}
+
+
+def dispatch(endpoint: str, payload: Optional[dict] = None) -> dict:
+    path = (endpoint or "/health").strip()
+    handler_fn = ROUTES.get(path) or ROUTES.get(path.lstrip("/"))
+    if not handler_fn:
+        return {"error": f"Unknown endpoint: {endpoint}", "detail": f"Unknown endpoint: {endpoint}"}
+    try:
+        # /health must return instantly so RunPod marks the worker ready.
+        if path in ("/health", "health"):
+            return handler_fn(payload or {})
+        load_model()
+        return handler_fn(payload or {})
+    except Exception as exc:
+        traceback.print_exc()
+        return {"error": str(exc), "detail": str(exc)}

@@ -25,15 +25,28 @@ async function transcribeAudio(fileBuffer, originalname = 'answer.webm', mimetyp
   const blob = new Blob([fileBuffer], { type: mimetype || 'application/octet-stream' });
   form.append('file', blob, originalname || 'answer.webm');
 
-  const response = await fetch(`${asrUrl}/transcribe`, {
-    method: 'POST',
-    body: form,
-    signal: AbortSignal.timeout(ASR_TIMEOUT_MS),
-  });
+  let response;
+  try {
+    response = await fetch(`${asrUrl}/transcribe`, {
+      method: 'POST',
+      body: form,
+      signal: AbortSignal.timeout(ASR_TIMEOUT_MS),
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Somali ASR unreachable at ${asrUrl} (${msg}). `
+      + 'Restart the backend and wait 1–3 min for ASR on port 8001. '
+      + 'If first setup: cd backend && npm run setup:somali-speech'
+    );
+  }
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`Somali ASR failed with ${response.status}: ${body.slice(0, 300)}`);
+    const hint = body.includes('fetch failed') || body.includes('ECONNREFUSED')
+      ? ' Somali ASR is not running — restart the backend and wait for port 8001, or run: cd backend && npm run setup:somali-speech'
+      : '';
+    throw new Error(`Somali ASR failed with ${response.status}: ${body.slice(0, 300)}${hint}`);
   }
 
   const data = await response.json();
@@ -42,7 +55,21 @@ async function transcribeAudio(fileBuffer, originalname = 'answer.webm', mimetyp
   return transcription;
 }
 
+const SOMALI_TTS_CACHE = new Map();
+const SOMALI_TTS_CACHE_MAX = 64;
+
+function ttsCacheKey(text) {
+  return text.trim();
+}
+
 async function synthesizeSomaliSpeech(text) {
+  const key = ttsCacheKey(text);
+  const cached = SOMALI_TTS_CACHE.get(key);
+  if (cached) {
+    logger.info(`Somali TTS cache hit (${text.length} chars)`);
+    return cached;
+  }
+
   const ttsUrl = getTtsBaseUrl();
   if (!ttsUrl) {
     throw new Error('Somali TTS URL is not configured');
@@ -71,10 +98,18 @@ async function synthesizeSomaliSpeech(text) {
   }
 
   const audio = Buffer.from(await audioResponse.arrayBuffer());
-  return {
+  const result = {
     audio,
     contentType: audioResponse.headers.get('content-type') || 'audio/wav',
   };
+
+  if (SOMALI_TTS_CACHE.size >= SOMALI_TTS_CACHE_MAX) {
+    const firstKey = SOMALI_TTS_CACHE.keys().next().value;
+    SOMALI_TTS_CACHE.delete(firstKey);
+  }
+  SOMALI_TTS_CACHE.set(key, result);
+
+  return result;
 }
 
 async function synthesizePiperSpeech(text, languageCode = 'en-US') {

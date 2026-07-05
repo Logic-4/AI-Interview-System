@@ -1,5 +1,5 @@
 export type QuestionDifficulty = 'easy' | 'medium' | 'hard';
-export type QuestionCategory = 'technical' | 'behavioral' | 'system-design' | 'mixed';
+export type QuestionCategory = string;
 
 export interface RetryAttempt {
   answer: string;
