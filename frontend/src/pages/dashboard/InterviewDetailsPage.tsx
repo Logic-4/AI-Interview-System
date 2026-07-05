@@ -389,7 +389,7 @@ export default function InterviewDetailsPage() {
               {!questionsReady ? (
                 <div className="text-center space-y-4">
                   <div className="flex items-center gap-3 px-6 py-4 rounded-md bg-primary/5 border border-primary/15">
-                    <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                    <LoadingSpinner size="sm" className="flex-shrink-0" />
                     <div className="text-left">
                       <p className="text-sm font-bold text-text-primary dark:text-white">Preparing your questions…</p>
                       <p className="text-xs font-medium text-text-muted opacity-70">

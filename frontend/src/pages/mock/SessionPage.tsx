@@ -262,7 +262,7 @@ export default function SessionPage() {
     return (
       <div className="min-h-screen bg-[#0E1117] text-text-primary flex flex-col items-center justify-center px-6">
         <Card hoverEffect={false} className="p-10 border border-white-light dark:border-[#1b2e4b] bg-white dark:bg-black max-w-lg text-center">
-          <Loader2 className="w-12 h-12 text-primary mx-auto mb-4 animate-spin" />
+          <LoadingSpinner size="lg" className="mx-auto mb-4 text-primary" />
           <h2 className="text-xl font-bold text-foreground mb-2">No Interview Selected</h2>
           <p className="text-sm text-text-muted mb-6">
             Start by creating a new interview or go through the preparation checklist.

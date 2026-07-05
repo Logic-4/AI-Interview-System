@@ -562,7 +562,7 @@ export default function NewInterviewPage() {
                             >
                               {isUploadingResume ? (
                                 <div className="flex flex-col items-center gap-2">
-                                  <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                  <LoadingSpinner size="sm" className="h-6 w-6" />
                                   <span className="text-xs font-semibold text-primary">Parsing file...</span>
                                 </div>
                               ) : (

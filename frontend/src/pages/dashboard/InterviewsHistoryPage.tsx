@@ -255,7 +255,7 @@ export default function InterviewsHistoryPage() {
                             title="Retake interview"
                           >
                             {retakingId === iv._id ? (
-                              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                               <LoadingSpinner size="sm" className="h-4 w-4" />
                             ) : (
                               <RotateCcw className="w-4 h-4" />
                             )}
@@ -268,7 +268,7 @@ export default function InterviewsHistoryPage() {
                           title="Delete interview"
                         >
                           {deletingId === iv._id ? (
-                            <div className="w-4 h-4 border-2 border-danger border-t-transparent rounded-full animate-spin" />
+                             <LoadingSpinner size="sm" className="h-4 w-4 border-danger" />
                           ) : (
                             <Trash2 className="w-4 h-4" />
                           )}

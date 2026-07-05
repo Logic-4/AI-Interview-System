@@ -246,7 +246,7 @@ export default function InterviewReportPage() {
               disabled={regenerating}
               className="h-9 px-5 rounded-md text-xs font-bold flex-shrink-0 text-white"
             >
-              {regenerating ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-2" />}
+              {regenerating ? <LoadingSpinner size="sm" className="mr-2 inline-block text-white" /> : <RefreshCw className="w-3.5 h-3.5 mr-2" />}
               {regenerating ? 'Generating...' : 'Regenerate'}
             </Button>
           </div>
@@ -484,7 +484,7 @@ export default function InterviewReportPage() {
           disabled={retaking}
           className="h-10 px-6 rounded-md text-xs font-bold shadow-lg shadow-primary/20 text-white"
         >
-          {retaking ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-2" />}
+          {retaking ? <LoadingSpinner size="sm" className="mr-2 inline-block text-white" /> : <RefreshCw className="w-3.5 h-3.5 mr-2" />}
           {retaking ? "Resetting..." : "Retake Interview"}
         </Button>
         <Link to="/interviews/new">

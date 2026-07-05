@@ -287,7 +287,7 @@ export default function InterviewReviewPage() {
                   className="h-8 px-4 rounded-md text-[10px] font-bold text-white"
                 >
                   {retryLoading ? (
-                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <LoadingSpinner size="sm" className="mr-1.5 inline-block text-white" />
                   ) : (
                     <Send className="w-3 h-3 mr-1.5" />
                   )}

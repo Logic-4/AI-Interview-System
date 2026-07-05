@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "../../stores/authStore";
 import authService from "../../services/authService";
 import toast from "react-hot-toast";
+import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
 
 export default function AuthCallbackPage() {
   const navigate = useNavigate();
@@ -42,7 +43,7 @@ export default function AuthCallbackPage() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center transition-colors duration-500">
       <div className="flex flex-col items-center gap-4">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <LoadingSpinner size="md" />
         <p className="text-text-muted text-sm font-semibold">Signing you in...</p>
       </div>
     </div>
