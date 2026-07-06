@@ -38,14 +38,19 @@ def load_model() -> None:
     except Exception as exc:
         print(f"Warning: Hugging Face login failed: {exc}")
 
-    print(f"Loading {MODEL_ID} on {DEVICE}...")
+    print(f"Loading base model google/gemma-3-4b-it on {DEVICE}...")
     tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, token=HF_TOKEN)
-    model = AutoModelForCausalLM.from_pretrained(
-        MODEL_ID,
+    base_model = AutoModelForCausalLM.from_pretrained(
+        "google/gemma-3-4b-it",
         dtype=torch.bfloat16 if DEVICE == "cuda" else torch.float32,
         device_map="auto" if DEVICE == "cuda" else None,
         token=HF_TOKEN,
     )
+    
+    from peft import PeftModel
+    print(f"Loading LoRA adapter {MODEL_ID}...")
+    model = PeftModel.from_pretrained(base_model, MODEL_ID, token=HF_TOKEN)
+    
     if DEVICE == "cpu":
         model = model.to(DEVICE)
     model.eval()
