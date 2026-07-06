@@ -7,7 +7,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-COPY worker.py handler.py test_input.json ./
+COPY worker.py handler.py ./
 
 ENV PYTHONUNBUFFERED=1
 ENV HF_HOME=/runpod-volume/huggingface

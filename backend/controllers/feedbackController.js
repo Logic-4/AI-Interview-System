@@ -71,7 +71,10 @@ const generateFeedback = async (req, res, next) => {
       _id: req.params.interviewId,
       user: req.user._id,
       status: 'completed',
-    }).populate('questions');
+    }).populate({
+      path: 'questions',
+      options: { sort: { order: 1 } }
+    });
 
     if (!interview) {
       return next(ApiError.notFound('Completed interview not found'));

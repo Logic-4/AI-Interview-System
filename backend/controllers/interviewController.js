@@ -89,6 +89,18 @@ async function generateRemainingQuestionsInBackground(interview, context, startI
             $push: { questions: question._id },
           });
 
+          if (i === 0) {
+            await Interview.findByIdAndUpdate(interview._id, {
+              $push: {
+                conversationHistory: {
+                  role: 'interviewer',
+                  content: question.text,
+                  timestamp: new Date()
+                }
+              }
+            });
+          }
+
           logger.info(`[BG] Question ${i + 1}/${totalCount} saved for interview ${interview._id}`);
         }
       } catch (qErr) {
@@ -119,8 +131,8 @@ async function generateRemainingQuestionsInBackground(interview, context, startI
 }
 
 /**
- * @desc    Create a new interview — responds immediately after generating the first
- *          question, then generates the remaining questions in the background.
+ * @desc    Create a new interview — responds immediately, generating all questions
+ *          in the background.
  * @route   POST /api/v1/interviews
  * @access  Private
  */
@@ -161,37 +173,7 @@ const createInterview = async (req, res, next) => {
         });
     }
 
-    // ── Step 3: Generate ONLY the first (intro) question synchronously ───────
-    let firstQuestion = null;
-    try {
-      const [firstAiQ] = await generateInterviewQuestions(type, domain, difficulty, 1, {
-        jobRole,
-        jobDescription,
-        resumeText,
-        focusSkills,
-        roleProfile,
-        language: interview.language,
-        candidateName: req.user.name,
-        _forcedCategory: 'intro',
-        _forcedIndex: 0,
-        _forcedCount: totalQuestionCount,
-      });
-
-      if (firstAiQ && firstAiQ.text) {
-        firstQuestion = await Question.create({
-          interview: interview._id,
-          text: firstAiQ.text,
-          category: 'intro',
-          difficulty: toQuestionDifficulty(firstAiQ.difficulty || difficulty),
-          expectedAnswer: firstAiQ.expectedAnswer || '',
-          order: 0,
-        });
-      }
-    } catch (q0Err) {
-      logger.warn(`First question generation failed for ${interview._id}: ${q0Err.message}`);
-    }
-
-    // ── Step 4: Seed conversation history and save ───────────────────────────
+    // ── Step 3: Seed conversation history and save ───────────────────────────
     const conversationHistory = [
       {
         role: 'system',
@@ -200,41 +182,28 @@ const createInterview = async (req, res, next) => {
       }
     ];
 
-    if (firstQuestion) {
-      conversationHistory.push({
-        role: 'interviewer',
-        content: firstQuestion.text,
-        timestamp: new Date()
-      });
-      interview.questions = [firstQuestion._id];
-    }
-
-    // If only 1 question total, it's already ready
-    if (totalQuestionCount === 1) {
-      interview.questionsReady = true;
-    }
-
     interview.conversationHistory = conversationHistory;
     await interview.save();
 
     await User.findByIdAndUpdate(req.user._id, { $inc: { interviewCount: 1 } });
 
-    // ── Step 5: Respond immediately ──────────────────────────────────────────
-    const populatedInterview = await Interview.findById(interview._id).populate('questions');
-    logger.info(`Interview created: ${interview._id} by user ${req.user._id} — responding immediately, ${totalQuestionCount - 1} questions generating in background`);
+    // ── Step 4: Respond immediately ──────────────────────────────────────────
+    const populatedInterview = await Interview.findById(interview._id).populate({
+      path: 'questions',
+      options: { sort: { order: 1 } }
+    });
+    logger.info(`Interview created: ${interview._id} by user ${req.user._id} — responding immediately, all ${totalQuestionCount} questions generating in background`);
     ApiResponse.created(res, { interview: populatedInterview }, 'Interview created — questions generating');
 
-    // ── Step 6: Generate remaining questions in the background ───────────────
-    if (totalQuestionCount > 1) {
-      const bgContext = {
-        type, domain, difficulty, jobRole, jobDescription, resumeText,
-        focusSkills, roleProfile, language: interview.language,
-        candidateName: req.user.name,
-      };
-      // Fire-and-forget — do NOT await
-      generateRemainingQuestionsInBackground(interview, bgContext, 1, totalQuestionCount)
-        .catch(err => logger.error(`[BG] Unhandled error in background generation: ${err.message}`));
-    }
+    // ── Step 5: Generate remaining questions in the background ───────────────
+    const bgContext = {
+      type, domain, difficulty, jobRole, jobDescription, resumeText,
+      focusSkills, roleProfile, language: interview.language,
+      candidateName: req.user.name,
+    };
+    // Fire-and-forget — do NOT await
+    generateRemainingQuestionsInBackground(interview, bgContext, 0, totalQuestionCount)
+      .catch(err => logger.error(`[BG] Unhandled error in background generation: ${err.message}`));
   } catch (error) {
     next(error);
   }
@@ -288,7 +257,10 @@ const getInterview = async (req, res, next) => {
       _id: req.params.id,
       user: req.user._id,
     })
-      .populate('questions')
+      .populate({
+        path: 'questions',
+        options: { sort: { order: 1 } }
+      })
       .populate('feedback');
 
     if (!interview) {
@@ -328,7 +300,10 @@ const startInterview = async (req, res, next) => {
       await interview.save();
     }
 
-    const populated = await Interview.findById(interview._id).populate('questions');
+    const populated = await Interview.findById(interview._id).populate({
+      path: 'questions',
+      options: { sort: { order: 1 } }
+    });
 
     ApiResponse.success(res, { interview: populated }, 'Interview started');
   } catch (error) {
@@ -518,7 +493,10 @@ const completeInterview = async (req, res, next) => {
     const interview = await Interview.findOne({
       _id: req.params.id,
       user: req.user._id,
-    }).populate('questions');
+    }).populate({
+      path: 'questions',
+      options: { sort: { order: 1 } }
+    });
 
     if (!interview) {
       return next(ApiError.notFound('Interview not found'));
@@ -724,7 +702,10 @@ const resetInterview = async (req, res, next) => {
 
     await interview.save();
 
-    const populated = await Interview.findById(interview._id).populate('questions');
+    const populated = await Interview.findById(interview._id).populate({
+      path: 'questions',
+      options: { sort: { order: 1 } }
+    });
 
     logger.info(`Interview reset: ${interview._id} by user ${req.user._id}`);
     ApiResponse.success(res, { interview: populated }, 'Interview reset successfully');

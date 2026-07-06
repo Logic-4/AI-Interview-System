@@ -24,7 +24,10 @@ const registerInterviewHandlers = (io) => {
         const interview = await Interview.findOne({
           _id: interviewId,
           user: socket.userId,
-        }).populate('questions');
+        }).populate({
+          path: 'questions',
+          options: { sort: { order: 1 } }
+        });
 
         if (!interview) {
           socket.emit('error', { message: 'Interview not found' });
@@ -149,7 +152,10 @@ const registerInterviewHandlers = (io) => {
     socket.on('interview-complete', async () => {
       try {
         if (socket.interviewId) {
-          const interview = await Interview.findById(socket.interviewId).populate('questions');
+          const interview = await Interview.findById(socket.interviewId).populate({
+            path: 'questions',
+            options: { sort: { order: 1 } }
+          });
 
           if (interview && interview.status === 'in-progress') {
             // Calculate score

@@ -9,7 +9,7 @@ Hosts `Mohamud24/gemma-3-technical-interviewer` on RunPod Serverless so your Nod
 | RunPod account + **$10 credit** | [runpod.io](https://www.runpod.io) |
 | **RunPod API key** | Console → Settings → API Keys |
 | **HF_TOKEN** | [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) (read access to your gated Gemma model) |
-| **24 GB GPU tier** | L4 / 3090 / A5000 (~$0.69/hr on Serverless) |
+| **24 GB GPU tier** | L4 / 3090 / 4090 / A5000 (~$0.69/hr on Serverless) (Note: Blackwell GPUs are not supported by the default PyTorch 2.4 image) |
 
 Do **not** put Somali ASR/TTS/Piper on this worker for now — keep those on your PC or a cheap CPU VPS.
 
@@ -34,7 +34,7 @@ docker push YOUR_DOCKERHUB_USER/ai-interview-gemma:latest
 1. Open [console.runpod.io/serverless](https://console.runpod.io/serverless)
 2. **New Endpoint** → **Import from Docker Registry**
 3. Image: `YOUR_DOCKERHUB_USER/ai-interview-gemma:latest`
-4. **GPU:** 24 GB tier (L4 / RTX 3090 / A5000)
+4. **GPU:** 24 GB tier (L4 / RTX 3090 / RTX 4090 / A5000) - **Do NOT choose Blackwell GPUs (such as RTX PRO 6000 Blackwell)** as they require a newer CUDA 12.8 + PyTorch compilation environment (`sm_120` compute capability).
 5. **Container disk:** at least **20 GB** (model weights)
 6. **Environment variables:**
    - `HF_TOKEN` = your Hugging Face token
