@@ -1,13 +1,10 @@
+runpod>=1.6.0
 torch
 torchaudio
-transformers
-datasets
-evaluate
-jiwer
+transformers>=4.40.0
 soundfile
-librosa
+scipy
 av
-torchcodec
 accelerate
 huggingface_hub
 safetensors

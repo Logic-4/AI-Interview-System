@@ -256,7 +256,8 @@ def handle_interview_turn(data: dict) -> dict:
         else
         "IMPORTANT: Your ENTIRE nextInterviewerResponse MUST be in Somali. DO NOT use English! "
         "Ku hadal af-Soomaali dabiici ah oo aad u xirfad iyo naxwe sarreeya. "
-        f"Technical jargon for '{domain}' may stay in English within Somali grammar."
+        "Fadlan u turjum ama u sharax ereyada farsamada Ingiriisiga ah af-Soomaali dabiici ah "
+        "si mashiinka ku dhawaaqista codka (TTS) uu ugu dhawaaqi karo si sax oo dabiici ah."
     )
 
     somali_note = ""
@@ -346,19 +347,9 @@ def handle_generate_question(data: dict) -> dict:
         else
         "IMPORTANT: Generate the question ENTIRELY in Somali. DO NOT use English! "
         "Ku hadal af-Soomaali dabiici ah oo aad u xirfad iyo naxwe sarreeya. "
-        f"Jargon-ka farsamada iyo erey-bixinta u gaarka ah maadada ama shaqada '{domain}' ha u turjumin af-Soomaali, "
-        "balse u daa Ingiriis ahaan adigoo ku habeynaya naxwaha Soomaaliga."
+        "Fadlan u turjum ama u sharax ereyada farsamada (keywords/jargon) af-Soomaali dabiici ah "
+        "si mashiinka ku dhawaaqista codka (TTS) uu ugu dhawaaqi karo si sax oo dabiici ah."
     )
-
-    if category == "intro":
-        if language.lower() == "somali":
-            question = f"Soo dhawoow {candidate_name}! Aniga ayaa ku wareysan doona maanta. Ma iska kay warami kartaa?"
-        else:
-            question = f"Hello {candidate_name}! I will be your interviewer today. Could you tell me a little bit about yourself?"
-        return {
-            "question": question,
-            "expectedAnswer": "Candidate provides a brief overview of their background and experience.",
-        }
 
     if category == "outro":
         if language.lower() == "somali":
@@ -390,6 +381,7 @@ def handle_generate_question(data: dict) -> dict:
         "RULES FOR QUESTION GENERATION:\n"
         "- Match difficulty to the level above.\n"
         f"- Category focus: {category}.\n"
+        f"- If category is 'intro', greet the candidate by name ({candidate_name}) and ask a custom opening question to introduce yourself and request them to summarize their background/experience for this role.\n"
         "- Natural and conversational; ONE clear question only.\n"
         "- Technical: ask 'What is...', 'How does...', 'Explain...'.\n"
         "- Behavioral: ask 'Tell me about a time...'.\n"

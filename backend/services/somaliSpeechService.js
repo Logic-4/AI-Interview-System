@@ -15,10 +15,67 @@ function getTtsBaseUrl() {
   return trimBaseUrl(process.env.SOMALI_TTS_URL || 'http://127.0.0.1:8002');
 }
 
+function isRunPodUrl(url) {
+  return typeof url === 'string' && /api\.runpod\.ai\/v2\//i.test(url);
+}
+
+function getRunPodEndpointBase(url) {
+  return url.replace(/\/+$/, '').replace(/\/(runsync|run|health|status)$/i, '');
+}
+
+function runPodHeaders() {
+  const key = (process.env.RUNPOD_API_KEY || '').trim();
+  if (!key) {
+    throw new Error('RUNPOD_API_KEY is required for RunPod Somali speech services.');
+  }
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${key}`,
+  };
+}
+
 async function transcribeAudio(fileBuffer, originalname = 'answer.webm', mimetype = 'audio/webm') {
   const asrUrl = getAsrBaseUrl();
   if (!asrUrl) {
     throw new Error('Somali ASR URL is not configured');
+  }
+
+  if (isRunPodUrl(asrUrl)) {
+    const base = getRunPodEndpointBase(asrUrl);
+    const runsyncUrl = `${base}/runsync`;
+    
+    logger.info(`[somaliSpeechService] POST transcribe via RunPod to ${runsyncUrl}`);
+    const audio_data = fileBuffer.toString('base64');
+    
+    const response = await fetch(runsyncUrl, {
+      method: 'POST',
+      headers: runPodHeaders(),
+      body: JSON.stringify({
+        input: {
+          action: 'transcribe',
+          audio_data,
+          filename: originalname,
+        },
+      }),
+      signal: AbortSignal.timeout(ASR_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Somali ASR RunPod error: status ${response.status} — ${text.slice(0, 200)}`);
+    }
+
+    const data = await response.json();
+    if (data.status === 'FAILED' || data.error) {
+      throw new Error(`Somali ASR RunPod job failed: ${data.error || data.status}`);
+    }
+    const output = data.output || {};
+    if (output.error) {
+      throw new Error(`Somali ASR worker error: ${output.error}`);
+    }
+    const transcription = output.transcription || '';
+    logger.info(`Somali ASR transcription received via RunPod (${transcription.length} chars)`);
+    return transcription;
   }
 
   const form = new FormData();
@@ -75,6 +132,55 @@ async function synthesizeSomaliSpeech(text) {
     throw new Error('Somali TTS URL is not configured');
   }
 
+  if (isRunPodUrl(ttsUrl)) {
+    const base = getRunPodEndpointBase(ttsUrl);
+    const runsyncUrl = `${base}/runsync`;
+
+    logger.info(`[somaliSpeechService] POST synthesize via RunPod to ${runsyncUrl}`);
+    const response = await fetch(runsyncUrl, {
+      method: 'POST',
+      headers: runPodHeaders(),
+      body: JSON.stringify({
+        input: {
+          action: 'synthesize',
+          text,
+        },
+      }),
+      signal: AbortSignal.timeout(TTS_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Somali TTS RunPod error: status ${response.status} — ${errorText.slice(0, 200)}`);
+    }
+
+    const data = await response.json();
+    if (data.status === 'FAILED' || data.error) {
+      throw new Error(`Somali TTS RunPod job failed: ${data.error || data.status}`);
+    }
+    const output = data.output || {};
+    if (output.error) {
+      throw new Error(`Somali TTS worker error: ${output.error}`);
+    }
+    if (!output.audio_data) {
+      throw new Error('Somali TTS RunPod did not return audio_data');
+    }
+
+    const audio = Buffer.from(output.audio_data, 'base64');
+    const result = {
+      audio,
+      contentType: output.content_type || 'audio/wav',
+    };
+
+    if (SOMALI_TTS_CACHE.size >= SOMALI_TTS_CACHE_MAX) {
+      const firstKey = SOMALI_TTS_CACHE.keys().next().value;
+      SOMALI_TTS_CACHE.delete(firstKey);
+    }
+    SOMALI_TTS_CACHE.set(key, result);
+
+    return result;
+  }
+
   const outputFilename = `tts_${Date.now()}_${Math.random().toString(36).slice(2)}.wav`;
   const synthResponse = await fetch(`${ttsUrl}/synthesize`, {
     method: 'POST',
@@ -116,6 +222,48 @@ async function synthesizePiperSpeech(text, languageCode = 'en-US') {
   const piperUrl = trimBaseUrl(process.env.PIPER_BASE_URL || '');
   if (!piperUrl) {
     throw new Error(`No TTS service configured for ${languageCode}`);
+  }
+
+  if (isRunPodUrl(piperUrl)) {
+    const base = getRunPodEndpointBase(piperUrl);
+    const runsyncUrl = `${base}/runsync`;
+
+    logger.info(`[somaliSpeechService] POST synthesize English via RunPod to ${runsyncUrl}`);
+    const response = await fetch(runsyncUrl, {
+      method: 'POST',
+      headers: runPodHeaders(),
+      body: JSON.stringify({
+        input: {
+          action: 'synthesize',
+          text,
+          language: 'english',
+        },
+      }),
+      signal: AbortSignal.timeout(TTS_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`English TTS RunPod error: status ${response.status} — ${errorText.slice(0, 200)}`);
+    }
+
+    const data = await response.json();
+    if (data.status === 'FAILED' || data.error) {
+      throw new Error(`English TTS RunPod job failed: ${data.error || data.status}`);
+    }
+    const output = data.output || {};
+    if (output.error) {
+      throw new Error(`English TTS worker error: ${output.error}`);
+    }
+    if (!output.audio_data) {
+      throw new Error('English TTS RunPod did not return audio_data');
+    }
+
+    const audio = Buffer.from(output.audio_data, 'base64');
+    return {
+      audio,
+      contentType: output.content_type || 'audio/wav',
+    };
   }
 
   const isSomali = languageCode.toLowerCase().startsWith('so');
