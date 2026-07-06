@@ -34,6 +34,64 @@ function runPodHeaders() {
   };
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function callSpeechRunPod(endpointUrl, payload, attempt = 0) {
+  const base = getRunPodEndpointBase(endpointUrl);
+  const runsyncUrl = `${base}/runsync`;
+  const statusUrlBase = `${base}/status`;
+
+  const response = await fetch(runsyncUrl, {
+    method: 'POST',
+    headers: runPodHeaders(),
+    body: JSON.stringify({ input: payload }),
+    signal: AbortSignal.timeout(ASR_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`RunPod serverless error: status ${response.status} — ${text.slice(0, 200)}`);
+  }
+
+  let data = await response.json();
+  const jobId = data.id;
+
+  // Poll status if job is queued or processing
+  const maxPolls = 30;
+  const pollIntervalMs = 2000;
+  for (let i = 0; i < maxPolls; i++) {
+    if (data.status === 'COMPLETED') {
+      break;
+    }
+    if (data.status === 'FAILED' || data.status === 'CANCELLED' || data.status === 'TIMED_OUT') {
+      throw new Error(`RunPod job ${data.status}: ${data.error || 'Unknown error'}`);
+    }
+
+    // Still IN_QUEUE or IN_PROGRESS, wait and poll status
+    await sleep(pollIntervalMs);
+    const statusRes = await fetch(`${statusUrlBase}/${jobId}`, {
+      headers: runPodHeaders(),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (statusRes.ok) {
+      data = await statusRes.json();
+    }
+  }
+
+  if (data.status !== 'COMPLETED') {
+    throw new Error(`RunPod job timeout with status: ${data.status}`);
+  }
+
+  const output = data.output || {};
+  if (output.error) {
+    throw new Error(`RunPod speech worker error: ${output.error}`);
+  }
+
+  return output;
+}
+
 async function transcribeAudio(fileBuffer, originalname = 'answer.webm', mimetype = 'audio/webm') {
   const asrUrl = getAsrBaseUrl();
   if (!asrUrl) {
@@ -41,38 +99,15 @@ async function transcribeAudio(fileBuffer, originalname = 'answer.webm', mimetyp
   }
 
   if (isRunPodUrl(asrUrl)) {
-    const base = getRunPodEndpointBase(asrUrl);
-    const runsyncUrl = `${base}/runsync`;
-    
-    logger.info(`[somaliSpeechService] POST transcribe via RunPod to ${runsyncUrl}`);
+    logger.info(`[somaliSpeechService] POST transcribe via RunPod helper`);
     const audio_data = fileBuffer.toString('base64');
     
-    const response = await fetch(runsyncUrl, {
-      method: 'POST',
-      headers: runPodHeaders(),
-      body: JSON.stringify({
-        input: {
-          action: 'transcribe',
-          audio_data,
-          filename: originalname,
-        },
-      }),
-      signal: AbortSignal.timeout(ASR_TIMEOUT_MS),
+    const output = await callSpeechRunPod(asrUrl, {
+      action: 'transcribe',
+      audio_data,
+      filename: originalname,
     });
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Somali ASR RunPod error: status ${response.status} — ${text.slice(0, 200)}`);
-    }
-
-    const data = await response.json();
-    if (data.status === 'FAILED' || data.error) {
-      throw new Error(`Somali ASR RunPod job failed: ${data.error || data.status}`);
-    }
-    const output = data.output || {};
-    if (output.error) {
-      throw new Error(`Somali ASR worker error: ${output.error}`);
-    }
     const transcription = output.transcription || '';
     logger.info(`Somali ASR transcription received via RunPod (${transcription.length} chars)`);
     return transcription;
@@ -133,35 +168,12 @@ async function synthesizeSomaliSpeech(text) {
   }
 
   if (isRunPodUrl(ttsUrl)) {
-    const base = getRunPodEndpointBase(ttsUrl);
-    const runsyncUrl = `${base}/runsync`;
-
-    logger.info(`[somaliSpeechService] POST synthesize via RunPod to ${runsyncUrl}`);
-    const response = await fetch(runsyncUrl, {
-      method: 'POST',
-      headers: runPodHeaders(),
-      body: JSON.stringify({
-        input: {
-          action: 'synthesize',
-          text,
-        },
-      }),
-      signal: AbortSignal.timeout(TTS_TIMEOUT_MS),
+    logger.info(`[somaliSpeechService] POST synthesize via RunPod helper`);
+    const output = await callSpeechRunPod(ttsUrl, {
+      action: 'synthesize',
+      text,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Somali TTS RunPod error: status ${response.status} — ${errorText.slice(0, 200)}`);
-    }
-
-    const data = await response.json();
-    if (data.status === 'FAILED' || data.error) {
-      throw new Error(`Somali TTS RunPod job failed: ${data.error || data.status}`);
-    }
-    const output = data.output || {};
-    if (output.error) {
-      throw new Error(`Somali TTS worker error: ${output.error}`);
-    }
     if (!output.audio_data) {
       throw new Error('Somali TTS RunPod did not return audio_data');
     }
@@ -225,36 +237,13 @@ async function synthesizePiperSpeech(text, languageCode = 'en-US') {
   }
 
   if (isRunPodUrl(piperUrl)) {
-    const base = getRunPodEndpointBase(piperUrl);
-    const runsyncUrl = `${base}/runsync`;
-
-    logger.info(`[somaliSpeechService] POST synthesize English via RunPod to ${runsyncUrl}`);
-    const response = await fetch(runsyncUrl, {
-      method: 'POST',
-      headers: runPodHeaders(),
-      body: JSON.stringify({
-        input: {
-          action: 'synthesize',
-          text,
-          language: 'english',
-        },
-      }),
-      signal: AbortSignal.timeout(TTS_TIMEOUT_MS),
+    logger.info(`[somaliSpeechService] POST synthesize English via RunPod helper`);
+    const output = await callSpeechRunPod(piperUrl, {
+      action: 'synthesize',
+      text,
+      language: 'english',
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`English TTS RunPod error: status ${response.status} — ${errorText.slice(0, 200)}`);
-    }
-
-    const data = await response.json();
-    if (data.status === 'FAILED' || data.error) {
-      throw new Error(`English TTS RunPod job failed: ${data.error || data.status}`);
-    }
-    const output = data.output || {};
-    if (output.error) {
-      throw new Error(`English TTS worker error: ${output.error}`);
-    }
     if (!output.audio_data) {
       throw new Error('English TTS RunPod did not return audio_data');
     }
