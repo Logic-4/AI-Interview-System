@@ -90,6 +90,19 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
           return;
         }
 
+        let resolved = false;
+        const safeResolve = () => {
+          if (resolved) return;
+          resolved = true;
+          setIsSpeaking(false);
+          setIsPaused(false);
+          browserUtteranceRef.current = null;
+          resolve();
+        };
+
+        // Safety timeout — some browsers silently fail to fire onend/onerror
+        const fallbackTimer = setTimeout(safeResolve, 15000);
+
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = languageCodeRef.current;
         utterance.onstart = () => {
@@ -97,16 +110,12 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
           setIsPaused(false);
         };
         utterance.onend = () => {
-          setIsSpeaking(false);
-          setIsPaused(false);
-          browserUtteranceRef.current = null;
-          resolve();
+          clearTimeout(fallbackTimer);
+          safeResolve();
         };
         utterance.onerror = () => {
-          setIsSpeaking(false);
-          setIsPaused(false);
-          browserUtteranceRef.current = null;
-          resolve();
+          clearTimeout(fallbackTimer);
+          safeResolve();
         };
 
         browserUtteranceRef.current = utterance;
