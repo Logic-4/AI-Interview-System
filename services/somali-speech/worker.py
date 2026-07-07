@@ -17,7 +17,14 @@ import scipy.io.wavfile
 import soundfile as sf
 import torch
 from scipy.signal import resample_poly
-from transformers import AutoModelForCTC, AutoProcessor, AutoTokenizer, VitsModel
+try:
+    from transformers import AutoModelForCTC, AutoProcessor, AutoTokenizer, VitsModel
+except Exception as e:
+    import traceback
+    print("================== IMPORT DIAGNOSTIC ERROR ==================", flush=True)
+    traceback.print_exc()
+    print("=============================================================", flush=True)
+    raise e
 
 # Paths and configuration
 device = "cuda" if torch.cuda.is_available() else "cpu"
