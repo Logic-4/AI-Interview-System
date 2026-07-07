@@ -8,3 +8,5 @@ av
 accelerate
 huggingface_hub
 safetensors
+sentencepiece
+protobuf
