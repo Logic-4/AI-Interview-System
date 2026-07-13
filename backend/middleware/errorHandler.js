@@ -11,7 +11,13 @@ const errorHandler = (err, req, res, _next) => {
   error.stack = err.stack;
 
   // Log the error
-  logger.error(`${err.message}`, { stack: err.stack, url: req.originalUrl, method: req.method });
+  logger.error(JSON.stringify({
+    event: 'request_failed',
+    requestId: req.requestId,
+    method: req.method,
+    path: req.originalUrl,
+    message: err.message,
+  }));
 
   // Mongoose bad ObjectId
   if (err.name === 'CastError') {
@@ -56,6 +62,7 @@ const errorHandler = (err, req, res, _next) => {
     statusCode,
     message,
     errors: error.errors || [],
+    requestId: req.requestId,
     ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
   });
 };

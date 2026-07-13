@@ -9,6 +9,8 @@
     "piper": "node ../scripts/start-piper.js",
     "somali-speech": "node -e \"require('./utils/somaliSpeechProcess').startSomaliSpeech(console).then(()=>process.exit(0))\"",
     "setup:somali-speech": "node ../scripts/setup-somali-speech.js",
+    "test": "node --test test/*.test.js",
+    "benchmark:pipeline": "node scripts/benchmarkPipeline.js",
     "lint": "eslint ."
   },
   "keywords": [

@@ -22,6 +22,7 @@ const generalLimiter = createLimiter({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.method === 'GET' && /^\/api\/v1\/interviews\/[^/]+\/progress$/.test(req.originalUrl.split('?')[0]),
 });
 
 /**

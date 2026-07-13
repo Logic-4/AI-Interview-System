@@ -75,7 +75,7 @@ const questionSchema = new mongoose.Schema(
 );
 
 // Compound index for efficient ordering
-questionSchema.index({ interview: 1, order: 1 });
+questionSchema.index({ interview: 1, order: 1 }, { unique: true });
 
 const Question = mongoose.model('Question', questionSchema);
 

@@ -59,6 +59,8 @@ export default function NewInterviewPage() {
 
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const submittingRef = React.useRef(false);
+  const generationKeyRef = React.useRef<string | null>(null);
   const [isUploadingResume, setIsUploadingResume] = React.useState(false);
   const [resumeFileName, setResumeFileName] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -121,7 +123,8 @@ export default function NewInterviewPage() {
   const autoTitle = jobRole ? `${jobRole} — ${INTERVIEW_TYPES.find((t) => t.value === interviewType)?.label ?? "Interview"}` : "";
 
   const handleGenerate = async () => {
-    if (!isFormValid) return;
+    if (!isFormValid || submittingRef.current) return;
+    submittingRef.current = true;
     setIsLoading(true);
     setError(null);
 
@@ -139,7 +142,10 @@ export default function NewInterviewPage() {
         resumeText: resumeText.trim() || undefined,
       };
 
-      const interview = await interviewService.createInterview(payload);
+      generationKeyRef.current ||= typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `interview-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const interview = await interviewService.createInterview(payload, generationKeyRef.current);
       setActiveInterview(interview);
       navigate(`/interviews/${interview._id}`, {
         state: { fromCreate: true, interview },
@@ -148,6 +154,7 @@ export default function NewInterviewPage() {
       const msg = err instanceof Error ? err.message : "Failed to create interview. Please try again.";
       setError(msg);
       setIsLoading(false);
+      submittingRef.current = false;
     }
   };
 

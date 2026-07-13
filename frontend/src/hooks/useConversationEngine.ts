@@ -42,6 +42,7 @@ export interface ConversationEngineConfig {
   interviewType: string;
   language?: string;
   questions: Question[];
+  expectedQuestionCount?: number;
   onSubmitAnswer: (
     questionId: string,
     answer: string,
@@ -102,6 +103,7 @@ export function useConversationEngine(
     interviewType,
     language = "english",
     questions,
+    expectedQuestionCount = questions.length,
     onSubmitAnswer,
     onComplete,
     onGenerateFeedback,
@@ -122,6 +124,10 @@ export function useConversationEngine(
   // without needing it in their dependency arrays (eliminates stale closure bugs).
   const currentQuestionIndexRef = useRef(0);
   currentQuestionIndexRef.current = currentQuestionIndex;
+  const questionsRef = useRef(questions);
+  questionsRef.current = questions;
+  const expectedQuestionCountRef = useRef(expectedQuestionCount);
+  expectedQuestionCountRef.current = expectedQuestionCount;
 
   const languageRef = useRef(language);
   languageRef.current = language;
@@ -360,7 +366,7 @@ export function useConversationEngine(
 
       // Use ref to always get the current question index (avoids stale closure)
       const idx = currentQuestionIndexRef.current;
-      const question = questions[idx];
+      const question = questionsRef.current[idx];
       if (!question) return;
 
       const timeSpent = Math.round(
@@ -393,10 +399,10 @@ export function useConversationEngine(
           setPhase("follow-up");
           setActiveFollowUpText(result.followUpText);
           activePromptRef.current = result.followUpText;
-          setIsQuestionTextVisible(false);
-          await delay(500);
+          setIsQuestionTextVisible(true);
+          await delay(50);
           if (abortRef.current) return;
-          await speakAndWait(result.followUpText, () => setIsQuestionTextVisible(true));
+          await speakAndWait(result.followUpText);
           if (abortRef.current) return;
 
           await beginListening();
@@ -408,9 +414,18 @@ export function useConversationEngine(
         setAnsweredCount(answeredRef.current.size);
 
         const nextIdx = currentQuestionIndexRef.current + 1;
-        if (nextIdx < questions.length) {
+        if (nextIdx < expectedQuestionCountRef.current) {
           setPhase("transitioning");
-          await delay(600);
+          const waitStartedAt = Date.now();
+          while (!questionsRef.current[nextIdx] && Date.now() - waitStartedAt < 20000 && !abortRef.current) {
+            await delay(250);
+          }
+          if (!questionsRef.current[nextIdx]) {
+            toast.error("The next question is still unavailable. Your completed answers were saved.");
+            await wrapUp();
+            return;
+          }
+          await delay(150);
           setCurrentQuestionIndex(nextIdx);
           await askQuestion(nextIdx);
         } else {
@@ -443,23 +458,23 @@ export function useConversationEngine(
   const askQuestion = useCallback(
     async (idx: number) => {
       if (abortRef.current) return;
-      const q = questions[idx];
+      const q = questionsRef.current[idx];
       if (!q) return;
 
       setPhase("asking");
       setActiveFollowUpText(null);
-      setIsQuestionTextVisible(false);
+      setIsQuestionTextVisible(true);
 
-      await delay(500);
-      if (abortRef.current) return;
-
-      await speakAndWait(q.text, () => setIsQuestionTextVisible(true));
+      await delay(50);
       if (abortRef.current) return;
 
       activePromptRef.current = q.text;
+      await speakAndWait(q.text);
+      if (abortRef.current) return;
+
       await beginListening();
     },
-    [questions, speakAndWait, beginListening]
+    [speakAndWait, beginListening]
   );
 
   /* ── Wrap up ───────────────────────────────────────────── */
@@ -515,7 +530,7 @@ export function useConversationEngine(
 
     // No hardcoded greeting — the AI's intro-category question handles it
     setPhase("greeting");
-    await delay(400);
+    await delay(50);
     if (abortRef.current) return;
 
     await askQuestion(0);

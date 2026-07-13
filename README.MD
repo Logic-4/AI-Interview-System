@@ -4,6 +4,8 @@
 
 This system simulates real interview sessions using AI. It helps candidates practice, get scored, and improve based on real job requirements.
 
+For the question/TTS latency architecture, production findings, benchmark procedure, and deployment requirements, see [`docs/PERFORMANCE_AUDIT.md`](docs/PERFORMANCE_AUDIT.md).
+
 The system does more than ask questions. It builds a full interview flow based on the job description, tracks performance, and gives clear feedback.
 
 ---

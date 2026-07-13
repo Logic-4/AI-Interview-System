@@ -11,7 +11,7 @@ import sys
 print("=== interview-gemma worker boot ===", flush=True)
 
 import runpod
-from worker import dispatch
+from worker import dispatch, validate_cuda_runtime
 
 
 def handler(event):
@@ -33,4 +33,5 @@ def handler(event):
 
 
 print("Starting RunPod serverless worker...", flush=True)
+validate_cuda_runtime()
 runpod.serverless.start({"handler": handler})

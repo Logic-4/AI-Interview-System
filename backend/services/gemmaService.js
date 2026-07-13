@@ -109,11 +109,39 @@ function getRunPodEndpointBase(url) {
   return url.replace(/\/+$/, '').replace(/\/(runsync|run|health|status)$/i, '');
 }
 
-const TIMEOUT_MS = 120000; // RunPod cold start can exceed 60s
-const MAX_RETRIES = 2;
+const TIMEOUT_MS = Number(process.env.GEMMA_TIMEOUT_MS || 90000);
+const MAX_RETRIES = Number(process.env.GEMMA_MAX_RETRIES || 1);
 const RETRY_DELAY_MS = 1500;
 const HISTORY_WINDOW = 8;
 const IS_PROD = process.env.NODE_ENV === 'production';
+const RUNPOD_POLL_MS = Number(process.env.RUNPOD_POLL_MS || 500);
+const CIRCUIT_OPEN_MS = Number(process.env.GEMMA_CIRCUIT_OPEN_MS || 60000);
+
+const circuit = { failures: 0, openUntil: 0, reason: '' };
+
+function assertCircuitClosed() {
+  if (circuit.openUntil > Date.now()) {
+    const retryAfterMs = circuit.openUntil - Date.now();
+    const error = new Error(`Gemma service circuit is open (${circuit.reason}); retry in ${Math.ceil(retryAfterMs / 1000)}s`);
+    error.code = 'GEMMA_CIRCUIT_OPEN';
+    error.retryAfterMs = retryAfterMs;
+    throw error;
+  }
+}
+
+function recordCircuitFailure(reason, immediate = false) {
+  circuit.failures += 1;
+  circuit.reason = reason;
+  if (immediate || circuit.failures >= 3) {
+    circuit.openUntil = Date.now() + CIRCUIT_OPEN_MS;
+  }
+}
+
+function recordCircuitSuccess() {
+  circuit.failures = 0;
+  circuit.openUntil = 0;
+  circuit.reason = '';
+}
 
 const PLACEHOLDER_ANSWER_RE = /^\[(No |Transcription)/i;
 
@@ -260,11 +288,13 @@ function safeParseJSON(raw) {
 }
 
 /* ─── RunPod Serverless runsync ─────────────────────────── */
-async function callRunPod(endpoint, payload, attempt = 0) {
+async function callRunPod(endpoint, payload, attempt = 0, timeoutMs = TIMEOUT_MS) {
+  assertCircuitClosed();
   const gemmaUrl = getGemmaBaseUrl();
   const base = getRunPodEndpointBase(gemmaUrl);
-  const runsyncUrl = `${base}/runsync`;
+  const runsyncUrl = `${base}/run`;
   const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const startedAt = Date.now();
 
   logGemmaRequest(runsyncUrl, `${path} (RunPod)`, payload);
 
@@ -278,62 +308,78 @@ async function callRunPod(endpoint, payload, attempt = 0) {
           payload,
         },
       }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(Math.min(timeoutMs, 15000)),
     });
 
     if (!response.ok) {
       const text = await response.text();
-      const retryable = response.status >= 500 || response.status === 429;
+      const retryable = response.status === 429;
       if (retryable && attempt < MAX_RETRIES) {
         logger.warn(`[gemmaService] RunPod ${response.status} on ${path}, retry ${attempt + 1}/${MAX_RETRIES}`);
         await sleep(RETRY_DELAY_MS * (attempt + 1));
-        return callRunPod(endpoint, payload, attempt + 1);
+        return callRunPod(endpoint, payload, attempt + 1, timeoutMs);
       }
+      recordCircuitFailure(`HTTP ${response.status}`, [401, 403, 404].includes(response.status));
       throw new Error(`RunPod API error! status: ${response.status} — ${text.slice(0, 200)}`);
     }
 
-    const data = await response.json();
+    let data = await response.json();
 
     if (data.status === 'FAILED' || data.status === 'CANCELLED' || data.status === 'TIMED_OUT') {
       const errMsg = data.error || data.status || 'RunPod job failed';
       throw new Error(`RunPod job ${data.status}: ${errMsg}`);
     }
 
-    // IN_QUEUE / IN_PROGRESS should not happen with runsync, but handle gracefully
-    if (data.status && data.status !== 'COMPLETED' && !data.output) {
-      if (attempt < MAX_RETRIES) {
-        await sleep(RETRY_DELAY_MS * (attempt + 1));
-        return callRunPod(endpoint, payload, attempt + 1);
+    const jobId = data.id;
+    while (data.status && data.status !== 'COMPLETED' && !data.output) {
+      if (['FAILED', 'CANCELLED', 'TIMED_OUT'].includes(data.status)) {
+        recordCircuitFailure(`job ${data.status}`);
+        throw new Error(`RunPod job ${data.status}: ${data.error || 'Unknown error'}`);
       }
-      throw new Error(`RunPod job incomplete: ${data.status}`);
+      if (!jobId) throw new Error(`RunPod job incomplete without an id: ${data.status}`);
+      if (Date.now() - startedAt >= timeoutMs) {
+        recordCircuitFailure('job timeout');
+        const timeoutError = new Error(`RunPod job timed out after ${timeoutMs}ms (last status: ${data.status})`);
+        timeoutError.code = 'GEMMA_TIMEOUT';
+        throw timeoutError;
+      }
+      await sleep(RUNPOD_POLL_MS);
+      const statusResponse = await fetch(`${base}/status/${jobId}`, {
+        headers: runPodHeaders(),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!statusResponse.ok) {
+        throw new Error(`RunPod status error ${statusResponse.status}: ${(await statusResponse.text()).slice(0, 120)}`);
+      }
+      data = await statusResponse.json();
     }
 
     const result = data.output ?? data;
     if (result && result.error) {
+      recordCircuitFailure('worker error');
       throw new Error(`RunPod worker error: ${result.error}`);
     }
 
+    recordCircuitSuccess();
     logGemmaResponse('RunPod OK', result);
     return result;
   } catch (error) {
-    if (attempt < MAX_RETRIES && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
-      logger.warn(`[gemmaService] RunPod timeout on ${path}, retry ${attempt + 1}/${MAX_RETRIES}`);
-      await sleep(RETRY_DELAY_MS * (attempt + 1));
-      return callRunPod(endpoint, payload, attempt + 1);
+    if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+      recordCircuitFailure('network timeout');
     }
     throw error;
   }
 }
 
 /* ─── Common fetch helper with retry ───────────────────── */
-async function callGemma(endpoint, payload, attempt = 0) {
+async function callGemma(endpoint, payload, attempt = 0, timeoutMs = TIMEOUT_MS) {
   const gemmaUrl = getGemmaBaseUrl();
   if (!gemmaUrl) {
     throw new Error('Gemma API URL is not configured.');
   }
 
   if (isRunPodUrl(gemmaUrl)) {
-    return callRunPod(endpoint, payload, attempt);
+    return callRunPod(endpoint, payload, attempt, timeoutMs);
   }
 
   const base = new URL(endpoint, gemmaUrl).href;
@@ -345,7 +391,7 @@ async function callGemma(endpoint, payload, attempt = 0) {
       method: 'POST',
       headers: HEADERS(),
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
     if (!response.ok) {
@@ -354,7 +400,7 @@ async function callGemma(endpoint, payload, attempt = 0) {
       if (retryable && attempt < MAX_RETRIES) {
         logger.warn(`[gemmaService] ${response.status} on ${endpoint}, retry ${attempt + 1}/${MAX_RETRIES}`);
         await sleep(RETRY_DELAY_MS * (attempt + 1));
-        return callGemma(endpoint, payload, attempt + 1);
+        return callGemma(endpoint, payload, attempt + 1, timeoutMs);
       }
       throw new Error(`Gemma API error! status: ${response.status} — ${text.slice(0, 200)}`);
     }
@@ -366,7 +412,7 @@ async function callGemma(endpoint, payload, attempt = 0) {
     if (attempt < MAX_RETRIES && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
       logger.warn(`[gemmaService] Timeout on ${endpoint}, retry ${attempt + 1}/${MAX_RETRIES}`);
       await sleep(RETRY_DELAY_MS * (attempt + 1));
-      return callGemma(endpoint, payload, attempt + 1);
+      return callGemma(endpoint, payload, attempt + 1, timeoutMs);
     }
     throw error;
   }
@@ -408,8 +454,12 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
     _forcedCategory,
     _forcedIndex,
     _forcedCount,
+    _startIndex = 0,
+    requestId,
+    requestTimeoutMs,
   } = context;
   const questions = [];
+  const batchRequests = [];
 
   // Build a concise skill list from all available sources
   const skillHints = [];
@@ -427,7 +477,7 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
 
   // Generate questions one by one with appropriate categories
   for (let i = 0; i < count; i++) {
-    const absoluteIndex = _forcedIndex !== undefined ? _forcedIndex : i;
+    const absoluteIndex = _forcedIndex !== undefined ? _forcedIndex : _startIndex + i;
     const category = _forcedCategory || resolveQuestionCategory(type, absoluteIndex, totalCount);
 
     const payload = {
@@ -443,9 +493,15 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
       experience: roleProfile?.experienceLevel || '',
       jobDescription: (jobDescription ? `[Job Description]:\n${jobDescription.slice(0, 800)}` : '')
         + (resumeText ? `\n\n[Candidate Resume]:\n${resumeText.slice(0, 500)}` : ''),
+      requestId,
     };
 
-    const result = await callGemma('/generate-question', payload);
+    if (count > 1) {
+      batchRequests.push({ payload, category, absoluteIndex });
+      continue;
+    }
+
+    const result = await callGemma('/generate-question', payload, 0, requestTimeoutMs || TIMEOUT_MS);
     const qText = result.question || result.text || '';
 
     if (qText) {
@@ -458,6 +514,28 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
       });
     }
   }
+
+  if (batchRequests.length) {
+    const result = await callGemma('/generate-questions', {
+      requests: batchRequests.map((item) => item.payload),
+      requestId,
+    }, 0, requestTimeoutMs || TIMEOUT_MS);
+    const generated = Array.isArray(result.questions) ? result.questions : [];
+    generated.forEach((item, index) => {
+      const meta = batchRequests[index];
+      const qText = item?.question || item?.text || '';
+      if (!meta || !qText) return;
+      questions.push({
+        text: qText,
+        category: meta.category,
+        difficulty: difficulty || 'medium',
+        expectedAnswer: item.expectedAnswer || item.expected_answer || item.answer || '',
+        order: meta.absoluteIndex,
+      });
+    });
+  }
+
+  questions.sort((a, b) => a.order - b.order);
 
   logger.info(`Generated ${questions.length} questions for ${type}/${domain}/${difficulty}`);
   return questions;
@@ -589,6 +667,18 @@ const transcribeAudio = async () => {
   throw new Error('Audio transcription is not available. The frontend uses browser-native Speech Recognition for STT.');
 };
 
+const warmGemma = async (requestId = 'startup-warmup') => {
+  const startedAt = Date.now();
+  const result = await callGemma('/warmup', { requestId });
+  logger.info(JSON.stringify({
+    event: 'gemma_warmup_complete',
+    requestId,
+    totalMs: Date.now() - startedAt,
+    modelLoadMs: result?._timing?.modelLoadMs ?? null,
+  }));
+  return result;
+};
+
 module.exports = {
   parseJobDescription,
   generateInterviewQuestions,
@@ -602,4 +692,7 @@ module.exports = {
   trimConversationHistory,
   compactRoleProfile,
   normalizeEvaluation,
+  checkGemmaStatus,
+  warmGemma,
+  _circuit: circuit,
 };

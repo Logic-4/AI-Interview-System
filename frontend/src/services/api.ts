@@ -14,6 +14,11 @@ api.interceptors.request.use((config) => {
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  if (config.headers && !config.headers['X-Request-ID']) {
+    config.headers['X-Request-ID'] = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `web-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
   return config;
 }, (error) => Promise.reject(error));
 

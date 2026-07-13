@@ -10,12 +10,13 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 import traceback
 from typing import Any, Optional, Tuple
 
 import torch
 from huggingface_hub import login
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, StoppingCriteria, StoppingCriteriaList
 
 MODEL_ID = os.environ.get("GEMMA_MODEL_ID", "Mohamud24/gemma-3-technical-interviewer")
 HF_TOKEN = os.environ.get("HF_TOKEN", "").strip()
@@ -23,12 +24,57 @@ HF_TOKEN = os.environ.get("HF_TOKEN", "").strip()
 tokenizer = None
 model = None
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+generation_timing: dict[str, Any] = {}
 
 
-def load_model() -> None:
+def validate_cuda_runtime() -> dict[str, Any]:
+    """Launch a tiny kernel so incompatible images fail with useful diagnostics."""
+    require_cuda = os.environ.get("REQUIRE_CUDA", "0").strip().lower() in {"1", "true", "yes"}
+    if not torch.cuda.is_available():
+        message = (
+            "CUDA is unavailable. This production image requires a GPU; verify the "
+            "RunPod GPU selection and NVIDIA container runtime."
+        )
+        if require_cuda:
+            raise RuntimeError(message)
+        print(f"CUDA startup probe skipped: {message}", flush=True)
+        return {"available": False, "device": "cpu"}
+
+    properties = torch.cuda.get_device_properties(0)
+    capability = f"{properties.major}.{properties.minor}"
+    compiled_arches = list(torch.cuda.get_arch_list())
+    try:
+        probe = torch.ones(1, device="cuda")
+        probe.add_(1)
+        torch.cuda.synchronize()
+        del probe
+    except Exception as exc:
+        raise RuntimeError(
+            "CUDA kernel startup probe failed. "
+            f"GPU={properties.name!r}, capability={capability}, "
+            f"torch={torch.__version__}, torch_cuda={torch.version.cuda}, "
+            f"compiled_arches={compiled_arches}. Use a PyTorch build containing "
+            "this GPU architecture or restrict the endpoint to a compatible GPU."
+        ) from exc
+
+    result = {
+        "available": True,
+        "gpu": properties.name,
+        "capability": capability,
+        "torch": torch.__version__,
+        "torch_cuda": torch.version.cuda,
+        "compiled_arches": compiled_arches,
+    }
+    print(f"CUDA startup probe passed: {result}", flush=True)
+    return result
+
+
+def load_model() -> dict[str, Any]:
     global tokenizer, model
     if model is not None:
-        return
+        return {"coldStart": False, "modelLoadMs": 0}
+
+    started_at = time.perf_counter()
 
     if not HF_TOKEN:
         raise RuntimeError("HF_TOKEN environment variable is required for the gated Gemma model.")
@@ -54,7 +100,9 @@ def load_model() -> None:
     if DEVICE == "cpu":
         model = model.to(DEVICE)
     model.eval()
-    print("Gemma model ready.")
+    load_ms = round((time.perf_counter() - started_at) * 1000, 1)
+    print(f"Gemma model ready in {load_ms}ms.")
+    return {"coldStart": True, "modelLoadMs": load_ms}
 
 
 def try_parse_json(text: str) -> Optional[dict]:
@@ -201,19 +249,46 @@ def normalize_turn_response(parsed: Optional[dict], raw_text: str = "") -> dict:
     }
 
 
+class _FirstTokenTimer(StoppingCriteria):
+    def __init__(self, started_at: float):
+        self.started_at = started_at
+        self.first_token_at: Optional[float] = None
+
+    def __call__(self, _input_ids, _scores, **_kwargs) -> bool:
+        if self.first_token_at is None:
+            self.first_token_at = time.perf_counter()
+        return False
+
+
 def run_generation(messages, max_new_tokens: int, temperature: float = 0.2, do_sample: bool = False) -> str:
+    global generation_timing
+    started_at = time.perf_counter()
     prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     inputs = tokenizer(prompt, return_tensors="pt").to(DEVICE)
+    generation_started_at = time.perf_counter()
+    first_token_timer = _FirstTokenTimer(generation_started_at)
     gen_kwargs = {
         "max_new_tokens": max_new_tokens,
         "do_sample": do_sample,
+        "use_cache": True,
+        "stopping_criteria": StoppingCriteriaList([first_token_timer]),
+        "pad_token_id": tokenizer.eos_token_id,
     }
     if do_sample:
         gen_kwargs["temperature"] = temperature
     with torch.no_grad():
         outputs = model.generate(**inputs, **gen_kwargs)
+    output_ids = outputs[0][inputs["input_ids"].shape[-1] :]
+    finished_at = time.perf_counter()
+    generation_timing = {
+        "promptConstructionMs": round((generation_started_at - started_at) * 1000, 1),
+        "firstTokenMs": round(((first_token_timer.first_token_at or finished_at) - generation_started_at) * 1000, 1),
+        "generationMs": round((finished_at - generation_started_at) * 1000, 1),
+        "inputTokens": int(inputs["input_ids"].shape[-1]),
+        "outputTokens": int(output_ids.shape[-1]),
+    }
     return tokenizer.decode(
-        outputs[0][inputs["input_ids"].shape[-1] :],
+        output_ids,
         skip_special_tokens=True,
     )
 
@@ -324,7 +399,7 @@ def handle_interview_turn(data: dict) -> dict:
     else:
         messages.append({"role": "user", "content": instruction})
 
-    parsed, raw = generate_json_response(messages, max_new_tokens=280, temperature=0.2)
+    parsed, raw = generate_json_response(messages, max_new_tokens=220, temperature=0.2)
     return normalize_turn_response(parsed, raw)
 
 
@@ -391,7 +466,7 @@ def handle_generate_question(data: dict) -> dict:
     )
 
     messages = [{"role": "user", "content": prompt_content}]
-    parsed, raw = generate_json_response(messages, max_new_tokens=150, temperature=0.4)
+    parsed, raw = generate_json_response(messages, max_new_tokens=96, temperature=0.3)
     if parsed and ("question" in parsed or "text" in parsed):
         return {
             "question": parsed.get("question") or parsed.get("text", ""),
@@ -415,6 +490,26 @@ def handle_generate_question(data: dict) -> dict:
         "question": default_q,
         "expectedAnswer": "Candidate describes relevant experience and domain knowledge.",
     }
+
+
+def handle_generate_questions(data: dict) -> dict:
+    requests = data.get("requests") or []
+    if not isinstance(requests, list) or not requests:
+        return {"error": "requests must be a non-empty list"}
+    if len(requests) > 16:
+        return {"error": "A maximum of 16 questions can be generated per batch"}
+
+    questions = []
+    timings = []
+    for request in requests:
+        result = handle_generate_question(request if isinstance(request, dict) else {})
+        questions.append(result)
+        timings.append(dict(generation_timing))
+    return {"questions": questions, "itemTimings": timings}
+
+
+def handle_warmup(_data: dict) -> dict:
+    return {"status": "ready", "model": MODEL_ID, "device": DEVICE}
 
 
 def handle_parse(data: dict) -> dict:
@@ -558,6 +653,10 @@ ROUTES = {
     "interview-turn": handle_interview_turn,
     "/generate-question": handle_generate_question,
     "generate-question": handle_generate_question,
+    "/generate-questions": handle_generate_questions,
+    "generate-questions": handle_generate_questions,
+    "/warmup": handle_warmup,
+    "warmup": handle_warmup,
     "/parse": handle_parse,
     "parse": handle_parse,
     "/feedback": handle_feedback,
@@ -566,6 +665,7 @@ ROUTES = {
 
 
 def dispatch(endpoint: str, payload: Optional[dict] = None) -> dict:
+    global generation_timing
     path = (endpoint or "/health").strip()
     handler_fn = ROUTES.get(path) or ROUTES.get(path.lstrip("/"))
     if not handler_fn:
@@ -574,8 +674,14 @@ def dispatch(endpoint: str, payload: Optional[dict] = None) -> dict:
         # /health must return instantly so RunPod marks the worker ready.
         if path in ("/health", "health"):
             return handler_fn(payload or {})
-        load_model()
-        return handler_fn(payload or {})
+        generation_timing = {}
+        load_timing = load_model()
+        result = handler_fn(payload or {})
+        if isinstance(result, dict):
+            result.setdefault("_timing", {})
+            result["_timing"].update(load_timing)
+            result["_timing"].update(generation_timing)
+        return result
     except Exception as exc:
         traceback.print_exc()
         return {"error": str(exc), "detail": str(exc)}

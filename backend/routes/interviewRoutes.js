@@ -4,6 +4,8 @@ const {
   createInterview,
   getInterviews,
   getInterview,
+  getInterviewProgress,
+  retryQuestionGeneration,
   startInterview,
   submitAnswer,
   completeInterview,
@@ -23,6 +25,8 @@ router.use(protect);
 // CRUD
 router.post('/', aiLimiter, createInterviewValidator, validate, createInterview);
 router.get('/', listInterviewsValidator, validate, getInterviews);
+router.get('/:id/progress', getInterviewProgress);
+router.post('/:id/retry-generation', aiLimiter, retryQuestionGeneration);
 router.get('/:id', getInterview);
 router.delete('/:id', deleteInterview);
 

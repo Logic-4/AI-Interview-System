@@ -1,5 +1,5 @@
 import runpod
-from worker import dispatch, load_asr, load_som_tts, load_eng_tts
+from worker import dispatch, validate_cuda_runtime
 
 
 def handler(job):
@@ -14,16 +14,6 @@ def handler(job):
 
 
 if __name__ == "__main__":
-    # Pre-download and load models into GPU memory at container startup
-    try:
-        print("Preloading ASR model...")
-        load_asr()
-        print("Preloading Somali TTS model...")
-        load_som_tts()
-        print("Preloading English TTS model...")
-        load_eng_tts()
-        print("All models successfully loaded at startup.")
-    except Exception as exc:
-        print(f"Warning: Model preloading failed: {exc}. Models will load on first request.")
-
+    print("Starting RunPod Somali speech serverless worker...")
+    validate_cuda_runtime()
     runpod.serverless.start({"handler": handler})

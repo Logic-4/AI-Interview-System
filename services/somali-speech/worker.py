@@ -7,8 +7,11 @@ from __future__ import annotations
 
 import base64
 import os
+import re
 import tempfile
+import time
 import traceback
+import unicodedata
 from pathlib import Path
 from typing import Any, Dict
 
@@ -34,6 +37,48 @@ som_tts_model = None
 
 eng_tts_tokenizer = None
 eng_tts_model = None
+
+
+def validate_cuda_runtime() -> Dict[str, Any]:
+    """Launch a tiny kernel so incompatible images fail with useful diagnostics."""
+    require_cuda = os.environ.get("REQUIRE_CUDA", "0").strip().lower() in {"1", "true", "yes"}
+    if not torch.cuda.is_available():
+        message = (
+            "CUDA is unavailable. This production image requires a GPU; verify the "
+            "RunPod GPU selection and NVIDIA container runtime."
+        )
+        if require_cuda:
+            raise RuntimeError(message)
+        print(f"CUDA startup probe skipped: {message}", flush=True)
+        return {"available": False, "device": "cpu"}
+
+    properties = torch.cuda.get_device_properties(0)
+    capability = f"{properties.major}.{properties.minor}"
+    compiled_arches = list(torch.cuda.get_arch_list())
+    try:
+        probe = torch.ones(1, device="cuda")
+        probe.add_(1)
+        torch.cuda.synchronize()
+        del probe
+    except Exception as exc:
+        raise RuntimeError(
+            "CUDA kernel startup probe failed. "
+            f"GPU={properties.name!r}, capability={capability}, "
+            f"torch={torch.__version__}, torch_cuda={torch.version.cuda}, "
+            f"compiled_arches={compiled_arches}. Use a PyTorch build containing "
+            "this GPU architecture or restrict the endpoint to a compatible GPU."
+        ) from exc
+
+    result = {
+        "available": True,
+        "gpu": properties.name,
+        "capability": capability,
+        "torch": torch.__version__,
+        "torch_cuda": torch.version.cuda,
+        "compiled_arches": compiled_arches,
+    }
+    print(f"CUDA startup probe passed: {result}", flush=True)
+    return result
 
 
 def load_asr() -> None:
@@ -175,9 +220,11 @@ def handle_synthesize(payload: Dict[str, Any]) -> Dict[str, Any]:
     if not text or not text.strip():
         return {"error": "Missing text in payload"}
 
-    language = payload.get("language", "somali").strip().lower()
+    language = str(payload.get("language") or payload.get("languageCode") or "somali").strip().lower()
+    is_english = language in {"english", "en", "en-us", "en-gb"} or language.startswith("en-")
 
-    if language == "english":
+    load_started_at = time.perf_counter()
+    if is_english:
         load_eng_tts()
         tokenizer = eng_tts_tokenizer
         model = eng_tts_model
@@ -187,8 +234,12 @@ def handle_synthesize(payload: Dict[str, Any]) -> Dict[str, Any]:
         tokenizer = som_tts_tokenizer
         model = som_tts_model
         model_name = SOM_TTS_MODEL_ID
+    model_load_ms = round((time.perf_counter() - load_started_at) * 1000, 1)
 
-    cleaned_text = text.strip()
+    cleaned_text = unicodedata.normalize("NFKC", str(text))
+    cleaned_text = re.sub(r"\s+", " ", cleaned_text).strip()
+    if len(cleaned_text) > 1000:
+        return {"error": "Text exceeds the 1000 character synthesis limit"}
     inputs = tokenizer(text=cleaned_text, return_tensors="pt")
     inputs = {key: val.to(device) for key, val in inputs.items()}
 
@@ -196,18 +247,29 @@ def handle_synthesize(payload: Dict[str, Any]) -> Dict[str, Any]:
         tmp_path = Path(tmp.name)
 
     try:
-        with torch.no_grad():
+        generation_started_at = time.perf_counter()
+        with torch.inference_mode():
             outputs = model(**inputs)
-        waveform = outputs.waveform[0].cpu().numpy()
+        waveform = outputs.waveform[0].detach().float().cpu().numpy()
+        if waveform.size == 0 or not np.isfinite(waveform).all():
+            raise ValueError("Model returned an empty or non-finite waveform")
+
+        peak = float(np.max(np.abs(waveform)))
+        if peak > 0:
+            waveform = waveform / max(peak, 1.0)
+        pcm16 = np.clip(waveform * 32767.0, -32768, 32767).astype(np.int16)
         
         scipy.io.wavfile.write(
             str(tmp_path),
             rate=model.config.sampling_rate,
-            data=waveform,
+            data=pcm16,
         )
 
         with open(tmp_path, "rb") as f:
-            audio_data_b64 = base64.b64encode(f.read()).decode("utf-8")
+            audio_bytes = f.read()
+            if len(audio_bytes) <= 44 or not audio_bytes.startswith(b"RIFF"):
+                raise ValueError("Generated WAV is empty or invalid")
+            audio_data_b64 = base64.b64encode(audio_bytes).decode("utf-8")
 
         return {
             "audio_data": audio_data_b64,
@@ -215,6 +277,12 @@ def handle_synthesize(payload: Dict[str, Any]) -> Dict[str, Any]:
             "sample_rate": model.config.sampling_rate,
             "device": device,
             "model": model_name,
+            "duration_seconds": round(len(pcm16) / model.config.sampling_rate, 3),
+            "audio_bytes": len(audio_bytes),
+            "_timing": {
+                "modelLoadMs": model_load_ms,
+                "generationMs": round((time.perf_counter() - generation_started_at) * 1000, 1),
+            },
         }
     except Exception as err:
         traceback.print_exc()
@@ -232,6 +300,18 @@ def dispatch(payload: Dict[str, Any]) -> Dict[str, Any]:
         return handle_transcribe(payload)
     elif action == "synthesize":
         return handle_synthesize(payload)
+    elif action == "warmup":
+        service = str(payload.get("service") or "somali_tts").lower()
+        started_at = time.perf_counter()
+        if service in {"somali_tts", "tts", "somali"}:
+            load_som_tts()
+        elif service in {"english_tts", "english"}:
+            load_eng_tts()
+        elif service == "asr":
+            load_asr()
+        else:
+            return {"error": f"Unknown warmup service: {service}"}
+        return {"status": "ready", "service": service, "load_ms": round((time.perf_counter() - started_at) * 1000, 1)}
     elif action == "health":
         return {
             "status": "ok",

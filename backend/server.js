@@ -16,8 +16,11 @@ const { initializeSocketHandlers } = require('./sockets');
 const { generalLimiter } = require('./middleware/rateLimiter');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
+const { requestContext } = require('./middleware/requestContext');
 const { startPiper, stopPiper } = require('./utils/piperProcess');
 const { startSomaliSpeech, stopSomaliSpeech } = require('./utils/somaliSpeechProcess');
+const { warmGemma } = require('./services/gemmaService');
+const { warmSpeechService } = require('./services/somaliSpeechService');
 
 // Routes
 const authRoutes = require('./routes/authRoutes');
@@ -33,6 +36,8 @@ const sttRoutes = require('./routes/sttRoutes');
 // ─── Initialize Express App ─────────────────────────
 const app = express();
 const server = http.createServer(app);
+
+app.use(requestContext);
 
 // ─── Security Middleware ─────────────────────────────
 app.use(helmet());
@@ -50,7 +55,8 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'Idempotency-Key'],
+  exposedHeaders: ['X-Request-ID', 'Server-Timing', 'X-TTS-Provider', 'X-TTS-Cache'],
 }));
 
 // ─── Rate Limiting ───────────────────────────────────
@@ -135,6 +141,17 @@ const startServer = async () => {
 ║  📝 API Base:    /api/v1                     ║
 ╚══════════════════════════════════════════════╝
       `);
+
+      void Promise.allSettled([
+        warmGemma('startup-gemma-warmup'),
+        warmSpeechService('startup-speech-warmup'),
+      ]).then((results) => {
+        results.forEach((result, index) => {
+          if (result.status === 'rejected') {
+            logger.warn(`${index === 0 ? 'Gemma' : 'Speech'} warmup failed: ${result.reason.message}`);
+          }
+        });
+      });
     });
   } catch (error) {
     logger.error(`Failed to start server: ${error.message}`);

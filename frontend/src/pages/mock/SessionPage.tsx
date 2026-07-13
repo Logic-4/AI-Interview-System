@@ -150,6 +150,7 @@ export default function SessionPage() {
     interviewType: interview?.type ?? "mixed",
     language: interview?.language ?? "english",
     questions,
+    expectedQuestionCount: interview?.expectedQuestionCount ?? questions.length,
     onSubmitAnswer,
     onComplete,
     onGenerateFeedback,

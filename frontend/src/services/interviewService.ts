@@ -3,8 +3,10 @@ import { Interview, PopulatedInterview, CreateInterviewPayload, SubmitAnswerPayl
 import { ApiResponse, PaginatedResponse } from '@/types/api';
 
 const interviewService = {
-  async createInterview(payload: CreateInterviewPayload): Promise<PopulatedInterview> {
-    const res = await api.post<ApiResponse<{ interview: PopulatedInterview }>>('/interviews', payload);
+  async createInterview(payload: CreateInterviewPayload, idempotencyKey?: string): Promise<PopulatedInterview> {
+    const res = await api.post<ApiResponse<{ interview: PopulatedInterview }>>('/interviews', payload, {
+      headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+    });
     return res.data.data.interview;
   },
 
@@ -15,6 +17,16 @@ const interviewService = {
 
   async getInterview(id: string): Promise<PopulatedInterview> {
     const res = await api.get<ApiResponse<{ interview: PopulatedInterview }>>(`/interviews/${id}`);
+    return res.data.data.interview;
+  },
+
+  async getInterviewProgress(id: string, signal?: AbortSignal): Promise<PopulatedInterview> {
+    const res = await api.get<ApiResponse<{ interview: PopulatedInterview }>>(`/interviews/${id}/progress`, { signal });
+    return res.data.data.interview;
+  },
+
+  async retryQuestionGeneration(id: string): Promise<PopulatedInterview> {
+    const res = await api.post<ApiResponse<{ interview: PopulatedInterview }>>(`/interviews/${id}/retry-generation`);
     return res.data.data.interview;
   },
 

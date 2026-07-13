@@ -142,6 +142,24 @@ const interviewSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    generationStatus: {
+      type: String,
+      enum: ['queued', 'generating-first', 'generating-remaining', 'ready', 'partial', 'failed'],
+      default: 'queued',
+    },
+    generationError: {
+      type: String,
+      default: '',
+      maxlength: 500,
+    },
+    generationStartedAt: Date,
+    firstQuestionReadyAt: Date,
+    generationCompletedAt: Date,
+    generationKey: {
+      type: String,
+      default: undefined,
+      maxlength: 128,
+    },
     expectedQuestionCount: {
       type: Number,
       default: 0,
@@ -163,6 +181,10 @@ interviewSchema.index({ user: 1, status: 1 });
 interviewSchema.index({ user: 1, createdAt: -1 });
 interviewSchema.index({ type: 1, difficulty: 1 });
 interviewSchema.index({ isDeleted: 1 });
+interviewSchema.index(
+  { user: 1, generationKey: 1 },
+  { unique: true, partialFilterExpression: { generationKey: { $type: 'string' } } }
+);
 
 // Virtual — feedback
 interviewSchema.virtual('feedback', {

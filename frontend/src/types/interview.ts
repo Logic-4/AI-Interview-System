@@ -36,6 +36,10 @@ export interface PopulatedInterview extends Omit<Interview, 'questions'> {
   feedback?: import('./feedback').Feedback;
   questionsReady?: boolean;
   expectedQuestionCount?: number;
+  generationStatus?: 'queued' | 'generating-first' | 'generating-remaining' | 'ready' | 'partial' | 'failed';
+  generationError?: string;
+  firstQuestionReadyAt?: string;
+  generationCompletedAt?: string;
 }
 
 export type InterviewLanguage = 'english' | 'somali';

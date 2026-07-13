@@ -27,6 +27,7 @@ import feedbackService from "../../services/feedbackService";
 import { useInterviewStore } from "../../stores/interviewStore";
 import { useAuthStore } from "../../stores/authStore";
 import { useConversationEngine } from "../../hooks/useConversationEngine";
+import { computeQuestionsReady } from "../../lib/interviewHelpers";
 
 import type { Question } from "../../types/question";
 import type { PopulatedInterview } from "../../types/interview";
@@ -78,8 +79,7 @@ export default function InterviewSessionPage() {
         setInterview(data);
         setActiveInterview(data);
         // Check if background generation is already done
-        const ready = (data as any).questionsReady === true ||
-          data.questions.length >= ((data as any).expectedQuestionCount || data.questions.length);
+        const ready = computeQuestionsReady(data);
         setQuestionsReady(ready);
         setPagePhase("ready");
       } catch {
@@ -95,26 +95,36 @@ export default function InterviewSessionPage() {
 
   /* ── Poll until all questions are ready ──────────────────── */
   useEffect(() => {
-    if (questionsReady || pagePhase !== "ready") return;
+    if (questionsReady || pagePhase === "error" || interview?.generationStatus === "failed" || interview?.generationStatus === "partial") return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-    const poll = setInterval(async () => {
+    const poll = async () => {
       try {
-        const data = await interviewService.getInterview(interviewId);
-        setInterview(data);
-        setActiveInterview(data);
-        const ready = (data as any).questionsReady === true ||
-          data.questions.length >= ((data as any).expectedQuestionCount || data.questions.length);
+        const data = await interviewService.getInterviewProgress(interviewId, controller.signal);
+        setInterview((current) => {
+          const merged = current ? { ...current, ...data, questions: data.questions } : data;
+          setActiveInterview(merged);
+          return merged;
+        });
+        const ready = computeQuestionsReady(data);
         if (ready) {
           setQuestionsReady(true);
-          clearInterval(poll);
+          return;
         }
-      } catch {
-        // Silently ignore poll errors
+      } catch (caught) {
+        if (controller.signal.aborted) return;
+        console.warn("[Interview] Progress update failed; retrying", caught);
       }
-    }, 2000);
+      timer = setTimeout(poll, 2000);
+    };
+    timer = setTimeout(poll, 500);
 
-    return () => clearInterval(poll);
-  }, [questionsReady, pagePhase, interviewId, setActiveInterview]);
+    return () => {
+      controller.abort();
+      if (timer) clearTimeout(timer);
+    };
+  }, [questionsReady, pagePhase, interviewId, interview?.generationStatus, setActiveInterview]);
 
   /* ── Callbacks for conversation engine ─────────────────── */
   const onSubmitAnswer = useCallback(
@@ -166,16 +176,27 @@ export default function InterviewSessionPage() {
 
   /* ── Conversation engine ─────────────────────────────────── */
   const questions: Question[] = interview?.questions ?? [];
+  const generationFailed = interview?.generationStatus === "failed";
+  const generationPartial = interview?.generationStatus === "partial";
   const engine = useConversationEngine({
     userName: user?.name ?? "there",
     interviewTitle: interview?.title ?? "",
     interviewType: interview?.type ?? "mixed",
     language: interview?.language ?? "english",
     questions,
+    expectedQuestionCount: interview?.expectedQuestionCount ?? questions.length,
     onSubmitAnswer,
     onComplete,
     onGenerateFeedback,
   });
+
+  useEffect(() => {
+    if (!questions.length) return;
+    void engine.tts.prefetch(questions[0].text);
+    if (questions.length > 1) {
+      void engine.tts.prefetchMany(questions.slice(1).map((question) => question.text));
+    }
+  }, [questions, engine.tts.prefetch, engine.tts.prefetchMany]);
 
   /* ── Start interview (API + engine) ───────────────────────── */
   const handleStart = async () => {
@@ -194,6 +215,16 @@ export default function InterviewSessionPage() {
     } catch {
       setError("Failed to start interview.");
       setPagePhase("error");
+    }
+  };
+
+  const handleRetryGeneration = async () => {
+    try {
+      const updated = await interviewService.retryQuestionGeneration(interviewId);
+      setInterview((current) => current ? { ...current, ...updated } : updated);
+      setQuestionsReady(false);
+    } catch {
+      setError("Could not retry question generation. Please try again shortly.");
     }
   };
 
@@ -334,14 +365,16 @@ export default function InterviewSessionPage() {
             </div>
 
             <div className="flex justify-center pt-4">
-              {!questionsReady ? (
+              {!questions.length ? (
                 <div className="text-center space-y-4">
                   <div className="flex items-center gap-3 px-6 py-4 rounded-md bg-primary/5 border border-primary/15">
-                    <LoadingSpinner size="sm" className="flex-shrink-0" />
+                    {generationFailed ? <AlertCircle className="w-5 h-5 text-danger flex-shrink-0" /> : <LoadingSpinner size="sm" className="flex-shrink-0" />}
                     <div className="text-left">
                       <p className="text-sm font-bold text-text-primary dark:text-white">Preparing your questions…</p>
                       <p className="text-xs font-medium text-text-muted opacity-70">
-                        AI is generating {(interview as any).expectedQuestionCount ?? "your"} questions in the background
+                        {generationFailed
+                          ? (interview.generationError || "The AI model endpoint is unavailable.")
+                          : `AI is generating ${interview.expectedQuestionCount ?? "your"} questions in the background`}
                       </p>
                     </div>
                   </div>
@@ -356,16 +389,30 @@ export default function InterviewSessionPage() {
                   <p className="text-xs text-text-muted opacity-60 font-medium">
                     You'll be able to begin shortly — {questions.length} question{questions.length !== 1 ? "s" : ""} ready so far
                   </p>
+                  {generationFailed && (
+                    <Button variant="outline" onClick={handleRetryGeneration}>Retry generation</Button>
+                  )}
                 </div>
               ) : (
-                <Button
-                  size="xl"
-                  className="h-14 px-12 rounded-md text-sm font-semibold uppercase tracking-wider shadow-xl shadow-primary/20 group text-white animate-pulse"
-                  onClick={handleStart}
-                >
-                  <Mic className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
-                  Begin Interview
-                </Button>
+                <div className="text-center space-y-3">
+                  <Button
+                    size="xl"
+                    className="h-14 px-12 rounded-md text-sm font-semibold uppercase tracking-wider shadow-xl shadow-primary/20 group text-white animate-pulse"
+                    onClick={handleStart}
+                  >
+                    <Mic className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
+                    Begin Interview
+                  </Button>
+                  {!questionsReady && !generationPartial && (
+                    <p className="text-xs text-text-muted">Later questions will continue preparing in the background.</p>
+                  )}
+                  {generationPartial && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-warning">Some later questions could not be prepared. You can begin now or retry.</p>
+                      <Button variant="outline" size="sm" onClick={handleRetryGeneration}>Retry missing questions</Button>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -575,6 +622,15 @@ export default function InterviewSessionPage() {
               </motion.p>
             ) : (
               <p className="text-lg text-text-muted">Preparing question...</p>
+            )}
+            {engine.tts.status === "preparing" && (
+              <p className="mt-3 text-xs font-semibold text-text-muted">Preparing audio...</p>
+            )}
+            {engine.tts.status === "retrying-fallback" && (
+              <p className="mt-3 text-xs font-semibold text-warning">Retrying with a fallback voice...</p>
+            )}
+            {engine.tts.status === "unavailable" && (
+              <p className="mt-3 text-xs font-semibold text-warning">Audio unavailable — continue with the question text.</p>
             )}
           </div>
 

@@ -1,6 +1,7 @@
 const { verifyAccessToken } = require('../utils/tokenUtils');
 const User = require('../models/User');
 const ApiError = require('../utils/ApiError');
+const { stageTimer } = require('./requestContext');
 
 /**
  * Protect routes — verify JWT access token
@@ -20,10 +21,12 @@ const protect = async (req, _res, next) => {
     }
 
     // Verify token
+    const stopAuth = stageTimer(req, 'authentication');
     const decoded = verifyAccessToken(token);
 
     // Attach user to request (exclude password)
     const user = await User.findById(decoded.id).select('-password -refreshTokens');
+    stopAuth();
     if (!user) {
       return next(ApiError.unauthorized('User no longer exists'));
     }
