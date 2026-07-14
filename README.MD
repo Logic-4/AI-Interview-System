@@ -114,7 +114,6 @@ Each answer is evaluated.
 
 #### A. Speech Processing
 - Convert audio → text
-- Add timestamps
 - Confidence score
 
 #### B. Content Evaluation
@@ -194,10 +193,28 @@ Tracks long-term growth.
 - Repeated mistakes
 - Keyword coverage
 
-**Optional Admin View:**
-- System usage
-- Common weak areas
-- Average performance by role
+The application is candidate-facing; it does not expose administrative dashboards or user-management endpoints.
+
+---
+
+## Core Product Deployment
+
+Configure these backend environment variables so password-reset messages are delivered through Resend:
+
+```env
+RESEND_API_KEY=re_...
+EMAIL_FROM=InterviewAI <noreply@your-verified-domain.com>
+CLIENT_URL=https://www.interviewsystem.app
+```
+
+After deploying the schema changes, run the one-time migration with the backend's `MONGO_URI`:
+
+```bash
+cd backend
+npm run migrate:core-product
+```
+
+It backfills evaluation states and removes retired camera/body-language and subscription fields while preserving valid answers, scores, feedback, and retries.
 
 ---
 

@@ -225,46 +225,6 @@ const getDashboard = async (req, res, next) => {
   }
 };
 
-/**
- * @desc    Get all users (admin only)
- * @route   GET /api/v1/users
- * @access  Private/Admin
- */
-const getAllUsers = async (req, res, next) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const skip = (page - 1) * limit;
-
-    const filter = {};
-    if (req.query.role) filter.role = req.query.role;
-    if (req.query.search) {
-      filter.$or = [
-        { name: { $regex: req.query.search, $options: 'i' } },
-        { email: { $regex: req.query.search, $options: 'i' } },
-      ];
-    }
-
-    const [users, total] = await Promise.all([
-      User.find(filter)
-        .select('-refreshTokens')
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit),
-      User.countDocuments(filter),
-    ]);
-
-    ApiResponse.paginated(res, users, {
-      page,
-      limit,
-      total,
-      pages: Math.ceil(total / limit),
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
 module.exports = {
   getProfile,
   updateProfile,
