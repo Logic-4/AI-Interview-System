@@ -1,74 +1,53 @@
 const logger = require('../utils/logger');
 
-/**
- * Email service placeholder
- * In production, integrate with SendGrid, Mailgun, or AWS SES
- */
-
 const sendEmail = async ({ to, subject, html, text }) => {
-  try {
-    // TODO: Integrate with email provider (SendGrid, Mailgun, etc.)
-    logger.info(`📧 Email sent to ${to}: ${subject}`);
+  const apiKey = String(process.env.RESEND_API_KEY || '').trim();
+  const from = String(process.env.EMAIL_FROM || '').trim();
+  if (!apiKey || !from) throw new Error('Resend email is not configured');
 
-    // Placeholder — log email in development
-    if (process.env.NODE_ENV === 'development') {
-      logger.debug(`Email body: ${text || html}`);
-    }
-
-    return { success: true, messageId: `dev_${Date.now()}` };
-  } catch (error) {
-    logger.error(`Email send failed: ${error.message}`);
-    throw new Error(`Failed to send email: ${error.message}`);
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ from, to: [to], subject, html, text }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = payload.message || `Resend returned HTTP ${response.status}`;
+    logger.error(`Email delivery failed: ${message}`);
+    throw new Error(message);
   }
+  logger.info(`Email delivered to ${to}: ${subject}`);
+  return { success: true, messageId: payload.id };
 };
 
 const sendVerificationEmail = async (user, verificationToken) => {
   const verificationUrl = `${process.env.CLIENT_URL}/verify-email?token=${verificationToken}`;
-
   return sendEmail({
     to: user.email,
-    subject: 'InterviewAI Pro — Verify Your Email',
-    html: `
-      <h1>Welcome to InterviewAI Pro!</h1>
-      <p>Hi ${user.name},</p>
-      <p>Please verify your email by clicking the link below:</p>
-      <a href="${verificationUrl}" style="padding: 10px 20px; background: #4F46E5; color: white; text-decoration: none; border-radius: 5px;">Verify Email</a>
-      <p>This link expires in 24 hours.</p>
-    `,
+    subject: 'InterviewAI - Verify Your Email',
+    html: `<h1>Welcome to InterviewAI!</h1><p>Hi ${user.name},</p><p>Please verify your email:</p><p><a href="${verificationUrl}">Verify Email</a></p>`,
     text: `Verify your email: ${verificationUrl}`,
   });
 };
 
-const sendInterviewCompletionEmail = async (user, interview, score) => {
-  return sendEmail({
-    to: user.email,
-    subject: `Interview Complete — Score: ${score}/100`,
-    html: `
-      <h1>Interview Results</h1>
-      <p>Hi ${user.name},</p>
-      <p>Your ${interview.type} interview for ${interview.domain} has been completed.</p>
-      <h2>Overall Score: ${score}/100</h2>
-      <p>Log in to see your detailed feedback and recommendations.</p>
-    `,
-    text: `Your interview score: ${score}/100. Log in to see detailed feedback.`,
-  });
-};
+const sendInterviewCompletionEmail = async (user, interview, score) => sendEmail({
+  to: user.email,
+  subject: `Interview Complete - Score: ${score}/100`,
+  html: `<h1>Interview Results</h1><p>Hi ${user.name},</p><p>Your ${interview.type} interview is complete.</p><h2>Overall Score: ${score}/100</h2>`,
+  text: `Your interview score: ${score}/100. Log in to see detailed feedback.`,
+});
 
 const sendPasswordResetEmail = async (user, resetToken) => {
-  const resetUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
-
+  const clientUrl = String(process.env.CLIENT_URL || 'http://localhost:3000').split(',')[0].trim();
+  const resetUrl = `${clientUrl}/reset-password/${resetToken}`;
   return sendEmail({
     to: user.email,
-    subject: 'InterviewAI — Password Reset Request',
-    html: `
-      <h1>Password Reset</h1>
-      <p>Hi ${user.name},</p>
-      <p>You requested a password reset. Click the link below to set a new password:</p>
-      <a href="${resetUrl}" style="display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:8px;font-weight:bold;">Reset Password</a>
-      <p style="margin-top:16px;color:#666;">This link expires in 1 hour. If you didn't request this, ignore this email.</p>
-      <p style="margin-top:24px;font-size:12px;color:#999;">Reset URL: ${resetUrl}</p>
-    `,
-    text: `Reset your password: ${resetUrl}\nThis link expires in 1 hour.`,
+    subject: 'InterviewAI - Password Reset Request',
+    html: `<h1>Password Reset</h1><p>Hi ${user.name},</p><p>You requested a password reset.</p><p><a href="${resetUrl}">Reset Password</a></p><p>This link expires in one hour.</p>`,
+    text: `Reset your password: ${resetUrl}\nThis link expires in one hour.`,
   });
 };
 

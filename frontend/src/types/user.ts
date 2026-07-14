@@ -10,11 +10,6 @@ export interface User {
   targetRole?: string;
   experienceLevel?: 'junior' | 'mid' | 'senior' | 'lead' | 'principal' | '';
   interviewCount?: number;
-  subscription?: {
-    plan: 'free' | 'pro' | 'enterprise';
-    status: 'active' | 'inactive' | 'cancelled';
-    expiresAt?: string;
-  };
   lastLogin?: string;
   createdAt?: string;
   updatedAt?: string;

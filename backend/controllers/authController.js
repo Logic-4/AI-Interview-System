@@ -305,7 +305,6 @@ const forgotPassword = async (req, res, next) => {
       user.resetPasswordExpires = undefined;
       await user.save({ validateBeforeSave: false });
       logger.error(`Password reset email failed: ${emailError.message}`);
-      return next(ApiError.internal('Failed to send reset email. Please try again.'));
     }
 
     ApiResponse.success(res, null, 'If an account exists with that email, a reset link has been sent.');

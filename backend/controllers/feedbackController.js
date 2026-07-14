@@ -2,7 +2,7 @@ const Feedback = require('../models/Feedback');
 const Interview = require('../models/Interview');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
-const { generateComprehensiveFeedback } = require('../services/gemmaService');
+const { generateComprehensiveFeedback, isPlaceholderAnswer } = require('../services/gemmaService');
 const logger = require('../utils/logger');
 
 /**
@@ -80,6 +80,21 @@ const generateFeedback = async (req, res, next) => {
       return next(ApiError.notFound('Completed interview not found'));
     }
 
+    const substantiveAnswers = (interview.questions || []).filter((question) =>
+      question.isAnswered && question.userAnswer && question.userAnswer.trim() && !isPlaceholderAnswer(question.userAnswer)
+    );
+    const incompleteEvaluations = substantiveAnswers.filter((question) =>
+      typeof question.score !== 'number'
+    );
+    if (!substantiveAnswers.length) {
+      return next(ApiError.badRequest('No evaluated answers are available for feedback'));
+    }
+    if (incompleteEvaluations.length) {
+      return next(new ApiError(409,
+        `${incompleteEvaluations.length} answer evaluation(s) must be retried before generating feedback`
+      ));
+    }
+
     // Check if feedback already exists
     const existingFeedback = await Feedback.findOne({ interview: interview._id });
 
@@ -116,7 +131,6 @@ const generateFeedback = async (req, res, next) => {
       improvements: aiFeedback.improvements,
       detailedFeedback: aiFeedback.detailedFeedback,
       recommendations: aiFeedback.recommendations,
-      visualMetrics: interview.visualMetrics || undefined,
       aiModel: 'gemma-3-technical-interviewer',
     });
 
@@ -143,27 +157,29 @@ const getUserProgress = async (req, res, next) => {
     const days = periodMap[period] || 30;
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-    // Aggregate progress data
-    const progress = await Feedback.aggregate([
-      {
-        $match: {
-          user: userId,
-          createdAt: { $gte: startDate },
-        },
-      },
-      { $sort: { createdAt: 1 } },
-      {
-        $project: {
-          overallScore: 1,
-          'categories.communication.score': 1,
-          'categories.technicalAccuracy.score': 1,
-          'categories.problemSolving.score': 1,
-          'categories.codeQuality.score': 1,
-          'categories.confidence.score': 1,
-          createdAt: 1,
-        },
-      },
-    ]);
+    // Overall progress is authoritative from completed interviews. Category detail
+    // is merged from comprehensive feedback when it is available.
+    const scoredInterviews = await Interview.find({
+      user: userId,
+      status: 'completed',
+      overallScore: { $ne: null },
+      completedAt: { $gte: startDate },
+    })
+      .sort({ completedAt: 1 })
+      .select('overallScore completedAt createdAt')
+      .lean();
+    const timelineFeedback = await Feedback.find({
+      interview: { $in: scoredInterviews.map((item) => item._id) },
+    }).select('interview categories').lean();
+    const timelineFeedbackMap = new Map(
+      timelineFeedback.map((item) => [String(item.interview), item.categories])
+    );
+    const progress = scoredInterviews.map((item) => ({
+      _id: item._id,
+      overallScore: item.overallScore,
+      categories: timelineFeedbackMap.get(String(item._id)) || {},
+      createdAt: item.completedAt || item.createdAt,
+    }));
 
     // Calculate averages per category (all-time)
     const categoryAverages = await Feedback.aggregate([
@@ -171,15 +187,18 @@ const getUserProgress = async (req, res, next) => {
       {
         $group: {
           _id: null,
-          avgOverall: { $avg: '$overallScore' },
           avgCommunication: { $avg: '$categories.communication.score' },
           avgTechnical: { $avg: '$categories.technicalAccuracy.score' },
           avgProblemSolving: { $avg: '$categories.problemSolving.score' },
           avgCodeQuality: { $avg: '$categories.codeQuality.score' },
           avgConfidence: { $avg: '$categories.confidence.score' },
-          count: { $sum: 1 },
         },
       },
+    ]);
+
+    const overallAverages = await Interview.aggregate([
+      { $match: { user: userId, status: 'completed', overallScore: { $ne: null } } },
+      { $group: { _id: null, avgOverall: { $avg: '$overallScore' }, count: { $sum: 1 } } },
     ]);
 
     // Recent feedback insights with interview context
@@ -203,19 +222,20 @@ const getUserProgress = async (req, res, next) => {
     }));
 
     const averages = categoryAverages[0] || {};
+    const overallStats = overallAverages[0] || {};
 
     ApiResponse.success(res, {
       period,
       timeline: progress,
       averages: {
-        overall: Math.round(averages.avgOverall || 0),
+        overall: Math.round(overallStats.avgOverall || 0),
         communication: Math.round(averages.avgCommunication || 0),
         technicalAccuracy: Math.round(averages.avgTechnical || 0),
         problemSolving: Math.round(averages.avgProblemSolving || 0),
         codeQuality: Math.round(averages.avgCodeQuality || 0),
         confidence: Math.round(averages.avgConfidence || 0),
       },
-      totalInterviewsReviewed: averages.count || 0,
+      totalInterviewsReviewed: overallStats.count || 0,
       recentInsights,
       domainActivity,
     });

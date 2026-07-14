@@ -87,7 +87,7 @@ export function Capabilities() {
             A complete <span className="text-gradient">interview studio</span>, built in
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Six production-grade systems working in concert — from resume parsing to body language, voice, and longitudinal analytics.
+            Six production-grade systems working in concert — from resume parsing and bilingual voice to AI evaluation and longitudinal analytics.
           </p>
         </motion.div>
 

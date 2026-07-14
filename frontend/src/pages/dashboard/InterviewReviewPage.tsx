@@ -48,7 +48,7 @@ export default function InterviewReviewPage() {
   const [retryMode, setRetryMode] = useState<string | null>(null);
   const [retryAnswer, setRetryAnswer] = useState('');
   const [retryLoading, setRetryLoading] = useState(false);
-  const [retryResult, setRetryResult] = useState<{ score: number; feedback: string; strengths: string[]; improvements: string[] } | null>(null);
+  const [retryResult, setRetryResult] = useState<{ score: number | null; feedback: string; strengths: string[]; improvements: string[] } | null>(null);
   const [expandedRetry, setExpandedRetry] = useState<string | null>(null);
 
   useEffect(() => {
@@ -81,7 +81,7 @@ export default function InterviewReviewPage() {
       const result = await interviewService.retryEvaluate(interviewId, q._id, retryAnswer);
       setRetryResult(result.evaluation);
     } catch {
-      setRetryResult({ score: 0, feedback: 'Evaluation failed. Please try again.', strengths: [], improvements: [] });
+      setRetryResult({ score: null, feedback: 'Evaluation failed. No score was recorded. Please try again.', strengths: [], improvements: [] });
     } finally {
       setRetryLoading(false);
     }
@@ -316,7 +316,7 @@ export default function InterviewReviewPage() {
                       "text-sm font-bold",
                       (retryResult.score ?? 0) >= 70 ? "text-success" : "text-warning"
                     )}>
-                      {retryResult.score}/100
+                      {retryResult.score === null ? 'Not scored' : `${retryResult.score}/100`}
                     </span>
                   </div>
                   {retryResult.feedback && (

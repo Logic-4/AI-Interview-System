@@ -1,5 +1,6 @@
 export type QuestionDifficulty = 'easy' | 'medium' | 'hard';
 export type QuestionCategory = string;
+export type EvaluationStatus = 'pending' | 'completed' | 'failed' | 'invalid';
 
 export interface RetryAttempt {
   answer: string;
@@ -21,6 +22,7 @@ export interface Question {
   userAnswer?: string;
   audioUrl?: string;
   score: number | null;
+  evaluationStatus: EvaluationStatus;
   aiFeedback?: string;
   timeSpent: number;
   order: number;

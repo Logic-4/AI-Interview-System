@@ -2,12 +2,12 @@ import { motion } from "framer-motion";
 import { Mic, Zap, BarChart3, Target, Brain, ShieldCheck } from "lucide-react";
 
 const features = [
-  { icon: Mic, title: "Live AI interviewer", desc: "Voice or text conversations with an AI that adapts to your seniority, role, and target company." },
-  { icon: Zap, title: "Instant feedback", desc: "Detailed breakdowns on content, delivery, body language, and structure right after each answer." },
-  { icon: BarChart3, title: "Performance analytics", desc: "Track progress over time with data-driven insights and benchmarks against industry standards." },
+  { icon: Mic, title: "Live AI interviewer", desc: "Voice or text conversations with an AI that adapts to your seniority, target role, resume, and job description." },
+  { icon: Zap, title: "Instant feedback", desc: "Detailed breakdowns on answer quality, clarity, relevance, confidence, and structure." },
+  { icon: BarChart3, title: "Performance analytics", desc: "Track your scores, skill breakdowns, and personal progress across completed interviews." },
   { icon: Target, title: "Role-specific paths", desc: "Tailored question banks for engineering, product, design, sales, and leadership tracks." },
-  { icon: Brain, title: "Memory of you", desc: "Remembers your goals, weak spots, and stories so every session feels personal and progressive." },
-  { icon: ShieldCheck, title: "Privacy-first", desc: "Your recordings stay yours. End-to-end encryption with one-click deletion, always." },
+  { icon: Brain, title: "Resume-aware practice", desc: "Use your experience, skills, and job description to generate questions grounded in your background." },
+  { icon: ShieldCheck, title: "Privacy-first", desc: "Authenticated private access with controls to permanently delete interviews, recordings, or your account." },
 ];
 
 export function Features() {

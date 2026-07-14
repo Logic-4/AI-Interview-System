@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import Dropdown from '../Dropdown';
 import { Menu, Search, XCircle, Sun, Moon, Monitor, User, LogOut } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
+import authService from '../../services/authService';
 
 const Header = () => {
     const location = useLocation();
@@ -39,9 +40,13 @@ const Header = () => {
     const dispatch = useDispatch();
     const { t } = useTranslation();
 
-    const handleLogout = () => {
-        logout();
-        navigate('/login');
+    const handleLogout = async () => {
+        try {
+            await authService.logout();
+        } finally {
+            logout();
+            navigate('/login');
+        }
     };
 
     return (

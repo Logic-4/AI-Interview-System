@@ -4,14 +4,19 @@ const User = require('../models/User');
 const Feedback = require('../models/Feedback');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
-const { parseJobDescription, generateInterviewQuestions, processInterviewTurn } = require('../services/gemmaService');
+const { parseJobDescription, generateInterviewQuestions, processInterviewTurn, isPlaceholderAnswer } = require('../services/gemmaService');
 const { transcribeAudio, synthesizeSpeech } = require('../services/somaliSpeechService');
-const { uploadAudio } = require('../services/blobService');
+const { uploadAudio, deleteBlobUrls } = require('../services/blobService');
 const logger = require('../utils/logger');
 const { stageTimer } = require('../middleware/requestContext');
 const {
   ensureInterviewerPromptInHistory,
 } = require('../utils/questionHelpers');
+const { normalizeEvaluation, calculateOverallScore } = require('../utils/evaluation');
+
+function escapeRegex(value = '') {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 /* ─── Normalize interview difficulty → question difficulty ── */
 const DIFFICULTY_MAP = {
@@ -362,6 +367,7 @@ const getInterviews = async (req, res, next) => {
     if (req.query.type) filter.type = req.query.type;
     if (req.query.domain) filter.domain = req.query.domain;
     if (req.query.difficulty) filter.difficulty = req.query.difficulty;
+    if (req.query.search) filter.title = { $regex: escapeRegex(req.query.search.trim()), $options: 'i' };
 
     const [interviews, total] = await Promise.all([
       Interview.find(filter)
@@ -582,12 +588,12 @@ const submitAnswer = async (req, res, next) => {
     });
 
     // Process interview turn dynamically (evaluate + next question)
-    let evaluation = { score: 0, feedback: '', strengths: [], improvements: [], suggestedAnswer: '' };
+    let evaluation = { score: null, feedback: '', strengths: [], improvements: [], suggestedAnswer: '', evaluationStatus: 'pending' };
     let nextInterviewerResponse = "Thank you. Let's move on to the next topic.";
     let isFollowUp = false;
     let answeredCandidateQuestion = false;
 
-    if (transcribedAnswer) {
+    if (transcribedAnswer && !isPlaceholderAnswer(transcribedAnswer)) {
       try {
         const turnResult = await processInterviewTurn(
           interview.conversationHistory,
@@ -609,13 +615,7 @@ const submitAnswer = async (req, res, next) => {
         );
 
         if (turnResult.evaluation) {
-          evaluation = {
-            score: turnResult.evaluation.score ?? 0,
-            feedback: turnResult.evaluation.feedback || '',
-            strengths: turnResult.evaluation.strengths || [],
-            improvements: turnResult.evaluation.improvements || [],
-            suggestedAnswer: turnResult.evaluation.suggestedAnswer || '',
-          };
+          evaluation = normalizeEvaluation(turnResult.evaluation);
         }
 
         if (turnResult.nextInterviewerResponse) {
@@ -626,8 +626,12 @@ const submitAnswer = async (req, res, next) => {
 
       } catch (aiError) {
         logger.warn(`AI turn processing failed: ${aiError.message}`);
-        evaluation.feedback = 'AI evaluation unavailable. Answer recorded for manual review.';
+        evaluation.feedback = 'AI evaluation unavailable. Answer recorded for retry.';
+        evaluation.evaluationStatus = 'failed';
       }
+    } else {
+      evaluation.feedback = 'No substantive answer was provided.';
+      evaluation.evaluationStatus = 'invalid';
     }
 
     // Persist answer text on every turn (including follow-ups); score only when topic completes.
@@ -640,9 +644,14 @@ const submitAnswer = async (req, res, next) => {
     question.timeSpent = (question.timeSpent || 0) + (timeSpent || 0);
 
     if (!isFollowUp) {
-      question.score = typeof evaluation.score === 'number' ? evaluation.score : null;
+      question.score = evaluation.evaluationStatus === 'completed' && typeof evaluation.score === 'number'
+        ? evaluation.score
+        : null;
       question.aiFeedback = evaluation.feedback;
       question.isAnswered = true;
+      question.evaluationStatus = evaluation.evaluationStatus;
+    } else {
+      question.evaluationStatus = 'pending';
     }
     await question.save();
 
@@ -711,17 +720,10 @@ const completeInterview = async (req, res, next) => {
       return next(ApiError.badRequest(`Cannot complete interview with status '${interview.status}'`));
     }
 
-    const answeredQuestions = interview.questions.filter((q) => q.isAnswered && q.score !== null);
-    const overallScore = answeredQuestions.length > 0
-      ? Math.round(answeredQuestions.reduce((sum, q) => sum + q.score, 0) / answeredQuestions.length)
-      : 0;
+    const overallScore = calculateOverallScore(interview.questions);
 
     interview.status = 'completed';
     interview.overallScore = overallScore;
-
-    if (req.body.visualMetrics) {
-      interview.visualMetrics = req.body.visualMetrics;
-    }
 
     await interview.save();
 
@@ -749,6 +751,9 @@ const deleteInterview = async (req, res, next) => {
       return next(ApiError.notFound('Interview not found'));
     }
 
+    const audioUrls = await Question.find({ interview: interview._id }).distinct('audioUrl');
+    await deleteBlobUrls([interview.recordingUrl, ...audioUrls]);
+
     await Promise.all([
       Question.deleteMany({ interview: interview._id }),
       require('../models/Feedback').deleteMany({ interview: interview._id }),
@@ -758,6 +763,104 @@ const deleteInterview = async (req, res, next) => {
 
     logger.info(`Interview deleted: ${interview._id} by user ${req.user._id}`);
     ApiResponse.success(res, null, 'Interview and all associated data deleted');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Retry evaluation of the answer already stored for a question
+ * @route   POST /api/v1/interviews/:interviewId/questions/:questionId/evaluate
+ * @access  Private
+ */
+const reevaluateAnswer = async (req, res, next) => {
+  try {
+    const { interviewId, questionId } = req.params;
+    const interview = await Interview.findOne({ _id: interviewId, user: req.user._id });
+    if (!interview) return next(ApiError.notFound('Interview not found'));
+
+    const question = await Question.findOne({ _id: questionId, interview: interviewId });
+    if (!question) return next(ApiError.notFound('Question not found'));
+    if (!question.userAnswer || !question.userAnswer.trim() || isPlaceholderAnswer(question.userAnswer)) {
+      question.evaluationStatus = 'invalid';
+      question.score = null;
+      await question.save();
+      return next(ApiError.badRequest('This question has no substantive answer to evaluate'));
+    }
+
+    let turnResult;
+    try {
+      turnResult = await processInterviewTurn(
+        [
+          { role: 'interviewer', content: question.text },
+          { role: 'candidate', content: question.userAnswer },
+        ],
+        interview.domain,
+        interview.jobRole,
+        interview.language,
+        interview.type,
+        {
+          difficulty: interview.difficulty || 'mid',
+          currentQuestion: {
+            text: question.text,
+            expectedAnswer: question.expectedAnswer || '',
+            category: question.category || 'general',
+            difficulty: question.difficulty || interview.difficulty || 'mid',
+          },
+          roleProfile: interview.roleProfile || null,
+          candidateAnswer: question.userAnswer,
+        }
+      );
+    } catch (error) {
+      question.evaluationStatus = 'failed';
+      question.score = null;
+      question.aiFeedback = 'AI evaluation is still unavailable. Please retry shortly.';
+      await question.save();
+      return next(ApiError.serviceUnavailable('AI evaluation is unavailable. Please retry shortly.'));
+    }
+
+    const evaluation = turnResult?.evaluation || {};
+    if (typeof evaluation.score !== 'number') {
+      question.evaluationStatus = 'failed';
+      question.score = null;
+      question.aiFeedback = evaluation.feedback || 'The model did not return a valid score.';
+      await question.save();
+      return next(ApiError.serviceUnavailable('The evaluation did not return a valid score. Please retry.'));
+    }
+
+    question.score = evaluation.score;
+    question.aiFeedback = evaluation.feedback || '';
+    question.evaluationStatus = 'completed';
+    question.isAnswered = true;
+    await question.save();
+
+    if (interview.status === 'completed') {
+      const scoredQuestions = await Question.find({
+        interview: interview._id,
+        isAnswered: true,
+        evaluationStatus: 'completed',
+        score: { $ne: null },
+      }).select('score');
+      interview.overallScore = calculateOverallScore(scoredQuestions.map((item) => ({
+        isAnswered: true,
+        evaluationStatus: 'completed',
+        score: item.score,
+      })));
+      await interview.save();
+      await Feedback.deleteMany({ interview: interview._id });
+    }
+
+    ApiResponse.success(res, {
+      question,
+      evaluation: {
+        score: evaluation.score,
+        feedback: evaluation.feedback || '',
+        strengths: evaluation.strengths || [],
+        improvements: evaluation.improvements || [],
+        suggestedAnswer: evaluation.suggestedAnswer || '',
+        evaluationStatus: 'completed',
+      },
+    }, 'Answer evaluated');
   } catch (error) {
     next(error);
   }
@@ -819,7 +922,7 @@ const retryEvaluate = async (req, res, next) => {
       }
     );
 
-    const evaluation = turnResult.evaluation || { score: 0, feedback: '', strengths: [], improvements: [], suggestedAnswer: '' };
+    const evaluation = turnResult.evaluation || { score: null, feedback: '', strengths: [], improvements: [], suggestedAnswer: '' };
 
     question.retryAnswers.push({
       answer: retryAnswer,
@@ -857,6 +960,9 @@ const resetInterview = async (req, res, next) => {
 
     await Feedback.deleteMany({ interview: interview._id });
 
+    const audioUrls = await Question.find({ interview: interview._id }).distinct('audioUrl');
+    await deleteBlobUrls([interview.recordingUrl, ...audioUrls]);
+
     await Question.updateMany(
       { interview: interview._id },
       {
@@ -864,6 +970,7 @@ const resetInterview = async (req, res, next) => {
           userAnswer: '',
           audioUrl: '',
           score: null,
+          evaluationStatus: 'pending',
           aiFeedback: '',
           timeSpent: 0,
           isAnswered: false,
@@ -893,6 +1000,7 @@ const resetInterview = async (req, res, next) => {
 
     interview.status = 'scheduled';
     interview.overallScore = null;
+    interview.recordingUrl = '';
     interview.startedAt = undefined;
     interview.completedAt = undefined;
     interview.conversationHistory = conversationHistory;
@@ -922,5 +1030,6 @@ module.exports = {
   completeInterview,
   deleteInterview,
   retryEvaluate,
+  reevaluateAnswer,
   resetInterview,
 };

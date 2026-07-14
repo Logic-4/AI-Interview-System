@@ -1,4 +1,4 @@
-const { put } = require('@vercel/blob');
+const { put, del } = require('@vercel/blob');
 const logger = require('../utils/logger');
 
 const uploadRecording = async (fileBuffer, userId, interviewId) => {
@@ -47,8 +47,23 @@ const uploadAvatar = async (fileBuffer, userId) => {
   };
 };
 
+const deleteBlobUrls = async (urls = []) => {
+  const uniqueUrls = [...new Set(urls.filter((url) => typeof url === 'string' && url.trim()))];
+  if (!uniqueUrls.length) return { deleted: 0, failed: [] };
+
+  const results = await Promise.allSettled(uniqueUrls.map((url) => del(url)));
+  const failed = results
+    .map((result, index) => ({ result, url: uniqueUrls[index] }))
+    .filter(({ result }) => result.status === 'rejected')
+    .map(({ result, url }) => ({ url, error: result.reason?.message || String(result.reason) }));
+
+  if (failed.length) logger.warn(`Failed to delete ${failed.length} blob(s): ${JSON.stringify(failed)}`);
+  return { deleted: uniqueUrls.length - failed.length, failed };
+};
+
 module.exports = {
   uploadRecording,
   uploadAudio,
   uploadAvatar,
+  deleteBlobUrls,
 };

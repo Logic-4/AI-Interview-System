@@ -1,2 +1,0 @@
-// paymentService
-export {};

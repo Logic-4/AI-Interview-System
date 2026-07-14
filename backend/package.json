@@ -11,6 +11,7 @@
     "setup:somali-speech": "node ../scripts/setup-somali-speech.js",
     "test": "node --test test/*.test.js",
     "benchmark:pipeline": "node scripts/benchmarkPipeline.js",
+    "migrate:core-product": "node scripts/migrateCoreProduct.js",
     "lint": "eslint ."
   },
   "keywords": [

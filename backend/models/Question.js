@@ -40,6 +40,12 @@ const questionSchema = new mongoose.Schema(
       max: 100,
       default: null,
     },
+    evaluationStatus: {
+      type: String,
+      enum: ['pending', 'completed', 'failed', 'invalid'],
+      default: 'pending',
+      index: true,
+    },
     aiFeedback: {
       type: String,
       default: '',

@@ -22,11 +22,6 @@ export interface Feedback {
   detailedFeedback: string;
   recommendations: string[];
   aiModel?: string;
-  visualMetrics?: {
-    eyeContactScore: number;
-    postureScore: number;
-    expressionMetrics: Record<string, number>;
-  };
   createdAt: string;
   updatedAt: string;
 }

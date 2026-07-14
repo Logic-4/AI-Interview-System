@@ -1,9 +1,11 @@
 const User = require('../models/User');
 const Interview = require('../models/Interview');
 const Feedback = require('../models/Feedback');
+const Question = require('../models/Question');
+const Session = require('../models/Session');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
-const { uploadAvatar } = require('../services/blobService');
+const { uploadAvatar, deleteBlobUrls } = require('../services/blobService');
 
 /**
  * @desc    Get user profile
@@ -71,6 +73,71 @@ const updateAvatar = async (req, res, next) => {
   }
 };
 
+const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return next(ApiError.badRequest('Current password and new password are required'));
+    }
+    if (String(newPassword).length < 8) {
+      return next(ApiError.badRequest('New password must be at least 8 characters'));
+    }
+
+    const user = await User.findById(req.user._id).select('+password');
+    if (!user) return next(ApiError.notFound('User not found'));
+    if (user.provider !== 'local' || !user.password) {
+      return next(ApiError.badRequest('Password changes are only available for password-based accounts'));
+    }
+    if (!(await user.comparePassword(currentPassword))) {
+      return next(ApiError.unauthorized('Current password is incorrect'));
+    }
+
+    user.password = newPassword;
+    user.refreshTokens = [];
+    await user.save();
+    ApiResponse.success(res, null, 'Password changed successfully. Please sign in again.');
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteAccount = async (req, res, next) => {
+  try {
+    if (req.body.confirm !== 'DELETE') {
+      return next(ApiError.badRequest('Type DELETE to confirm permanent account deletion'));
+    }
+
+    const user = await User.findById(req.user._id).select('+password');
+    if (!user) return next(ApiError.notFound('User not found'));
+    if (user.provider === 'local') {
+      if (!req.body.currentPassword || !(await user.comparePassword(req.body.currentPassword))) {
+        return next(ApiError.unauthorized('Current password is required to delete this account'));
+      }
+    }
+
+    const interviews = await Interview.find({ user: user._id, isDeleted: { $in: [true, false] } }).select('_id recordingUrl').lean();
+    const interviewIds = interviews.map((item) => item._id);
+    const audioUrls = await Question.find({ interview: { $in: interviewIds } }).distinct('audioUrl');
+    const blobResult = await deleteBlobUrls([
+      user.avatar,
+      ...interviews.map((item) => item.recordingUrl),
+      ...audioUrls,
+    ]);
+
+    await Promise.all([
+      Question.deleteMany({ interview: { $in: interviewIds } }),
+      Feedback.deleteMany({ user: user._id }),
+      Session.deleteMany({ user: user._id }),
+      Interview.deleteMany({ user: user._id }),
+    ]);
+    await User.deleteOne({ _id: user._id });
+
+    ApiResponse.success(res, { blobCleanupFailures: blobResult.failed.length }, 'Account permanently deleted');
+  } catch (error) {
+    next(error);
+  }
+};
+
 /**
  * @desc    Get user dashboard stats
  * @route   GET /api/v1/users/dashboard
@@ -94,15 +161,15 @@ const getDashboard = async (req, res, next) => {
     ]);
 
     // Get average score
-    const scoreAgg = await Feedback.aggregate([
-      { $match: { user: userId } },
+    const scoreAgg = await Interview.aggregate([
+      { $match: { user: userId, status: 'completed', overallScore: { $ne: null } } },
       {
         $group: {
           _id: null,
           averageScore: { $avg: '$overallScore' },
           highestScore: { $max: '$overallScore' },
           lowestScore: { $min: '$overallScore' },
-          totalFeedbacks: { $sum: 1 },
+          totalScored: { $sum: 1 },
         },
       },
     ]);
@@ -114,13 +181,28 @@ const getDashboard = async (req, res, next) => {
       .select('title type domain difficulty status overallScore createdAt');
 
     // Get score trend (last 10 completed interviews)
-    const scoreTrend = await Feedback.find({ user: userId })
+    const scoredTrend = await Interview.find({
+      user: userId,
+      status: 'completed',
+      overallScore: { $ne: null },
+    })
       .sort({ createdAt: -1 })
       .limit(10)
-      .select('overallScore categories createdAt')
+      .select('overallScore completedAt createdAt')
       .lean();
 
-    const stats = scoreAgg[0] || { averageScore: 0, highestScore: 0, lowestScore: 0, totalFeedbacks: 0 };
+    const trendFeedback = await Feedback.find({ interview: { $in: scoredTrend.map((item) => item._id) } })
+      .select('interview categories')
+      .lean();
+    const feedbackByInterview = new Map(trendFeedback.map((item) => [String(item.interview), item]));
+    const scoreTrend = scoredTrend.map((item) => ({
+      _id: item._id,
+      overallScore: item.overallScore,
+      categories: feedbackByInterview.get(String(item._id))?.categories,
+      createdAt: item.completedAt || item.createdAt,
+    }));
+
+    const stats = scoreAgg[0] || { averageScore: 0, highestScore: 0, lowestScore: 0, totalScored: 0 };
 
     ApiResponse.success(res, {
       overview: {
@@ -133,7 +215,7 @@ const getDashboard = async (req, res, next) => {
         average: Math.round(stats.averageScore || 0),
         highest: stats.highestScore || 0,
         lowest: stats.lowestScore || 0,
-        totalReviewed: stats.totalFeedbacks,
+        totalReviewed: stats.totalScored,
       },
       recentInterviews,
       scoreTrend: scoreTrend.reverse(),
@@ -187,6 +269,7 @@ module.exports = {
   getProfile,
   updateProfile,
   updateAvatar,
+  changePassword,
+  deleteAccount,
   getDashboard,
-  getAllUsers,
 };

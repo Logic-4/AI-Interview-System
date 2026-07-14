@@ -134,10 +134,6 @@ const interviewSchema = new mongoose.Schema(
         },
       },
     ],
-    visualMetrics: {
-      type: mongoose.Schema.Types.Mixed,
-      default: null,
-    },
     questionsReady: {
       type: Boolean,
       default: false,

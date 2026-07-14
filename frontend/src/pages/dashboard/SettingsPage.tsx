@@ -1,18 +1,19 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { IRootState } from '../../store';
 import { setPageTitle } from '../../store/themeConfigSlice';
 import { User, Lock } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import userService from '../../services/userService';
-import api from '../../services/api';
+import authService from '../../services/authService';
 import toast from 'react-hot-toast';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 
 const SettingsPage = () => {
     const dispatch = useDispatch();
-    const { user, setUser } = useAuthStore();
+    const navigate = useNavigate();
+    const { user, setUser, logout } = useAuthStore();
     const [tabs, setTabs] = useState<string>('profile');
 
     // Profile state
@@ -51,6 +52,9 @@ const SettingsPage = () => {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [changingPw, setChangingPw] = useState(false);
+    const [deleteConfirmation, setDeleteConfirmation] = useState('');
+    const [deletePassword, setDeletePassword] = useState('');
+    const [deletingAccount, setDeletingAccount] = useState(false);
 
     // RunPod configuration is managed statically via environment variables (.env)
 
@@ -102,15 +106,34 @@ const SettingsPage = () => {
         }
         setChangingPw(true);
         try {
-            await api.put('/users/profile', { currentPassword, newPassword });
+            await userService.changePassword(currentPassword, newPassword);
             toast.success('Password changed successfully.');
-            setCurrentPassword('');
-            setNewPassword('');
-            setConfirmPassword('');
+            await authService.logout().catch(() => undefined);
+            logout();
+            navigate('/login', { replace: true });
         } catch (err: any) {
             toast.error(err.response?.data?.message || 'Failed to change password.');
         } finally {
             setChangingPw(false);
+        }
+    };
+
+    const handleDeleteAccount = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (deleteConfirmation !== 'DELETE') {
+            toast.error('Type DELETE to confirm permanent account deletion.');
+            return;
+        }
+        setDeletingAccount(true);
+        try {
+            await userService.deleteAccount(deleteConfirmation, deletePassword || undefined);
+            logout();
+            navigate('/', { replace: true });
+            toast.success('Your account and interview data were permanently deleted.');
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || 'Failed to delete account.');
+        } finally {
+            setDeletingAccount(false);
         }
     };
 
@@ -315,6 +338,19 @@ const SettingsPage = () => {
                                         {changingPw ? 'Updating...' : 'Change Password'}
                                     </button>
                                 </div>
+                            </div>
+                        </form>
+                        <form onSubmit={handleDeleteAccount} className="mt-8 pt-6 border-t border-danger/20 max-w-xl">
+                            <h6 className="text-lg font-bold text-danger mb-2">Delete Account</h6>
+                            <p className="text-sm text-text-muted mb-4">
+                                Permanently deletes your interviews, answers, reports, recordings, and profile. This cannot be undone.
+                            </p>
+                            <div className="space-y-4">
+                                <input type="text" value={deleteConfirmation} onChange={(e) => setDeleteConfirmation(e.target.value)} className="form-input" placeholder="Type DELETE to confirm" />
+                                <input type="password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} className="form-input" placeholder="Current password (password accounts)" />
+                                <button type="submit" disabled={deletingAccount || deleteConfirmation !== 'DELETE'} className="btn btn-danger">
+                                    {deletingAccount ? 'Deleting...' : 'Permanently Delete Account'}
+                                </button>
                             </div>
                         </form>
                     </div>

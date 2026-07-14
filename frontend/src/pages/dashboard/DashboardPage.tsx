@@ -261,12 +261,12 @@ const DashboardPage = () => {
                         </div>
                     </div>
                     <div className="border-t border-[#E8ECF2] dark:border-white-light/10 pt-5 mt-5">
-                        <h5 className="font-bold text-sm text-[#1E2433] dark:text-white mb-2 uppercase tracking-wider">Practice Plan</h5>
+                        <h5 className="font-bold text-sm text-[#1E2433] dark:text-white mb-2 uppercase tracking-wider">Performance Insights</h5>
                         <p className="text-xs text-[#697386] dark:text-white-dark leading-relaxed font-medium">
                             Structured AI evaluations pinpoint weaknesses across Communication, Problem Solving, and Technical accuracy.
                         </p>
-                        <Link to="/study-plan" className="btn btn-outline-secondary btn-sm mt-4 w-full h-10 flex items-center justify-center">
-                            View Study Plan
+                        <Link to="/analytics" className="btn btn-outline-secondary btn-sm mt-4 w-full h-10 flex items-center justify-center">
+                            View Analytics
                         </Link>
                     </div>
                 </div>

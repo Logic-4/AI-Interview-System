@@ -5,7 +5,7 @@ import { Check } from "lucide-react";
 const steps = [
   { n: "01", title: "Pick your role", desc: "Tell us the company, level, and type of interview you're preparing for." },
   { n: "02", title: "Practice live", desc: "Speak naturally with an AI that asks follow-ups and probes your reasoning." },
-  { n: "03", title: "Review & improve", desc: "Get a scorecard with timestamps, transcripts, and concrete next steps." },
+  { n: "03", title: "Review & improve", desc: "Review each answer, time spent, score, detailed feedback, and concrete next steps." },
 ];
 
 const DURATION = 2.4; // seconds for full line sweep

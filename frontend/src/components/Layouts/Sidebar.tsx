@@ -11,9 +11,6 @@ import {
     History,
     BarChart3,
     HelpCircle,
-    GraduationCap,
-    Award,
-    Trophy,
     ChevronDown
 } from 'lucide-react';
 
@@ -36,9 +33,6 @@ const Sidebar = () => {
         { path: '/interviews', label: t('History'), icon: History, end: true },
         { path: '/analytics', label: t('Analytics'), icon: BarChart3, end: false },
         { path: '/questions', label: t('Questions Library'), icon: HelpCircle, end: false },
-        { path: '/study-plan', label: t('Study Plan'), icon: GraduationCap, end: false },
-        { path: '/achievements', label: t('Achievements'), icon: Award, end: true },
-        { path: '/leaderboard', label: t('Leaderboard'), icon: Trophy, end: true },
     ];
 
     return (

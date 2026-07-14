@@ -11,14 +11,7 @@ const PROTECTED_PATHS = [
   '/analytics',
   '/profile',
   '/settings',
-  '/questions',
-  '/study-plan',
-  '/achievements',
-  '/leaderboard',
-  '/preparation',
-  '/session',
-  '/processing',
-  '/admin'
+  '/questions'
 ];
 
 const GUEST_PATHS = ['/login', '/register', '/forgot-password', '/reset-password'];

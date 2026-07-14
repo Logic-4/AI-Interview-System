@@ -71,6 +71,8 @@ export default function InterviewReportPage() {
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState(false);
   const [retaking, setRetaking] = useState(false);
+  const [reevaluatingId, setReevaluatingId] = useState<string | null>(null);
+  const [evaluationError, setEvaluationError] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -119,7 +121,9 @@ export default function InterviewReportPage() {
   const feedback: Feedback | undefined = interview.feedback;
   const questions: Question[] = interview.questions ?? [];
   const answeredQuestions = questions.filter((q) => q.isAnswered);
-  const overallScore = feedback?.overallScore ?? interview.overallScore ?? 0;
+  const evaluatedQuestions = answeredQuestions.filter((q) => q.evaluationStatus === 'completed' && q.score !== null);
+  const overallScoreValue = feedback?.overallScore ?? interview.overallScore;
+  const overallScore = overallScoreValue ?? 0;
   const scoreColor = getScoreColor(overallScore);
   const totalTimeSpent = questions.reduce((sum, q) => sum + (q.timeSpent || 0), 0);
 
@@ -130,13 +134,14 @@ export default function InterviewReportPage() {
 
   const handleRegenerateFeedback = async () => {
     setRegenerating(true);
+    setEvaluationError(null);
     try {
       await feedbackService.generateFeedback(interviewId, true);
       // Reload interview data to get fresh feedback
       const data = await interviewService.getInterview(interviewId);
       setInterview(data);
-    } catch {
-      // Silent fail — user can retry
+    } catch (err: any) {
+      setEvaluationError(err.response?.data?.message || 'Feedback could not be generated. Retry incomplete evaluations first.');
     } finally {
       setRegenerating(false);
     }
@@ -150,6 +155,19 @@ export default function InterviewReportPage() {
     } catch {
       setError("Failed to reset interview for retaking. Please try again.");
       setRetaking(false);
+    }
+  };
+
+  const handleReevaluate = async (questionId: string) => {
+    setReevaluatingId(questionId);
+    setEvaluationError(null);
+    try {
+      await interviewService.reevaluateAnswer(interviewId, questionId);
+      setInterview(await interviewService.getInterview(interviewId));
+    } catch (err: any) {
+      setEvaluationError(err.response?.data?.message || 'Evaluation is still unavailable. Please retry shortly.');
+    } finally {
+      setReevaluatingId(null);
     }
   };
 
@@ -174,20 +192,19 @@ export default function InterviewReportPage() {
         <div className="flex flex-col md:flex-row items-center gap-8">
           {/* Circular score */}
           <div className="flex flex-col items-center gap-3">
-            <Progress
-              variant="circular"
-              size="xl"
-              value={overallScore}
-              showValue
-              color={scoreColor as "primary" | "success" | "warning" | "danger"}
-              gradient={false}
-            />
+            {overallScoreValue === null || overallScoreValue === undefined ? (
+              <div className="w-28 h-28 rounded-full border-4 border-warning/30 flex items-center justify-center text-sm font-bold text-warning text-center px-3">
+                Not scored
+              </div>
+            ) : (
+              <Progress variant="circular" size="xl" value={overallScore} showValue color={scoreColor as "primary" | "success" | "warning" | "danger"} gradient={false} />
+            )}
             <div className="text-center">
               <p className={cn(
                 "text-sm font-bold",
                 scoreColor === "success" ? "text-success" : scoreColor === "warning" ? "text-warning" : "text-danger"
               )}>
-                {getScoreLabel(overallScore)}
+                {overallScoreValue === null || overallScoreValue === undefined ? 'Evaluation incomplete' : getScoreLabel(overallScore)}
               </p>
               <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest mt-1">Overall Score</p>
             </div>
@@ -378,13 +395,15 @@ export default function InterviewReportPage() {
 
       {/* Question-by-Question Breakdown */}
       <Card hoverEffect={false} className="p-6 border border-white-light dark:border-[#1b2e4b] bg-white dark:bg-black">
+        {evaluationError && <p className="mb-4 text-xs font-semibold text-danger">{evaluationError}</p>}
         <h3 className="text-sm font-bold text-text-primary dark:text-white mb-4 flex items-center gap-2">
           <MessageSquare className="w-4 h-4 text-primary" />
-          Question Breakdown ({answeredQuestions.length}/{questions.length} answered)
+          Question Breakdown ({evaluatedQuestions.length}/{answeredQuestions.length} evaluated)
         </h3>
         <div className="space-y-2">
           {questions.map((q, idx) => {
             const isExpanded = expandedQuestion === q._id;
+            const hasScore = q.evaluationStatus === 'completed' && q.score !== null;
             const qScore = q.score ?? 0;
             const qColor = getScoreColor(qScore);
             return (
@@ -395,11 +414,11 @@ export default function InterviewReportPage() {
                 >
                   <span className={cn(
                     "w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0",
-                    q.isAnswered
+                    hasScore
                       ? qColor === "success" ? "bg-success/10 text-success" : qColor === "warning" ? "bg-warning/10 text-warning" : "bg-danger/10 text-danger"
                       : "bg-foreground/5 text-text-muted"
                   )}>
-                    {q.isAnswered ? qScore : "—"}
+                    {hasScore ? qScore : "—"}
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-text-primary dark:text-white truncate">
@@ -453,6 +472,19 @@ export default function InterviewReportPage() {
                       <div>
                         <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-1">AI Feedback</p>
                         <p className="text-xs text-text-muted font-semibold leading-relaxed">{q.aiFeedback}</p>
+                      </div>
+                    )}
+                    {q.isAnswered && !hasScore && (
+                      <div className="rounded-md border border-warning/30 bg-warning/5 p-3">
+                        <p className="text-xs font-semibold text-warning mb-2">
+                          {q.evaluationStatus === 'invalid' ? 'This answer could not be evaluated.' : 'Evaluation did not complete.'}
+                        </p>
+                        {q.evaluationStatus !== 'invalid' && (
+                          <Button size="sm" variant="outline" disabled={reevaluatingId === q._id} onClick={() => handleReevaluate(q._id)} className="text-xs">
+                            <RefreshCw className={cn('w-3.5 h-3.5 mr-2', reevaluatingId === q._id && 'animate-spin')} />
+                            Retry evaluation
+                          </Button>
+                        )}
                       </div>
                     )}
                     {q.expectedAnswer && (

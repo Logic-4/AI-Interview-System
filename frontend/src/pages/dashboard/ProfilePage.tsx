@@ -61,9 +61,6 @@ const ProfilePage = () => {
                         <div className="flex flex-col justify-center items-center">
                             <img src={user?.avatar || "/assets/images/user-profile.jpeg"} alt="img" className="w-24 h-24 rounded-full object-cover mb-5 ring-4 ring-primary/20" />
                             <p className="font-semibold text-primary text-xl">{user?.name ?? 'User'}</p>
-                            <span className="badge badge-outline-primary mt-2 uppercase text-[10px] tracking-wider font-extrabold">
-                                {user?.subscription?.plan ?? 'free'} plan
-                            </span>
                         </div>
                         <ul className="mt-6 flex flex-col max-w-[200px] m-auto space-y-4 font-semibold text-white-dark text-sm">
                             {user?.targetRole && (

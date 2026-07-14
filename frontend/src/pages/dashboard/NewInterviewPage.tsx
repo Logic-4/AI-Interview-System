@@ -542,7 +542,7 @@ export default function NewInterviewPage() {
                         <div className="relative">
                           <input
                             type="file"
-                            accept=".txt,.pdf,.doc,.docx"
+                            accept=".txt,.pdf,.docx"
                             className="hidden"
                             ref={fileInputRef}
                             onChange={handleFileUpload}

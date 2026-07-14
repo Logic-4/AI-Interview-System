@@ -11,6 +11,7 @@ const {
   completeInterview,
   deleteInterview,
   retryEvaluate,
+  reevaluateAnswer,
   resetInterview,
 } = require('../controllers/interviewController');
 const { createInterviewValidator, submitAnswerValidator, listInterviewsValidator } = require('../validators/interviewValidator');
@@ -38,5 +39,6 @@ router.put('/:id/reset', resetInterview);
 
 // Practice loop — retry a question after feedback (Step 7)
 router.post('/:interviewId/questions/:questionId/retry', aiLimiter, retryEvaluate);
+router.post('/:interviewId/questions/:questionId/evaluate', aiLimiter, reevaluateAnswer);
 
 module.exports = router;

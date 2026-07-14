@@ -110,6 +110,12 @@ const listInterviewsValidator = [
     .optional()
     .isIn(['technical', 'behavioral', 'system-design', 'hr', 'mixed'])
     .withMessage('Invalid type filter'),
+
+  query('search')
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Search must be between 1 and 100 characters'),
 ];
 
 module.exports = {

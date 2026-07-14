@@ -26,6 +26,14 @@ const userService = {
     const res = await api.get<ApiResponse<DashboardStats>>('/users/dashboard');
     return res.data.data;
   },
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    await api.put('/users/password', { currentPassword, newPassword });
+  },
+
+  async deleteAccount(confirm: string, currentPassword?: string): Promise<void> {
+    await api.delete('/users/account', { data: { confirm, currentPassword } });
+  },
 };
 
 export default userService;

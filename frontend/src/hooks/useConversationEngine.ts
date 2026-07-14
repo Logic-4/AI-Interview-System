@@ -49,7 +49,7 @@ export interface ConversationEngineConfig {
     timeSpent: number,
     extras?: { audio?: Blob | File; activePromptText?: string }
   ) => Promise<{
-    score: number;
+    score: number | null;
     feedback: string;
     strengths: string[];
     improvements: string[];

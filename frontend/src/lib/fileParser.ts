@@ -1,67 +1,51 @@
+const MAX_RESUME_BYTES = 5 * 1024 * 1024;
+const SUPPORTED_EXTENSIONS = new Set(['txt', 'pdf', 'docx']);
+
 export async function parseResumeFile(file: File): Promise<string> {
-  const extension = file.name.split('.').pop()?.toLowerCase();
-  
-  if (extension === 'txt') {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target?.result as string);
-      reader.onerror = (e) => reject(e);
-      reader.readAsText(file);
-    });
+  const extension = file.name.split('.').pop()?.toLowerCase() || '';
+  if (file.size > MAX_RESUME_BYTES) throw new Error('Resume files must be 5MB or smaller.');
+  if (!SUPPORTED_EXTENSIONS.has(extension)) {
+    throw new Error('Unsupported file type. Please upload a PDF, DOCX, or TXT file.');
   }
 
-  if (extension === 'pdf') {
-    return parsePdfFile(file);
-  }
+  let text = '';
+  if (extension === 'txt') text = await file.text();
+  if (extension === 'pdf') text = await parsePdfFile(file);
+  if (extension === 'docx') text = await parseWordFile(file);
 
-  if (extension === 'doc' || extension === 'docx') {
-    return parseWordFile(file);
-  }
-
-  throw new Error("Unsupported file type. Please upload a PDF, DOCX, or TXT file.");
+  const normalized = text.replace(/\u0000/g, '').replace(/[ \t]+\n/g, '\n').trim();
+  if (!normalized) throw new Error('No readable text was found in this resume.');
+  return normalized;
 }
 
 async function parsePdfFile(file: File): Promise<string> {
   try {
-    // Dynamically load pdf.js via CDN to avoid heavy bundle sizes and dependency issues
-    const pdfjsLib = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.mjs' /* @vite-ignore */ as any);
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.mjs';
-
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    let fullText = '';
-    
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
+    const pdfjsLib = await import('pdfjs-dist');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+      'pdfjs-dist/build/pdf.worker.min.mjs',
+      import.meta.url
+    ).toString();
+    const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+    const pages: string[] = [];
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      const page = await pdf.getPage(pageNumber);
       const content = await page.getTextContent();
-      const strings = content.items.map((item: any) => item.str);
-      fullText += strings.join(' ') + '\n';
+      pages.push(content.items.map((item) => ('str' in item ? item.str : '')).join(' '));
     }
-    return fullText;
+    return pages.join('\n');
   } catch (error) {
-    console.error("PDF Parsing Error:", error);
-    throw new Error("Failed to parse PDF file.");
+    console.error('PDF parsing error:', error);
+    throw new Error('Failed to parse this PDF resume.');
   }
 }
 
 async function parseWordFile(file: File): Promise<string> {
   try {
-    // Dynamically load mammoth via CDN
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
-    
-    await new Promise((resolve, reject) => {
-      script.onload = resolve;
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
-
-    const arrayBuffer = await file.arrayBuffer();
-    // @ts-ignore
-    const result = await window.mammoth.extractRawText({ arrayBuffer });
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
     return result.value;
   } catch (error) {
-    console.error("Word Parsing Error:", error);
-    throw new Error("Failed to parse Word file.");
+    console.error('DOCX parsing error:', error);
+    throw new Error('Failed to parse this DOCX resume.');
   }
 }

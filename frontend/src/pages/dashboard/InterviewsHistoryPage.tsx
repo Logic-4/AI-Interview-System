@@ -70,6 +70,7 @@ export default function InterviewsHistoryPage() {
         limit: 10,
       };
       if (statusFilter) params.status = statusFilter;
+      if (search) params.search = search;
       const { interviews: data, pagination } = await interviewService.getInterviews(params);
       setInterviews(data);
       setTotalPages(pagination.pages);
@@ -79,7 +80,7 @@ export default function InterviewsHistoryPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [page, statusFilter, search]);
 
   useEffect(() => {
     fetchInterviews();
@@ -117,9 +118,7 @@ export default function InterviewsHistoryPage() {
     }
   };
 
-  const filteredInterviews = search
-    ? interviews.filter((iv) => iv.title.toLowerCase().includes(search.toLowerCase()))
-    : interviews;
+  const filteredInterviews = interviews;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700 text-black dark:text-white-dark">

@@ -68,11 +68,12 @@ export interface SubmitAnswerPayload {
 }
 
 export interface AnswerEvaluation {
-  score: number;
+  score: number | null;
   feedback: string;
   strengths: string[];
   improvements: string[];
   suggestedAnswer: string;
+  evaluationStatus?: import('./question').EvaluationStatus;
 }
 
 export interface SubmitAnswerResponse {
@@ -91,4 +92,5 @@ export interface InterviewListParams {
   type?: InterviewType;
   domain?: InterviewDomain;
   difficulty?: InterviewDifficulty;
+  search?: string;
 }
