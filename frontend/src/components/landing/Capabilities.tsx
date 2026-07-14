@@ -54,12 +54,12 @@ const domains = [
 
 export function Capabilities() {
   return (
-    <section id="capabilities" className="relative py-24 md:py-32 overflow-hidden">
+    <section id="capabilities" className="relative py-20 md:py-24 overflow-hidden">
       {/* Section-level pattern backgrounds */}
-      <div className="absolute inset-0 -z-10 bg-mesh opacity-90" />
-      <div className="absolute inset-0 -z-10 grid-pattern opacity-40 dark:opacity-20" />
-      <div className="absolute -top-24 left-1/3 w-[36rem] h-[36rem] rounded-full bg-primary/20 blur-3xl animate-blob" />
-      <div className="absolute bottom-0 -right-24 w-[28rem] h-[28rem] rounded-full bg-primary-glow/20 blur-3xl animate-blob [animation-delay:-8s]" />
+      <div className="absolute inset-0 -z-10 bg-mesh opacity-25 dark:opacity-45" />
+      <div className="absolute inset-0 -z-10 grid-pattern opacity-20 dark:opacity-15" />
+      <div className="absolute -top-24 left-1/3 -z-10 h-[36rem] w-[36rem] rounded-full bg-primary/8 blur-3xl animate-blob" />
+      <div className="absolute bottom-0 -right-24 -z-10 h-[28rem] w-[28rem] rounded-full bg-primary-glow/8 blur-3xl animate-blob [animation-delay:-8s]" />
 
       {/* Floating particles */}
       <div className="absolute inset-0 -z-10 pointer-events-none">
@@ -91,7 +91,7 @@ export function Capabilities() {
           </p>
         </motion.div>
 
-        <div className="mt-14 grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="mt-12 grid md:grid-cols-2 lg:grid-cols-3 gap-5">
           {items.map((it, i) => (
             <motion.div
               key={it.title}
@@ -136,7 +136,7 @@ export function Capabilities() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-60px" }}
           transition={{ duration: 0.5 }}
-          className="mt-20 md:mt-24"
+          className="mt-16 md:mt-20"
         >
           <div className="flex items-end justify-between flex-wrap gap-4">
             <div className="max-w-xl">

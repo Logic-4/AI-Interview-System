@@ -9,7 +9,7 @@ const stats = [
 
 export function Stats() {
   return (
-    <section id="stats" className="relative py-24">
+    <section id="stats" className="relative py-20 md:py-24">
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
         <div className="relative rounded-3xl border border-border bg-card overflow-hidden shadow-card">
           <div className="absolute inset-0 bg-mesh opacity-60" />

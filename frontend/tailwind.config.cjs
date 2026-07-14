@@ -22,6 +22,8 @@ module.exports = {
                     hover: '#E13458',
                     light: '#FFF1F4',
                     'dark-light': 'rgba(238,66,100,.15)',
+                    foreground: withOpacity('--primary-foreground'),
+                    glow: withOpacity('--primary-glow'),
                 },
                 secondary: {
                     DEFAULT: '#2F3446',

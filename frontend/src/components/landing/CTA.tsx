@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 export function CTA() {
   return (
-    <section id="cta" className="relative py-24 md:py-32">
+    <section id="cta" className="relative py-20 md:py-24">
       <div className="mx-auto max-w-6xl px-5 sm:px-8">
         <motion.div
           initial={{ opacity: 0, y: 30 }}

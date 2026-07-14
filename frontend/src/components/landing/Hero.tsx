@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Play, Sparkles, Mic, Pause } from "lucide-react";
+import { ArrowRight, Play, Sparkles, Pause } from "lucide-react";
 import { Link } from "react-router-dom";
 export function Hero() {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -40,12 +40,11 @@ export function Hero() {
   }, []);
 
   return (
-    <section id="top" className="relative pt-32 pb-20 md:pt-40 md:pb-28 overflow-hidden">
+    <section id="top" className="relative pt-28 pb-14 md:pt-36 md:pb-20 overflow-hidden">
       {/* Background layers */}
       <div className="absolute inset-0 -z-10 bg-mesh" />
       <div className="absolute inset-0 -z-10 grid-pattern opacity-40 dark:opacity-20" />
       <div className="absolute top-20 -left-32 w-96 h-96 rounded-full bg-primary/30 blur-3xl animate-blob" />
-      <div className="absolute top-40 -right-32 w-[28rem] h-[28rem] rounded-full bg-primary-glow/25 blur-3xl animate-blob [animation-delay:-6s]" />
 
       <div className="mx-auto max-w-7xl px-5 sm:px-8 grid lg:grid-cols-[1.05fr_0.95fr] gap-12 lg:gap-8 items-center">
         {/* Copy */}
@@ -57,7 +56,7 @@ export function Hero() {
             className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-primary/30 bg-primary/10 backdrop-blur-sm text-xs font-semibold uppercase tracking-wider"
           >
             <Sparkles className="h-3.5 w-3.5 text-primary" />
-            <span className="text-foreground/80">Powered by GPT-4 Vision &amp; Voice</span>
+            <span className="text-foreground/80">Powered by GEMMA fine tuned</span>
           </motion.div>
 
           <motion.h1
@@ -92,34 +91,8 @@ export function Hero() {
               Start practicing free
               <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
             </Link>
-            <button
-              onClick={handlePlay}
-              className="group inline-flex items-center gap-2 h-12 px-5 rounded-full border border-border bg-surface/70 backdrop-blur font-semibold hover:bg-accent transition-all"
-            >
-              <span className="h-7 w-7 rounded-full bg-primary/15 grid place-items-center">
-                {isPlaying ? (
-                  <Pause className="h-3 w-3 fill-primary text-primary" />
-                ) : (
-                  <Play className="h-3 w-3 fill-primary text-primary translate-x-px" />
-                )}
-              </span>
-              {isPlaying ? "Stop Introduction" : "Hear an AI voice"}
-            </button>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="mt-8 flex items-center gap-3 justify-center lg:justify-start text-sm text-muted-foreground"
-          >
-            <div className="flex -space-x-2">
-              {["bg-orange-300", "bg-rose-300", "bg-amber-300", "bg-pink-300"].map((c, i) => (
-                <div key={i} className={`h-7 w-7 rounded-full ${c} ring-2 ring-background`} />
-              ))}
-            </div>
-            <span>Joined by <b className="text-foreground">12,400+</b> candidates this month</span>
-          </motion.div>
         </div>
 
         {/* Visual */}
@@ -127,59 +100,26 @@ export function Hero() {
           initial={{ opacity: 0, scale: 0.92, y: 30 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-          className="relative mx-auto w-full max-w-xl"
+          className="relative mx-auto w-full max-w-xl lg:-mt-4"
         >
           {/* Orb / logo halo behind character */}
           <div className="absolute inset-0 grid place-items-center pointer-events-none">
             <div className="relative h-72 w-72 md:h-96 md:w-96">
-              <div className="absolute inset-0 rounded-full bg-gradient-primary blur-3xl opacity-40 animate-pulse" />
               <div className="absolute inset-8 rounded-full bg-gradient-primary opacity-90 blur-sm" />
               <div className="absolute inset-0 rounded-full border border-primary/30 animate-pulse-ring" />
               <div className="absolute inset-0 rounded-full border border-primary/20 animate-pulse-ring [animation-delay:1s]" />
             </div>
           </div>
 
-          <motion.img
-            src="/assets/cartoon-interviewer.png"
-            alt="Candidate practicing with the InterviewAI Pro coach"
-            width={1280}
-            height={1280}
-            className="relative z-10 w-full h-auto drop-shadow-[0_30px_60px_rgba(244,63,94,0.25)]"
-            animate={{ y: [0, -10, 0] }}
-            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+          <img
+            src="/assets/ai-interview-coach.png"
+            alt="Male AI interview coach with a headset and tablet"
+            width={1062}
+            height={868}
+            className="relative z-10 mx-auto w-[92%] h-auto"
           />
 
-          {/* Floating cards */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.8 }}
-            className="absolute z-20 top-10 -left-2 md:-left-6 px-3 py-2.5 rounded-2xl bg-surface-elevated/95 backdrop-blur border border-border shadow-card flex items-center gap-2.5"
-          >
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-60" />
-              <span className="relative rounded-full h-2 w-2 bg-emerald-500" />
-            </span>
-            <div className="text-left">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Live session</p>
-              <p className="text-xs font-semibold">Senior PM · Stripe</p>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 1 }}
-            className="absolute z-20 bottom-8 -right-2 md:-right-6 px-3 py-2.5 rounded-2xl bg-surface-elevated/95 backdrop-blur border border-border shadow-card flex items-center gap-2.5"
-          >
-            <span className="h-8 w-8 grid place-items-center rounded-xl bg-primary/15 text-primary">
-              <Mic className="h-4 w-4" />
-            </span>
-            <div className="text-left">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Clarity</p>
-              <p className="text-xs font-semibold">94<span className="text-muted-foreground">/100</span></p>
-            </div>
-          </motion.div>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-28 bg-gradient-to-b from-transparent via-background/55 to-background dark:via-background/35 dark:to-background" />
 
           {/* Dynamic Speaking Waveform Overlay */}
           <AnimatePresence>

@@ -24,7 +24,7 @@ export function HowItWorks() {
   }, [inView]);
 
   return (
-    <section id="how" ref={ref} className="relative py-24 md:py-32 bg-surface/50 border-y border-border">
+    <section id="how" ref={ref} className="relative py-20 md:py-24 bg-surface/50 border-y border-border">
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -37,7 +37,7 @@ export function HowItWorks() {
           <h2 className="mt-3 text-4xl md:text-5xl font-bold">Three steps to interview-ready</h2>
         </motion.div>
 
-        <div className="mt-16 grid md:grid-cols-3 gap-6 relative">
+        <div className="mt-14 grid md:grid-cols-3 gap-6 relative">
           {/* Animated connecting line */}
           <div className="hidden md:block absolute top-12 left-[16%] right-[16%] h-px overflow-hidden">
             <div className="absolute inset-0 bg-border" />

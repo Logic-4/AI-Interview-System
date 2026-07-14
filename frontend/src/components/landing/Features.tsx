@@ -12,7 +12,7 @@ const features = [
 
 export function Features() {
   return (
-    <section id="features" className="relative py-24 md:py-32">
+    <section id="features" className="relative py-20 md:py-24">
       <div className="absolute inset-0 -z-10 bg-radial-fade" />
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
         <motion.div
@@ -31,7 +31,7 @@ export function Features() {
           </p>
         </motion.div>
 
-        <div className="mt-14 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {features.map((f, i) => (
             <motion.div
               key={f.title}

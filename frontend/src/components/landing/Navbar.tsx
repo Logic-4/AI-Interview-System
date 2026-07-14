@@ -11,7 +11,6 @@ const links = [
   { href: "#features", label: "Features" },
   { href: "#capabilities", label: "Capabilities" },
   { href: "#how", label: "How it works" },
-  { href: "#stats", label: "Results" },
 ];
 
 
@@ -79,7 +78,7 @@ export function Navbar() {
           <Logo />
         </a>
 
-        <ul className="hidden md:flex items-center gap-1 p-1 rounded-full border border-border/60 bg-surface/60 backdrop-blur">
+        <ul className="hidden md:flex items-center gap-1.5 p-1.5 rounded-full border border-border/60 bg-surface/70 backdrop-blur-xl shadow-[0_18px_45px_-28px_rgba(15,23,42,0.28)]">
           {links.map((l) => {
             const isActive = active === l.href;
             return (
@@ -87,18 +86,32 @@ export function Navbar() {
                 <a
                   href={l.href}
                   onClick={(e) => handleNav(e, l.href)}
-                  className={`relative z-10 px-4 py-1.5 text-sm font-medium rounded-full transition-colors ${
-                    isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                  className={`group relative z-10 flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-full transition-all duration-250 ${
+                    isActive
+                      ? "text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {isActive && (
-                    <motion.span
-                      layoutId="nav-active"
-                      className="absolute inset-0 rounded-full bg-accent/70 -z-10"
-                      transition={{ type: "spring", stiffness: 380, damping: 32 }}
-                    />
+                  {!isActive && (
+                    <span className="absolute inset-0 rounded-full bg-gradient-to-r from-primary/10 via-primary/5 to-transparent opacity-0 transition-opacity duration-250 group-hover:opacity-100" />
                   )}
-                  {l.label}
+                  {isActive && (
+                    <>
+                      <motion.span
+                        layoutId="nav-active"
+                        className="absolute inset-0 rounded-full bg-gradient-primary shadow-[0_14px_36px_-18px_rgba(238,66,100,0.75)]"
+                        transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                      />
+                      <motion.span
+                        layoutId="nav-active-ring"
+                        className="absolute inset-0 rounded-full ring-1 ring-white/40 dark:ring-white/15"
+                        transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                      />
+                    </>
+                  )}
+                  <span className={`relative ${isActive ? "" : "group-hover:translate-x-0.5"} transition-transform duration-250`}>
+                    {l.label}
+                  </span>
                 </a>
               </li>
             );
@@ -116,7 +129,7 @@ export function Navbar() {
           <button
             onClick={toggle}
             aria-label="Toggle theme"
-            className="h-10 w-10 grid place-items-center rounded-full border border-border/60 bg-surface/60 hover:bg-accent/70 transition-all hover:scale-105"
+            className="h-10 w-10 grid place-items-center rounded-full border border-border/60 bg-surface/70 hover:bg-accent/70 transition-all hover:scale-105"
           >
             <AnimatePresence mode="wait" initial={false}>
               <motion.span
@@ -140,7 +153,7 @@ export function Navbar() {
 
           <button
             onClick={() => setOpen((v) => !v)}
-            className="md:hidden h-10 w-10 grid place-items-center rounded-full border border-border/60"
+            className="md:hidden h-10 w-10 grid place-items-center rounded-full border border-border/60 bg-surface/70"
             aria-label="Menu"
           >
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -156,13 +169,17 @@ export function Navbar() {
             exit={{ height: 0, opacity: 0 }}
             className="md:hidden overflow-hidden bg-background/95 backdrop-blur-xl border-b border-border"
           >
-            <ul className="px-6 py-4 flex flex-col gap-1">
+            <ul className="px-6 py-4 flex flex-col gap-2">
               {links.map((l) => (
                 <li key={l.href}>
                   <a
                     href={l.href}
                     onClick={(e) => handleNav(e, l.href)}
-                    className="block py-2.5 text-base font-medium text-foreground/90 hover:text-primary"
+                    className={`block rounded-2xl px-4 py-3 text-base font-semibold transition-all ${
+                      active === l.href
+                        ? "bg-gradient-primary text-primary-foreground shadow-[0_14px_36px_-18px_rgba(238,66,100,0.75)]"
+                        : "bg-surface/70 text-foreground/90 hover:bg-accent/80 hover:text-foreground"
+                    }`}
                   >
                     {l.label}
                   </a>
