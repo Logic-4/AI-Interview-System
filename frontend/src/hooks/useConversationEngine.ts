@@ -350,11 +350,13 @@ export function useConversationEngine(
 
       if (!transcript.trim() || isPlaceholderTranscript(transcript)) {
         if (sttErrorMessage) {
-          toast.error(
-            sttErrorMessage.includes("503") || sttErrorMessage.includes("fetch")
-              ? "Somali speech recognition is unavailable. Ensure the backend ASR service is running on port 8001."
-              : `Could not transcribe your answer: ${sttErrorMessage.slice(0, 120)}`
-          );
+          const normalizedError = sttErrorMessage.toLowerCase();
+          const message = normalizedError.includes("503")
+            ? `Speech recognition did not respond in time and may still be warming (${sttErrorMessage.slice(0, 100)}). Please retry.`
+            : normalizedError.includes("fetch")
+              ? `Could not reach speech recognition: ${sttErrorMessage.slice(0, 120)}`
+              : `Could not transcribe your answer: ${sttErrorMessage.slice(0, 120)}`;
+          toast.error(message);
         } else if (transcript.includes("[No speech detected]")) {
           toast.error("We heard audio but could not detect speech. Speak louder and try again.");
         } else {

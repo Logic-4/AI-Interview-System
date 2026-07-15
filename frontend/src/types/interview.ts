@@ -2,6 +2,25 @@ export type InterviewType = 'technical' | 'behavioral' | 'system-design' | 'hr' 
 export type InterviewDifficulty = 'junior' | 'mid' | 'senior' | 'lead';
 export type InterviewDomain = 'technology' | 'healthcare' | 'finance' | 'engineering' | 'education' | 'legal';
 export type InterviewStatus = 'scheduled' | 'in-progress' | 'completed' | 'cancelled';
+export type InterviewWarmupPhase = 'idle' | 'warming' | 'ready' | 'failed';
+
+export interface InterviewWarmupServiceState {
+  status: InterviewWarmupPhase;
+  startedAt: string | null;
+  completedAt: string | null;
+  readyUntil: string | null;
+  error: string | null;
+}
+
+export interface InterviewWarmupStatus {
+  status: InterviewWarmupPhase;
+  ttlMs: number;
+  started?: boolean;
+  services: {
+    gemma: InterviewWarmupServiceState;
+    speech: InterviewWarmupServiceState;
+  };
+}
 
 export interface Interview {
   _id: string;

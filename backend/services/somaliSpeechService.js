@@ -322,9 +322,41 @@ async function synthesizeSpeech(text, languageCode = 'en-US', options = {}) {
 }
 
 async function warmSpeechService(requestId = 'startup-warmup') {
-  const url = getTtsBaseUrl();
-  if (!isRunPodUrl(url)) return { status: 'skipped', reason: 'not_runpod' };
-  return callSpeechRunPod(url, { action: 'warmup', service: 'somali_tts', requestId }, TTS_TIMEOUT_MS);
+  const asrUrl = getAsrBaseUrl();
+  const ttsUrl = getTtsBaseUrl();
+  const asrIsRunPod = isRunPodUrl(asrUrl);
+  const ttsIsRunPod = isRunPodUrl(ttsUrl);
+
+  if (!asrIsRunPod && !ttsIsRunPod) {
+    return { status: 'skipped', reason: 'not_runpod' };
+  }
+
+  if (asrIsRunPod && ttsIsRunPod && getRunPodEndpointBase(asrUrl) === getRunPodEndpointBase(ttsUrl)) {
+    return callSpeechRunPod(
+      ttsUrl,
+      { action: 'warmup', service: 'all', requestId },
+      Math.max(ASR_TIMEOUT_MS, TTS_TIMEOUT_MS)
+    );
+  }
+
+  const tasks = [];
+  if (ttsIsRunPod) {
+    tasks.push(callSpeechRunPod(
+      ttsUrl,
+      { action: 'warmup', service: 'somali_tts', requestId },
+      TTS_TIMEOUT_MS
+    ));
+  }
+  if (asrIsRunPod) {
+    tasks.push(callSpeechRunPod(
+      asrUrl,
+      { action: 'warmup', service: 'asr', requestId },
+      ASR_TIMEOUT_MS
+    ));
+  }
+
+  const results = await Promise.all(tasks);
+  return { status: 'ready', service: 'split', results };
 }
 
 module.exports = {

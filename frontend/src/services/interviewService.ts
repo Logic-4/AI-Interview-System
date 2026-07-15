@@ -1,8 +1,25 @@
 import api from './api';
-import { Interview, PopulatedInterview, CreateInterviewPayload, SubmitAnswerPayload, SubmitAnswerResponse, AnswerEvaluation, InterviewListParams } from '@/types/interview';
+import { Interview, PopulatedInterview, CreateInterviewPayload, SubmitAnswerPayload, SubmitAnswerResponse, AnswerEvaluation, InterviewListParams, InterviewWarmupStatus } from '@/types/interview';
 import { ApiResponse, PaginatedResponse } from '@/types/api';
 
 const interviewService = {
+  async startInterviewWarmup(force = false): Promise<InterviewWarmupStatus> {
+    const res = await api.post<ApiResponse<{ warmup: InterviewWarmupStatus }>>(
+      '/interviews/warmup',
+      undefined,
+      { params: force ? { force: true } : undefined }
+    );
+    return res.data.data.warmup;
+  },
+
+  async getInterviewWarmupStatus(signal?: AbortSignal): Promise<InterviewWarmupStatus> {
+    const res = await api.get<ApiResponse<{ warmup: InterviewWarmupStatus }>>(
+      '/interviews/warmup',
+      { signal }
+    );
+    return res.data.data.warmup;
+  },
+
   async createInterview(payload: CreateInterviewPayload, idempotencyKey?: string): Promise<PopulatedInterview> {
     const res = await api.post<ApiResponse<{ interview: PopulatedInterview }>>('/interviews', payload, {
       headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,

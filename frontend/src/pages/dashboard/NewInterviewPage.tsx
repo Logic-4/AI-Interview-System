@@ -6,7 +6,7 @@ import { DOMAIN_ROLES, DOMAIN_LABELS } from "../../lib/constants";
 import { estimateQuestionCount } from "../../lib/interviewHelpers";
 import interviewService from "../../services/interviewService";
 import { useInterviewStore } from "../../stores/interviewStore";
-import type { InterviewType, InterviewDifficulty, InterviewDomain, InterviewLanguage, CreateInterviewPayload } from "../../types/interview";
+import type { InterviewType, InterviewDifficulty, InterviewDomain, InterviewLanguage, CreateInterviewPayload, InterviewWarmupStatus } from "../../types/interview";
 
 import { Code, User, Users, Settings, Zap, Clock, MessageSquare, Video, Plus, X, ArrowLeft, AlertCircle, DollarSign, BookOpen, Heart, CheckCheck, Upload, FileText } from "lucide-react";
 import { parseResumeFile } from "../../lib/fileParser";
@@ -59,6 +59,9 @@ export default function NewInterviewPage() {
 
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [warmup, setWarmup] = React.useState<InterviewWarmupStatus | null>(null);
+  const [warmupRequestError, setWarmupRequestError] = React.useState<string | null>(null);
+  const warmupPollCountRef = React.useRef(0);
   const submittingRef = React.useRef(false);
   const generationKeyRef = React.useRef<string | null>(null);
   const [isUploadingResume, setIsUploadingResume] = React.useState(false);
@@ -71,6 +74,56 @@ export default function NewInterviewPage() {
   React.useEffect(() => {
     setJobRole("");
   }, [domain]);
+
+  const getRequestError = React.useCallback((err: unknown) => {
+    const responseMessage = (err as { response?: { data?: { message?: string; error?: string } } })
+      ?.response?.data;
+    return responseMessage?.message || responseMessage?.error ||
+      (err instanceof Error ? err.message : "Unable to warm AI services");
+  }, []);
+
+  const triggerWarmup = React.useCallback(async (force = false) => {
+    try {
+      warmupPollCountRef.current = 0;
+      setWarmupRequestError(null);
+      const status = await interviewService.startInterviewWarmup(force);
+      setWarmup(status);
+    } catch (err) {
+      setWarmupRequestError(getRequestError(err));
+    }
+  }, [getRequestError]);
+
+  // Warm only after an authenticated user reaches interview setup.
+  React.useEffect(() => {
+    void triggerWarmup();
+  }, [triggerWarmup]);
+
+  // Step 3 rechecks the eight-minute readiness window. The backend deduplicates
+  // this request with any warmup already in progress.
+  React.useEffect(() => {
+    if (step === 3) void triggerWarmup();
+  }, [step, triggerWarmup]);
+
+  React.useEffect(() => {
+    if (warmup?.status !== "warming" || warmupPollCountRef.current >= 48) return;
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      warmupPollCountRef.current += 1;
+      try {
+        const status = await interviewService.getInterviewWarmupStatus(controller.signal);
+        setWarmupRequestError(null);
+        setWarmup(status);
+      } catch (err) {
+        if (!controller.signal.aborted) setWarmupRequestError(getRequestError(err));
+      }
+    }, 2500);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [warmup, getRequestError]);
 
   const addSkill = () => {
     const trimmed = skillInput.trim();
@@ -128,6 +181,10 @@ export default function NewInterviewPage() {
     setIsLoading(true);
     setError(null);
 
+    // A no-op while readiness is fresh; otherwise it restarts warming without
+    // delaying interview creation.
+    void triggerWarmup();
+
     try {
       const payload: CreateInterviewPayload = {
         title: autoTitle,
@@ -159,6 +216,8 @@ export default function NewInterviewPage() {
   };
 
   const questionEstimate = estimateQuestionCount(duration);
+  const providerWarmupError = warmup?.services.speech.error || warmup?.services.gemma.error;
+  const warmupFailure = providerWarmupError || warmupRequestError;
 
   /* ─── Fullscreen Loading Overlay ──────────────────────── */
   if (isLoading) {
@@ -193,6 +252,56 @@ export default function NewInterviewPage() {
           <p className="text-sm text-text-muted font-medium opacity-70">Set up your mock interview session step-by-step.</p>
         </div>
       </div>
+
+      <AnimatePresence mode="wait">
+        {(warmup?.status === "warming" || warmup?.status === "ready" || warmupFailure) && (
+          <motion.div
+            key={warmupFailure ? "failed" : warmup?.status}
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className={cn(
+              "p-3.5 rounded-md border flex items-center gap-3",
+              warmupFailure
+                ? "bg-danger/5 border-danger/20"
+                : warmup?.status === "ready"
+                  ? "bg-success/5 border-success/20"
+                  : "bg-primary/5 border-primary/20"
+            )}
+          >
+            {warmupFailure ? (
+              <AlertCircle className="w-4 h-4 text-danger flex-shrink-0" />
+            ) : warmup?.status === "ready" ? (
+              <CheckCheck className="w-4 h-4 text-success flex-shrink-0" />
+            ) : (
+              <LoadingSpinner size="sm" className="text-primary flex-shrink-0" />
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-text-primary dark:text-white">
+                {warmupFailure
+                  ? "AI service warmup needs attention"
+                  : warmup?.status === "ready"
+                    ? "AI services are ready"
+                    : "AI services are warming up"}
+              </p>
+              <p className={cn("text-xs mt-0.5 break-words", warmupFailure ? "text-danger" : "text-text-muted")}>
+                {warmupFailure || (warmup?.status === "ready"
+                  ? "Gemma and Somali speech are ready for your interview."
+                  : "You can continue configuring the interview while models load in the background.")}
+              </p>
+            </div>
+            {warmupFailure && (
+              <button
+                type="button"
+                onClick={() => void triggerWarmup(true)}
+                className="text-xs font-semibold text-danger hover:underline flex-shrink-0"
+              >
+                Retry
+              </button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Error alert */}
       <AnimatePresence>

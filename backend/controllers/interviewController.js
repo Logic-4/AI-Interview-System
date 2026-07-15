@@ -13,6 +13,10 @@ const {
   ensureInterviewerPromptInHistory,
 } = require('../utils/questionHelpers');
 const { normalizeEvaluation, calculateOverallScore } = require('../utils/evaluation');
+const {
+  startInterviewWarmup,
+  getInterviewWarmupStatus,
+} = require('../services/interviewWarmupService');
 
 function escapeRegex(value = '') {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -254,6 +258,7 @@ function ensureQuestionGeneration(interview, context) {
  */
 const createInterview = async (req, res, next) => {
   try {
+    startInterviewWarmup({ requestId: req.requestId || 'create-interview-warmup' });
     const { title, type, difficulty, domain, duration, scheduledAt, jobRole, focusSkills, jobDescription, resumeText, language } = req.body;
     const rawGenerationKey = String(req.get('idempotency-key') || '').trim();
     const generationKey = /^[A-Za-z0-9._:-]{1,128}$/.test(rawGenerationKey) ? rawGenerationKey : undefined;
@@ -347,6 +352,26 @@ const createInterview = async (req, res, next) => {
       }).populate({ path: 'questions', options: { sort: { order: 1 } } }).catch(() => null);
       if (existing) return ApiResponse.success(res, { interview: existing }, 'Existing interview returned for idempotent request');
     }
+    next(error);
+  }
+};
+
+const warmInterviewServices = async (req, res, next) => {
+  try {
+    const warmup = startInterviewWarmup({
+      requestId: req.requestId || `warmup-${req.user._id}`,
+      force: req.query.force === 'true',
+    });
+    ApiResponse.success(res, { warmup }, 'Interview services are warming in the background', 202);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getWarmupStatus = async (_req, res, next) => {
+  try {
+    ApiResponse.success(res, { warmup: getInterviewWarmupStatus() });
+  } catch (error) {
     next(error);
   }
 };
@@ -1021,6 +1046,8 @@ const resetInterview = async (req, res, next) => {
 
 module.exports = {
   createInterview,
+  warmInterviewServices,
+  getWarmupStatus,
   getInterviews,
   getInterview,
   getInterviewProgress,

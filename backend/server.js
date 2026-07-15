@@ -19,8 +19,6 @@ const logger = require('./utils/logger');
 const { requestContext } = require('./middleware/requestContext');
 const { startPiper, stopPiper } = require('./utils/piperProcess');
 const { startSomaliSpeech, stopSomaliSpeech } = require('./utils/somaliSpeechProcess');
-const { warmGemma } = require('./services/gemmaService');
-const { warmSpeechService } = require('./services/somaliSpeechService');
 
 // Routes
 const authRoutes = require('./routes/authRoutes');
@@ -142,16 +140,7 @@ const startServer = async () => {
 ╚══════════════════════════════════════════════╝
       `);
 
-      void Promise.allSettled([
-        warmGemma('startup-gemma-warmup'),
-        warmSpeechService('startup-speech-warmup'),
-      ]).then((results) => {
-        results.forEach((result, index) => {
-          if (result.status === 'rejected') {
-            logger.warn(`${index === 0 ? 'Gemma' : 'Speech'} warmup failed: ${result.reason.message}`);
-          }
-        });
-      });
+      logger.info('Interview AI services will warm on authenticated interview setup, not on server startup.');
     });
   } catch (error) {
     logger.error(`Failed to start server: ${error.message}`);

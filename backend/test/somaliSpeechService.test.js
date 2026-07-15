@@ -82,3 +82,43 @@ test('falls back to the secondary Somali provider when the primary fails', async
 test('rejects corrupt audio instead of sending it to the browser', () => {
   assert.throws(() => speech.validateAudio(Buffer.from('not audio'), 'audio/wav'), /empty|incomplete|corrupt/i);
 });
+
+test('warms ASR and Somali TTS with one all-service job on a unified RunPod endpoint', async () => {
+  const originalFetch = global.fetch;
+  const originalAsrUrl = process.env.SOMALI_ASR_URL;
+  const originalTtsUrl = process.env.SOMALI_TTS_URL;
+  const originalRunPodKey = process.env.RUNPOD_API_KEY;
+  const requests = [];
+
+  process.env.SOMALI_ASR_URL = 'https://api.runpod.ai/v2/unified-speech';
+  process.env.SOMALI_TTS_URL = 'https://api.runpod.ai/v2/unified-speech/run';
+  process.env.RUNPOD_API_KEY = 'test-key';
+  global.fetch = async (url, options) => {
+    requests.push({ url: String(url), body: JSON.parse(options.body) });
+    return Response.json({
+      status: 'COMPLETED',
+      output: { status: 'ready', service: 'all', models: { asr: 'loaded', somali_tts: 'loaded' } },
+    });
+  };
+
+  try {
+    const result = await speech.warmSpeechService('test-warmup');
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].url, 'https://api.runpod.ai/v2/unified-speech/run');
+    assert.deepEqual(requests[0].body.input, {
+      action: 'warmup',
+      service: 'all',
+      requestId: 'test-warmup',
+    });
+    assert.equal(result.models.asr, 'loaded');
+    assert.equal(result.models.somali_tts, 'loaded');
+  } finally {
+    global.fetch = originalFetch;
+    if (originalAsrUrl === undefined) delete process.env.SOMALI_ASR_URL;
+    else process.env.SOMALI_ASR_URL = originalAsrUrl;
+    if (originalTtsUrl === undefined) delete process.env.SOMALI_TTS_URL;
+    else process.env.SOMALI_TTS_URL = originalTtsUrl;
+    if (originalRunPodKey === undefined) delete process.env.RUNPOD_API_KEY;
+    else process.env.RUNPOD_API_KEY = originalRunPodKey;
+  }
+});

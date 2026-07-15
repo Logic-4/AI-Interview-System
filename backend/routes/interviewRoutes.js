@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const {
   createInterview,
+  warmInterviewServices,
+  getWarmupStatus,
   getInterviews,
   getInterview,
   getInterviewProgress,
@@ -24,6 +26,8 @@ const upload = require('../middleware/upload');
 router.use(protect);
 
 // CRUD
+router.post('/warmup', aiLimiter, warmInterviewServices);
+router.get('/warmup', getWarmupStatus);
 router.post('/', aiLimiter, createInterviewValidator, validate, createInterview);
 router.get('/', listInterviewsValidator, validate, getInterviews);
 router.get('/:id/progress', getInterviewProgress);

@@ -303,7 +303,15 @@ def dispatch(payload: Dict[str, Any]) -> Dict[str, Any]:
     elif action == "warmup":
         service = str(payload.get("service") or "somali_tts").lower()
         started_at = time.perf_counter()
-        if service in {"somali_tts", "tts", "somali"}:
+        model_timings: Dict[str, float] = {}
+        if service in {"all", "interview", "somali_all"}:
+            model_started_at = time.perf_counter()
+            load_som_tts()
+            model_timings["somali_tts_ms"] = round((time.perf_counter() - model_started_at) * 1000, 1)
+            model_started_at = time.perf_counter()
+            load_asr()
+            model_timings["asr_ms"] = round((time.perf_counter() - model_started_at) * 1000, 1)
+        elif service in {"somali_tts", "tts", "somali"}:
             load_som_tts()
         elif service in {"english_tts", "english"}:
             load_eng_tts()
@@ -311,7 +319,16 @@ def dispatch(payload: Dict[str, Any]) -> Dict[str, Any]:
             load_asr()
         else:
             return {"error": f"Unknown warmup service: {service}"}
-        return {"status": "ready", "service": service, "load_ms": round((time.perf_counter() - started_at) * 1000, 1)}
+        return {
+            "status": "ready",
+            "service": service,
+            "load_ms": round((time.perf_counter() - started_at) * 1000, 1),
+            "model_timings": model_timings,
+            "models": {
+                "asr": ASR_MODEL_ID if asr_model is not None else "not_loaded",
+                "somali_tts": SOM_TTS_MODEL_ID if som_tts_model is not None else "not_loaded",
+            },
+        }
     elif action == "health":
         return {
             "status": "ok",
