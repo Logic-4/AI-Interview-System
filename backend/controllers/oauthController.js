@@ -58,15 +58,17 @@ const finishOAuth = async (res, { provider, providerId, email, name, avatar }) =
 
 // ─── Google ─────────────────────────────────────────
 
-const googleRedirect = (_req, res) => {
+const googleRedirect = (req, res) => {
+  const loginHint = String(req.query.login_hint || '').trim();
   const params = new URLSearchParams({
     client_id: process.env.GOOGLE_CLIENT_ID,
     redirect_uri: `${process.env.API_BASE_URL || 'http://localhost:5000'}/api/v1/auth/google/callback`,
     response_type: 'code',
     scope: 'openid email profile',
     access_type: 'offline',
-    prompt: 'consent',
+    prompt: 'select_account',
   });
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginHint)) params.set('login_hint', loginHint);
   res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
 };
 

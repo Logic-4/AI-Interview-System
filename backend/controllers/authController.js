@@ -3,7 +3,7 @@ const User = require('../models/User');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { generateAccessToken, generateRefreshToken, verifyRefreshToken, getTokenExpiry, getExpiryMs } = require('../utils/tokenUtils');
-const { sendPasswordResetEmail } = require('../services/emailService');
+const { sendPasswordResetEmail, sendGoogleSignInHelpEmail } = require('../services/emailService');
 const logger = require('../utils/logger');
 
 const DEFAULT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
@@ -281,8 +281,17 @@ const forgotPassword = async (req, res, next) => {
 
     const user = await User.findOne({ email });
 
-    // Always respond success to prevent email enumeration
-    if (!user || user.provider !== 'local') {
+    // Always respond success to prevent email enumeration. Google accounts get
+    // guidance rather than a reset token because they have no local password.
+    if (!user) {
+      return ApiResponse.success(res, null, 'If an account exists with that email, a reset link has been sent.');
+    }
+    if (user.provider !== 'local') {
+      try {
+        await sendGoogleSignInHelpEmail(user);
+      } catch (emailError) {
+        logger.error(`Google sign-in help email failed: ${emailError.message}`);
+      }
       return ApiResponse.success(res, null, 'If an account exists with that email, a reset link has been sent.');
     }
 

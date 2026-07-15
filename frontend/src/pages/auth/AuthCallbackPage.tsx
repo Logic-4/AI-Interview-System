@@ -4,6 +4,7 @@ import { useAuthStore } from "../../stores/authStore";
 import authService from "../../services/authService";
 import toast from "react-hot-toast";
 import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
+import { rememberGoogleAccount } from "../../lib/rememberedAccounts";
 
 export default function AuthCallbackPage() {
   const navigate = useNavigate();
@@ -27,6 +28,7 @@ export default function AuthCallbackPage() {
 
       try {
         const user = await authService.getMe();
+        rememberGoogleAccount({ name: user.name, email: user.email, avatar: user.avatar });
         login(user, accessToken);
         toast.success("Signed in successfully!");
         navigate("/dashboard", { replace: true });

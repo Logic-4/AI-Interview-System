@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { IRootState } from '../../store';
 import { useEffect, useState, useMemo } from 'react';
 import { setPageTitle } from '../../store/themeConfigSlice';
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, UserRound, X } from 'lucide-react';
 import authService from '../../services/authService';
 import { useAuthStore } from '../../stores/authStore';
 import { sanitizeRedirectPath } from '../../lib/authRedirect';
@@ -13,6 +13,7 @@ import toast from 'react-hot-toast';
 import axios from 'axios';
 import ThemeToggle from '../../components/layout/ThemeToggle';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { forgetGoogleAccount, getRememberedGoogleAccounts, RememberedGoogleAccount } from '../../lib/rememberedAccounts';
 
 const LoginPage = () => {
     const dispatch = useDispatch();
@@ -28,6 +29,7 @@ const LoginPage = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [isCheckingSession, setIsCheckingSession] = useState(true);
     const [showPassword, setShowPassword] = useState(false);
+    const [rememberedAccounts, setRememberedAccounts] = useState<RememberedGoogleAccount[]>([]);
 
     const redirectPath = useMemo(
         () => sanitizeRedirectPath(searchParams.get('from')),
@@ -36,6 +38,7 @@ const LoginPage = () => {
 
     useEffect(() => {
         dispatch(setPageTitle('Sign In | InterviewAI'));
+        setRememberedAccounts(getRememberedGoogleAccounts());
     }, [dispatch]);
 
     useEffect(() => {
@@ -98,6 +101,15 @@ const LoginPage = () => {
         }
     };
 
+    const continueWithGoogle = (email?: string) => {
+        window.location.href = getGoogleAuthUrl(email);
+    };
+
+    const forgetAccount = (email: string) => {
+        forgetGoogleAccount(email);
+        setRememberedAccounts(getRememberedGoogleAccounts());
+    };
+
     return (
         <div>
             <div className="absolute inset-0">
@@ -120,6 +132,29 @@ const LoginPage = () => {
                                 <h1 className="text-3xl font-extrabold uppercase !leading-snug text-primary md:text-4xl">Sign in</h1>
                                 <p className="text-base font-bold leading-normal text-white-dark mt-2">Enter your email and password to login</p>
                             </div>
+                            {rememberedAccounts.length > 0 && (
+                                <div className="mb-6 rounded-2xl border border-primary/20 bg-primary/[0.06] p-4">
+                                    <div className="mb-3 flex items-center gap-2 text-sm font-bold text-primary">
+                                        <UserRound className="h-4 w-4" /> Continue as
+                                    </div>
+                                    <div className="space-y-2">
+                                        {rememberedAccounts.map((account) => (
+                                            <div key={account.email} className="flex items-center gap-3 rounded-xl bg-white/80 p-3 dark:bg-black/30">
+                                                {account.avatar ? (
+                                                    <img src={account.avatar} alt="" className="h-10 w-10 rounded-full object-cover" />
+                                                ) : (
+                                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">{account.name?.charAt(0)?.toUpperCase() || 'G'}</div>
+                                                )}
+                                                <button type="button" onClick={() => continueWithGoogle(account.email)} className="min-w-0 flex-1 text-left">
+                                                    <span className="block truncate text-sm font-bold text-text-primary dark:text-white">{account.name || 'Google account'}</span>
+                                                    <span className="block truncate text-xs text-text-muted">{account.email}</span>
+                                                </button>
+                                                <button type="button" onClick={() => forgetAccount(account.email)} aria-label={`Forget ${account.email}`} className="rounded p-1 text-text-muted hover:text-danger"><X className="h-4 w-4" /></button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                             <form className="space-y-5 dark:text-white" onSubmit={handleSubmit}>
                                 <div>
                                     <label htmlFor="Email">Email Address</label>
@@ -194,7 +229,7 @@ const LoginPage = () => {
                             <div className="mt-4 mb-4 flex flex-col gap-3">
                                 <button
                                     type="button"
-                                    onClick={() => { window.location.href = getGoogleAuthUrl(); }}
+                                    onClick={() => continueWithGoogle()}
                                     className="w-full h-12 flex items-center justify-center gap-3 rounded-xl border border-primary text-primary hover:bg-primary-light dark:hover:bg-primary-dark-light hover:text-primary-hover font-bold transition-all duration-150 active:scale-95 cursor-pointer"
                                 >
                                     <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0">

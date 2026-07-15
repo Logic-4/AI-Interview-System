@@ -205,6 +205,9 @@ Configure these backend environment variables so password-reset messages are del
 RESEND_API_KEY=re_...
 EMAIL_FROM=InterviewAI <noreply@your-verified-domain.com>
 CLIENT_URL=https://www.interviewsystem.app
+EMAIL_LOGO_URL=https://www.interviewsystem.app/ai-interview-logo.svg
+EMAIL_SUPPORT_URL=https://www.interviewsystem.app/contact
+EMAIL_SUPPORT_EMAIL=support@interviewsystem.app
 ```
 
 After deploying the schema changes, run the one-time migration with the backend's `MONGO_URI`:
