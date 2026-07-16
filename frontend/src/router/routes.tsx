@@ -6,6 +6,7 @@ const RegisterPage = lazy(() => import('../pages/auth/RegisterPage'));
 const ForgotPasswordPage = lazy(() => import('../pages/auth/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('../pages/auth/ResetPasswordPage'));
 const AuthCallbackPage = lazy(() => import('../pages/auth/AuthCallbackPage'));
+const MaintenancePage = lazy(() => import('../pages/MaintenancePage'));
 
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const InterviewsHistoryPage = lazy(() => import('../pages/dashboard/InterviewsHistoryPage'));
@@ -23,6 +24,11 @@ const routes = [
     {
         path: '/',
         element: <LandingPage />,
+        layout: 'blank',
+    },
+    {
+        path: '/maintenance',
+        element: <MaintenancePage />,
         layout: 'blank',
     },
     {

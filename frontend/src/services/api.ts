@@ -26,6 +26,11 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    if (error.response?.status === 503 && error.response?.data?.maintenance) {
+      window.location.href = '/maintenance';
+      return Promise.reject(error);
+    }
+
     const originalRequest = error.config;
     const requestUrl = originalRequest?.url || '';
     const isAuthRequest = [

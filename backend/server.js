@@ -17,6 +17,7 @@ const { generalLimiter } = require('./middleware/rateLimiter');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
 const { requestContext } = require('./middleware/requestContext');
+const { checkMaintenance } = require('./middleware/maintenance');
 const { startPiper, stopPiper } = require('./utils/piperProcess');
 const { startSomaliSpeech, stopSomaliSpeech } = require('./utils/somaliSpeechProcess');
 
@@ -64,6 +65,7 @@ app.use('/api/', generalLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
+app.use(checkMaintenance);
 
 // ─── Logging ─────────────────────────────────────────
 if (process.env.NODE_ENV === 'development') {
@@ -82,6 +84,7 @@ app.get('/api/v1/health', (req, res) => {
     environment: process.env.NODE_ENV,
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
+    maintenance: process.env.MAINTENANCE_MODE === 'true',
   });
 });
 
