@@ -20,7 +20,8 @@ import { getApiBaseUrl } from '../lib/apiConfig';
  */
 export async function transcribeAudio(
   audioBlob: Blob,
-  filename = 'answer.webm'
+  filename = 'answer.webm',
+  languageCode = 'so-SO'
 ): Promise<string> {
   // Attach the JWT so the protected route accepts the request
   const token = typeof window !== 'undefined'
@@ -29,6 +30,7 @@ export async function transcribeAudio(
 
   const form = new FormData();
   form.append('audio', audioBlob, filename);
+  form.append('languageCode', languageCode);
 
   const response = await fetch(`${getApiBaseUrl()}/stt/transcribe`, {
     method: 'POST',

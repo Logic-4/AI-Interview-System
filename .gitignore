@@ -12,15 +12,12 @@ dist/
 .env.test.local
 .env.production.local
 
-# Piper model files (large files, 60MB+)
+# Speech model files (large files, 60MB+)
 *.onnx
 *.onnx.json
 
 # Logs & temp files
 *.log
-piper-server.err.log
-piper-server.out.log
-piper-test.wav
 
 # Python cache & runtime logs
 __pycache__/

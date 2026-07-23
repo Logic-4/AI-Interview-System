@@ -11,7 +11,7 @@ Hosts `Mohamud24/gemma-3-technical-interviewer` on RunPod Serverless so your Nod
 | **HF_TOKEN** | [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) (read access to your gated Gemma model) |
 | **24 GB GPU tier** | L4 / 3090 / 4090 / A5000 (~$0.69/hr on Serverless) (Note: Blackwell GPUs are not supported by the default PyTorch 2.4 image) |
 
-Do **not** put Somali ASR/TTS/Piper on this worker for now — keep those on your PC or a cheap CPU VPS.
+Do **not** put speech services on this worker for now — keep Somali speech local/CPU-hosted and English Whisper/Kokoro on its dedicated GPU endpoint.
 
 ---
 

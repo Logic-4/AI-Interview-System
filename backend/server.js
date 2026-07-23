@@ -18,7 +18,6 @@ const errorHandler = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
 const { requestContext } = require('./middleware/requestContext');
 const { checkMaintenance } = require('./middleware/maintenance');
-const { startPiper, stopPiper } = require('./utils/piperProcess');
 const { startSomaliSpeech, stopSomaliSpeech } = require('./utils/somaliSpeechProcess');
 
 // Routes
@@ -122,9 +121,6 @@ const startServer = async () => {
     // Connect to MongoDB
     await connectDB();
 
-    // Start Piper TTS in development (PIPER_AUTO_START=true by default)
-    await startPiper(logger);
-
     // Somali ASR/TTS warm up in background (models can take minutes on first load)
     void startSomaliSpeech(logger, { waitForReady: false }).catch((err) => {
       logger.warn(`[somali-speech] Auto-start error: ${err.message}`);
@@ -156,7 +152,6 @@ startServer();
 function shutdown(signal) {
   logger.info(`${signal} received — shutting down`);
   stopSomaliSpeech(logger);
-  stopPiper(logger);
   server.close(() => process.exit(0));
 }
 

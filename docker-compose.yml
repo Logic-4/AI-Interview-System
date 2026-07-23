@@ -1,5 +1,5 @@
 # Staging stack for AI Interview System
-# Gemma inference (RunPod serverless worker) and Piper TTS run separately — set RUNPOD_API_URL and PIPER_BASE_URL in .env
+# Gemma inference, Somali speech services, and the English RunPod speech worker run separately.
 
 services:
   mongodb:

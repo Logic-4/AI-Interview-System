@@ -285,7 +285,7 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
   return {
     speak, prefetch, prefetchMany, cancel, pause, resume,
     isSpeaking, isPaused, isFetchingTTS, highlight,
-    voiceName: isSomaliLanguage(languageCode) ? "Somali TTS" : "Piper TTS",
+    voiceName: isSomaliLanguage(languageCode) ? "Somali TTS" : "Kokoro TTS",
     ready: status === "ready" || status === "playing",
     status, error, provider,
   };

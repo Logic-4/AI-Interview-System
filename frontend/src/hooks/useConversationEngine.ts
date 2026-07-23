@@ -165,11 +165,8 @@ export function useConversationEngine(
     tts.pause();
     // Only pause audio/recording if actually in the listening phase
     if (phaseRef.current === "listening") {
-      if (isSomaliSession()) {
-        audioRecorder.pauseRecording();
-      } else {
-        try { recognition.stopListening(); } catch {}
-      }
+      audioRecorder.pauseRecording();
+      if (!isSomaliSession()) try { recognition.stopListening(); } catch {}
     }
   }, [tts, recognition, audioRecorder.pauseRecording, language]);
 
@@ -178,10 +175,9 @@ export function useConversationEngine(
     isPausedRef.current = false;
     setIsPaused(false);
     tts.resume();
-    if (phaseRef.current === "listening" && !isSomaliSession()) {
-      recognition.startListening();
-    } else if (phaseRef.current === "listening") {
+    if (phaseRef.current === "listening") {
       audioRecorder.resumeRecording();
+      if (!isSomaliSession()) recognition.startListening();
     }
   }, [tts, recognition, audioRecorder.resumeRecording]);
 
@@ -213,11 +209,8 @@ export function useConversationEngine(
   /* ── Stop recording for review ─────────────────────────── */
   const stopRecordingForReview = useCallback(() => {
     if (phaseRef.current === "listening") {
-      if (isSomaliSession()) {
-        audioRecorder.stopRecording();
-      } else {
-        recognition.stopListening();
-      }
+      audioRecorder.stopRecording();
+      if (!isSomaliSession()) recognition.stopListening();
       setPhase("reviewing");
     }
   }, [recognition, audioRecorder.stopRecording]);
@@ -284,18 +277,18 @@ export function useConversationEngine(
     listenStartRef.current = Date.now();
     questionTimerRef.current = 0;
 
-    if (!isSomaliSession()) {
-      recognition.resetTranscript();
-      recognition.startListening();
-      return;
-    }
-
     try {
       await audioRecorder.resetRecording();
       await audioRecorder.startRecording();
     } catch {
       toast.error("Microphone access failed. Allow the mic in your browser and try again.");
       setPhase("reviewing");
+      return;
+    }
+
+    if (!isSomaliSession()) {
+      recognition.resetTranscript();
+      recognition.startListening();
     }
   }, [recognition, audioRecorder]);
 
@@ -306,20 +299,15 @@ export function useConversationEngine(
       setPhase("processing");
 
       const isSomali = isSomaliSession();
-      let audioAnswer: Blob | null = null;
-      if (isSomali) {
-        audioAnswer = await audioRecorder.finalizeRecording();
-      } else {
-        recognition.stopListening();
-      }
+      const audioAnswer = await audioRecorder.finalizeRecording();
+      if (!isSomali) recognition.stopListening();
 
       // ── Determine transcript ─────────────────────────────────────────────
       let transcript: string;
-      let sttSucceeded = false;
       let sttErrorMessage: string | null = null;
       if (textAnswer !== undefined) {
         transcript = textAnswer.trim();
-      } else if (isSomali) {
+      } else {
         if (!audioAnswer || audioAnswer.size < 500) {
           toast.error(
             audioAnswer
@@ -331,21 +319,22 @@ export function useConversationEngine(
         }
         try {
           console.log(`[STT] Sending ${(audioAnswer.size / 1024).toFixed(1)} KB to ASR…`);
-          transcript = await transcribeWithSTT(audioAnswer, 'answer.webm');
+          transcript = await transcribeWithSTT(audioAnswer, 'answer.webm', languageCode);
           if (!transcript.trim()) {
             transcript = "[No speech detected]";
-          } else {
-            sttSucceeded = true;
           }
           console.log(`[STT] Transcript received: "${transcript.slice(0, 80)}"`);
         } catch (sttError) {
           console.warn("[STT] Transcription failed:", sttError);
           sttErrorMessage =
             sttError instanceof Error ? sttError.message : "Speech recognition service unavailable";
-          transcript = "[Transcription unavailable — audio was recorded but could not be processed]";
+          transcript = isSomali
+            ? "[Transcription unavailable — audio was recorded but could not be processed]"
+            : recognition.getTranscript();
+          if (!isSomali && transcript.trim()) {
+            toast("Whisper is unavailable; using the browser transcript for this answer.", { icon: "⚠️" });
+          }
         }
-      } else {
-        transcript = recognition.getTranscript();
       }
 
       if (!transcript.trim() || isPlaceholderTranscript(transcript)) {
@@ -382,7 +371,7 @@ export function useConversationEngine(
           transcript,
           timeSpent,
           {
-            audio: isSomali && sttSucceeded ? undefined : (audioAnswer || undefined),
+            audio: audioAnswer || undefined,
             activePromptText: activePromptRef.current || question.text,
           }
         );

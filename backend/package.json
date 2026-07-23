@@ -6,12 +6,12 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "piper": "node ../scripts/start-piper.js",
     "somali-speech": "node -e \"require('./utils/somaliSpeechProcess').startSomaliSpeech(console).then(()=>process.exit(0))\"",
     "setup:somali-speech": "node ../scripts/setup-somali-speech.js",
     "test": "node --test test/*.test.js",
     "benchmark:pipeline": "node scripts/benchmarkPipeline.js",
     "migrate:core-product": "node scripts/migrateCoreProduct.js",
+    "seed:demo": "node scripts/seedDemoData.js",
     "lint": "eslint ."
   },
   "keywords": [

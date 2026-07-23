@@ -294,9 +294,9 @@ After multiple sessions, the candidate should:
 
 ---
 
-## Local Text-To-Speech (Piper)
+## Local Somali speech services
 
-English interviews use Piper. Somali uses Python ASR/TTS on ports **8001** (ASR) and **8002** (TTS).
+Somali uses Python ASR/TTS on ports **8001** (ASR) and **8002** (TTS). English speech uses the dedicated Whisper Turbo + Kokoro worker described below.
 
 **One-time Somali setup** (required — the bundled `Skydheere/.venv` may point to another machine's Python):
 
@@ -314,34 +314,19 @@ cd backend && npm run dev
 
 First launch can take **1–3 minutes** while models load. Wait for backend logs: `[somali-tts] Ready at http://127.0.0.1:8002`.
 
-**English Piper — one-time setup:**
+## English speech services: Whisper Turbo + Kokoro
 
-```bash
-pip install "piper-tts[http]"
-python -m piper.download_voices en_US-lessac-medium
-```
+English interviews use a dedicated GPU speech worker in production. It transcribes the final recording with `openai/whisper-large-v3-turbo` and synthesizes interviewer audio with `hexgrad/Kokoro-82M`; Somali speech services are unchanged.
 
-**Option A — automatic (recommended for dev):**  
-With `PIPER_AUTO_START=true` in root `.env`, the backend starts Piper when you run:
-
-```bash
-cd backend && npm run dev
-```
-
-**Option B — manual:** run Piper in its own terminal:
-
-```bash
-cd backend && npm run piper
-# or: node scripts/start-piper.js
-# or: scripts/start-piper.bat   (Windows)
-```
-
-Root `.env`:
+Deploy `services/english-speech` as its own persistent GPU RunPod endpoint, then configure the backend:
 
 ```env
-PIPER_BASE_URL=http://localhost:5001
-PIPER_VOICE=en_US-lessac-medium
-PIPER_AUTO_START=true
+ENGLISH_ASR_URL=https://api.runpod.ai/v2/<english-speech-endpoint>
+ENGLISH_TTS_URL=https://api.runpod.ai/v2/<english-speech-endpoint>
+KOKORO_VOICE=af_heart
+ENGLISH_ASR_TIMEOUT_MS=90000
+ENGLISH_ASR_MAX_BYTES=31457280
+ENGLISH_ASR_MAX_SECONDS=180
 ```
 
-If Piper is not running, English TTS falls back to the browser's built-in speech synthesis.
+The worker accepts `transcribe`, `synthesize`, `warmup`, and `health` actions. Keep the endpoint warm in production; it requires NVIDIA CUDA for Whisper Turbo. Browser speech remains the final client fallback if the English worker is unavailable.

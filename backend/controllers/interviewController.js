@@ -590,10 +590,10 @@ const submitAnswer = async (req, res, next) => {
       // Transcribe audio if no text answer provided
       if (!userAnswer) {
         try {
-          transcribedAnswer = await transcribeAudio(req.file.buffer, req.file.originalname, req.file.mimetype);
+          transcribedAnswer = await transcribeAudio(req.file.buffer, req.file.originalname, req.file.mimetype, interview.language);
         } catch (transcriptionError) {
-          logger.warn(`Somali audio transcription failed: ${transcriptionError.message}`);
-          return next(ApiError.badRequest('Could not transcribe the Somali audio answer. Please try recording again.'));
+          logger.warn(`${interview.language} audio transcription failed: ${transcriptionError.message}`);
+          return next(ApiError.badRequest(`Could not transcribe the ${interview.language} audio answer. Please try recording again.`));
         }
       }
     }

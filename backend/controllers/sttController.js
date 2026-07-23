@@ -24,12 +24,14 @@ const transcribe = async (req, res, next) => {
     }
 
     const { buffer, originalname, mimetype } = req.file;
+    const languageCode = String(req.body?.languageCode || req.body?.language || 'so-SO');
     logger.info(`[STT] Received audio: "${originalname}" (${mimetype}, ${(buffer.length / 1024).toFixed(1)} KB)`);
 
     const transcript = await transcribeAudio(
       buffer,
       originalname || 'answer.webm',
-      mimetype || 'audio/webm'
+      mimetype || 'audio/webm',
+      languageCode
     );
 
     logger.info(`[STT] Transcript (${transcript.length} chars): "${transcript.slice(0, 120)}"`);
