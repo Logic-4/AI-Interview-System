@@ -174,6 +174,11 @@ function compactRoleProfile(roleProfile) {
     technicalStack: (roleProfile.technicalStack || []).slice(0, 5),
     responsibilities: (roleProfile.responsibilities || []).slice(0, 3),
     experienceLevel: roleProfile.experienceLevel || roleProfile.experience || '',
+    candidateSkills: (roleProfile.candidateSkills || []).slice(0, 8),
+    candidateExperience: (roleProfile.candidateExperience || []).slice(0, 5),
+    candidateEducation: (roleProfile.candidateEducation || []).slice(0, 3),
+    candidateProjects: (roleProfile.candidateProjects || []).slice(0, 5),
+    candidateCertifications: (roleProfile.candidateCertifications || []).slice(0, 5),
   };
 }
 
@@ -451,6 +456,9 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
     resumeText,
     focusSkills,
     roleProfile,
+    title,
+    duration,
+    scheduledAt,
     _forcedCategory,
     _forcedIndex,
     _forcedCount,
@@ -466,9 +474,17 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
   if (roleProfile?.requiredSkills?.length) skillHints.push(...roleProfile.requiredSkills);
   if (roleProfile?.preferredSkills?.length) skillHints.push(...roleProfile.preferredSkills);
   if (roleProfile?.technicalStack?.length) skillHints.push(...roleProfile.technicalStack);
+  if (roleProfile?.candidateSkills?.length) skillHints.push(...roleProfile.candidateSkills);
   if (focusSkills?.length) skillHints.push(...focusSkills);
   // Deduplicate
   const uniqueSkills = [...new Set(skillHints.map(s => s.toLowerCase()))].slice(0, 10);
+  const hasStructuredProfile = Boolean(roleProfile && (
+    roleProfile.requiredSkills?.length
+    || roleProfile.candidateSkills?.length
+    || roleProfile.responsibilities?.length
+    || roleProfile.candidateExperience?.length
+  ));
+  const rawContextLimit = hasStructuredProfile ? 2000 : 12000;
 
   console.log(`\n[gemmaService] 🎯 Fetching ${count} interview questions...`);
   if (uniqueSkills.length) console.log(`[gemmaService] 📋 Focus skills: ${uniqueSkills.join(', ')}`);
@@ -491,8 +507,15 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
       skills: uniqueSkills,
       responsibilities: roleProfile?.responsibilities || [],
       experience: roleProfile?.experienceLevel || '',
-      jobDescription: (jobDescription ? `[Job Description]:\n${jobDescription.slice(0, 800)}` : '')
-        + (resumeText ? `\n\n[Candidate Resume]:\n${resumeText.slice(0, 500)}` : ''),
+      candidateExperience: roleProfile?.candidateExperience || [],
+      candidateEducation: roleProfile?.candidateEducation || [],
+      candidateProjects: roleProfile?.candidateProjects || [],
+      candidateCertifications: roleProfile?.candidateCertifications || [],
+      interviewTitle: title || '',
+      durationMinutes: duration || null,
+      scheduledAt: scheduledAt || null,
+      jobDescription: jobDescription ? jobDescription.slice(0, rawContextLimit) : '',
+      resumeText: resumeText ? resumeText.slice(0, rawContextLimit) : '',
       requestId,
     };
 
@@ -623,10 +646,12 @@ const evaluateAnswer = async () => {
  *   Payload:  { job_description, role }
  *   Response: expects { evaluation: "..." } or direct JSON
  */
-const parseJobDescription = async (jobDescription, jobRole) => {
+const parseJobDescription = async (jobDescription, jobRole, resumeText = '', metadata = {}) => {
   const payload = {
     job_description: jobDescription,
+    resume_text: resumeText,
     role: jobRole,
+    interview_title: metadata.title || '',
   };
 
   const result = await callGemma('/parse', payload);

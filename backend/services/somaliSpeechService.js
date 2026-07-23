@@ -314,13 +314,19 @@ async function synthesizeSpeech(text, languageCode = 'en-US', options = {}) {
   throw error;
 }
 
-async function warmSpeechService(requestId = 'startup-warmup') {
+async function warmSpeechService(requestId = 'startup-warmup', language = 'all') {
+  const normalizedWarmupLanguage = String(language || 'all').toLowerCase();
   const endpoints = [
     { url: getAsrBaseUrl(), service: 'asr', timeoutMs: ASR_TIMEOUT_MS },
     { url: getTtsBaseUrl(), service: 'somali_tts', timeoutMs: TTS_TIMEOUT_MS },
     { url: getEnglishAsrBaseUrl(), service: 'english_asr', timeoutMs: ENGLISH_ASR_TIMEOUT_MS },
     { url: getEnglishTtsBaseUrl(), service: 'english_tts', timeoutMs: TTS_TIMEOUT_MS },
-  ].filter((entry) => isRunPodUrl(entry.url));
+  ].filter((entry) => {
+    if (!isRunPodUrl(entry.url)) return false;
+    if (normalizedWarmupLanguage === 'english') return entry.service.startsWith('english_');
+    if (normalizedWarmupLanguage === 'somali') return !entry.service.startsWith('english_');
+    return true;
+  });
 
   if (!endpoints.length) {
     return { status: 'skipped', reason: 'not_runpod' };

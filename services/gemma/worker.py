@@ -414,7 +414,15 @@ def handle_generate_question(data: dict) -> dict:
     skills = data.get("skills", [])
     responsibilities = data.get("responsibilities", [])
     experience = data.get("experience", "")
+    candidate_experience = data.get("candidateExperience", [])
+    candidate_education = data.get("candidateEducation", [])
+    candidate_projects = data.get("candidateProjects", [])
+    candidate_certifications = data.get("candidateCertifications", [])
+    interview_title = data.get("interviewTitle", "")
+    duration_minutes = data.get("durationMinutes")
+    scheduled_at = data.get("scheduledAt")
     job_description = data.get("jobDescription", "")
+    resume_text = data.get("resumeText", "")
 
     lang_hint = (
         "Generate the question in English."
@@ -444,9 +452,26 @@ def handle_generate_question(data: dict) -> dict:
         context_block += f"Key responsibilities for this role include: {', '.join(responsibilities[:5])}.\n"
     if experience:
         context_block += f"Required experience level: {experience}.\n"
+    if candidate_experience:
+        context_block += f"Candidate experience highlights: {', '.join(candidate_experience[:5])}.\n"
+    if candidate_education:
+        context_block += f"Candidate education: {', '.join(candidate_education[:3])}.\n"
+    if candidate_projects:
+        context_block += f"Candidate projects: {', '.join(candidate_projects[:5])}.\n"
+    if candidate_certifications:
+        context_block += f"Candidate certifications: {', '.join(candidate_certifications[:5])}.\n"
+    if interview_title:
+        context_block += f"Interview title and intended focus: {interview_title[:200]}.\n"
+    if duration_minutes:
+        context_block += f"Planned interview duration: {duration_minutes} minutes; keep each question proportionate to that time budget.\n"
+    if scheduled_at:
+        context_block += f"Interview schedule metadata: {str(scheduled_at)[:80]}.\n"
     if job_description:
-        context_block += f"Job description details: {job_description[:400]}\n"
+        context_block += f"Job description details:\n{job_description[:6000]}\n"
         context_block += "Ensure the question aligns with the context and requirements provided above.\n"
+    if resume_text:
+        context_block += f"Candidate resume details:\n{resume_text[:6000]}\n"
+        context_block += "Tailor questions to actual candidate claims, projects, and experience without revealing private contact details.\n"
 
     prompt_content = (
         f"You are an expert {domain} interviewer hiring for a {role} position.\n"
@@ -514,26 +539,34 @@ def handle_warmup(_data: dict) -> dict:
 
 def handle_parse(data: dict) -> dict:
     job_description = data.get("job_description", "")
+    resume_text = data.get("resume_text", "")
     role = data.get("role", "")
-    job_description = job_description[:6000] if job_description else ""
+    interview_title = data.get("interview_title", "")
+    job_description = job_description[:10000] if job_description else ""
+    resume_text = resume_text[:10000] if resume_text else ""
 
     messages = [
         {
             "role": "user",
             "content": (
-                "You are an expert job description parser. "
-                "Extract structured data from this job description. "
+                "You are an expert job-description and resume parser. "
+                "Extract structured hiring requirements and candidate evidence from the supplied text. "
                 "IMPORTANT: Keep all arrays to a MAXIMUM of 8 items each. "
-                "Keep all string values under 60 characters. "
+                "Keep each array item under 120 characters and do not include contact details. "
                 "Return ONLY raw JSON with EXACTLY these keys: "
                 "requiredSkills (array of strings), preferredSkills (array of strings), "
-                "responsibilities (array of strings), experienceLevel (string), technicalStack (array of strings).\n\n"
-                f"Parse this job description for a {role} role:\n\n{job_description}"
+                "responsibilities (array of strings), experienceLevel (string), technicalStack (array of strings), "
+                "candidateSkills (array of strings), candidateExperience (array of strings), "
+                "candidateEducation (array of strings), candidateProjects (array of strings), "
+                "candidateCertifications (array of strings).\n\n"
+                f"Role: {role}\nInterview title: {interview_title}\n\n"
+                f"JOB DESCRIPTION:\n{job_description or 'Not provided'}\n\n"
+                f"CANDIDATE RESUME:\n{resume_text or 'Not provided'}"
             ),
         }
     ]
 
-    parsed, _raw = generate_json_response(messages, max_new_tokens=256, temperature=0.0)
+    parsed, _raw = generate_json_response(messages, max_new_tokens=512, temperature=0.0)
     if parsed:
         return {"data": parsed}
     return {
@@ -543,6 +576,11 @@ def handle_parse(data: dict) -> dict:
             "responsibilities": [],
             "experienceLevel": "",
             "technicalStack": [],
+            "candidateSkills": [],
+            "candidateExperience": [],
+            "candidateEducation": [],
+            "candidateProjects": [],
+            "candidateCertifications": [],
         }
     }
 

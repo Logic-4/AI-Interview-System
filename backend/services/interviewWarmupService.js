@@ -2,10 +2,13 @@ const logger = require('../utils/logger');
 const { warmGemma } = require('./gemmaService');
 const { warmSpeechService } = require('./somaliSpeechService');
 
-const WARM_TTL_MS = Math.max(60_000, Number(process.env.INTERVIEW_WARM_TTL_MS || 8 * 60 * 1000));
+// This is an application freshness hint, not proof that a zero-active-worker
+// RunPod endpoint is still alive. Live interviews use forced heartbeats.
+const WARM_TTL_MS = Math.max(60_000, Number(process.env.INTERVIEW_WARM_TTL_MS || 2 * 60 * 1000));
 
 const createServiceState = () => ({
   status: 'idle',
+  variant: null,
   startedAt: null,
   completedAt: null,
   readyUntil: null,
@@ -47,7 +50,7 @@ function snapshot() {
   };
 }
 
-async function runServiceWarmup(name, requestId) {
+async function runServiceWarmup(name, requestId, language) {
   const service = state[name];
   const startedAt = Date.now();
   service.status = 'warming';
@@ -57,9 +60,10 @@ async function runServiceWarmup(name, requestId) {
   service.error = '';
 
   try {
-    await warmers[name](requestId);
+    await warmers[name](requestId, language);
     const completedAt = Date.now();
     service.status = 'ready';
+    service.variant = name === 'speech' ? language : null;
     service.completedAt = new Date(completedAt).toISOString();
     service.readyUntil = new Date(completedAt + WARM_TTL_MS).toISOString();
     logger.info(JSON.stringify({
@@ -82,11 +86,18 @@ async function runServiceWarmup(name, requestId) {
   }
 }
 
-function startInterviewWarmup({ requestId = 'interview-warmup', force = false } = {}) {
+function startInterviewWarmup({ requestId = 'interview-warmup', force = false, language = 'all' } = {}) {
+  const normalizedLanguage = ['english', 'somali'].includes(String(language).toLowerCase())
+    ? String(language).toLowerCase()
+    : 'all';
   expireStaleServices();
   if (activeWarmup) return { started: false, ...snapshot() };
 
-  const names = Object.keys(state).filter((name) => force || state[name].status !== 'ready');
+  const names = Object.keys(state).filter((name) => (
+    force
+    || state[name].status !== 'ready'
+    || (name === 'speech' && state[name].variant !== normalizedLanguage)
+  ));
   if (!names.length) return { started: false, ...snapshot() };
 
   for (const name of names) {
@@ -94,7 +105,7 @@ function startInterviewWarmup({ requestId = 'interview-warmup', force = false } 
     state[name].error = '';
   }
 
-  activeWarmup = Promise.all(names.map((name) => runServiceWarmup(name, requestId)))
+  activeWarmup = Promise.all(names.map((name) => runServiceWarmup(name, requestId, normalizedLanguage)))
     .finally(() => {
       activeWarmup = null;
     });

@@ -138,6 +138,40 @@ test('warms ASR and Somali TTS with one all-service job on a unified RunPod endp
   }
 });
 
+test('warms only English speech providers for an English interview', async () => {
+  const originalFetch = global.fetch;
+  const previous = {
+    SOMALI_ASR_URL: process.env.SOMALI_ASR_URL,
+    SOMALI_TTS_URL: process.env.SOMALI_TTS_URL,
+    ENGLISH_ASR_URL: process.env.ENGLISH_ASR_URL,
+    ENGLISH_TTS_URL: process.env.ENGLISH_TTS_URL,
+    RUNPOD_API_KEY: process.env.RUNPOD_API_KEY,
+  };
+  const requests = [];
+  process.env.SOMALI_ASR_URL = 'https://api.runpod.ai/v2/somali-speech';
+  process.env.SOMALI_TTS_URL = 'https://api.runpod.ai/v2/somali-speech';
+  process.env.ENGLISH_ASR_URL = 'https://api.runpod.ai/v2/english-speech';
+  process.env.ENGLISH_TTS_URL = 'https://api.runpod.ai/v2/english-speech';
+  process.env.RUNPOD_API_KEY = 'test-key';
+  global.fetch = async (url, options) => {
+    requests.push({ url: String(url), body: JSON.parse(options.body) });
+    return Response.json({ status: 'COMPLETED', output: { status: 'ready' } });
+  };
+
+  try {
+    await speech.warmSpeechService('english-only', 'english');
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].url, 'https://api.runpod.ai/v2/english-speech/run');
+    assert.equal(requests[0].body.input.service, 'all');
+  } finally {
+    global.fetch = originalFetch;
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
 test('sends English recordings to the Whisper worker with a transcribe action', async () => {
   const originalFetch = global.fetch;
   const originalUrl = process.env.ENGLISH_ASR_URL;

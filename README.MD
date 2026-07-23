@@ -327,6 +327,18 @@ KOKORO_VOICE=af_heart
 ENGLISH_ASR_TIMEOUT_MS=90000
 ENGLISH_ASR_MAX_BYTES=31457280
 ENGLISH_ASR_MAX_SECONDS=180
+INTERVIEW_WARM_TTL_MS=120000
 ```
 
-The worker accepts `transcribe`, `synthesize`, `warmup`, and `health` actions. Keep the endpoint warm in production; it requires NVIDIA CUDA for Whisper Turbo. Browser speech remains the final client fallback if the English worker is unavailable.
+The worker accepts `transcribe`, `synthesize`, `warmup`, and `health` actions. It requires NVIDIA CUDA for Whisper Turbo. Browser speech remains the final client fallback if the English worker is unavailable.
+
+For RunPod Serverless with **Active Workers = 0**, attach a network volume at
+`/runpod-volume` so Hugging Face model downloads survive worker replacement, and
+set the endpoint idle timeout to at least **180 seconds**. The app warms models
+when interview setup opens, forces a fresh warm-up at the final setup step, and
+sends a warm heartbeat every 120 seconds while the interview page is visible.
+Only the selected language's speech endpoint is warmed; English setup does not
+start the Somali ASR/TTS workers, and Somali setup does not start Whisper/Kokoro.
+This avoids paying for a 24/7 active worker while keeping the GPU alive during
+an actual interview. A shorter RunPod idle timeout defeats the heartbeat and
+causes repeated cold starts.

@@ -107,6 +107,18 @@ async function saveGeneratedQuestion(interviewId, aiQuestion, order, fallbackDif
 async function runQuestionGenerationPipeline(interviewId, context) {
   const interview = await Interview.findById(interviewId);
   if (!interview || interview.questionsReady || interview.status === 'cancelled') return;
+  const generationContext = {
+    ...context,
+    title: context.title || interview.title,
+    duration: context.duration || interview.duration,
+    scheduledAt: context.scheduledAt || interview.scheduledAt,
+    jobRole: context.jobRole || interview.jobRole,
+    jobDescription: context.jobDescription || interview.jobDescription,
+    resumeText: context.resumeText || interview.resumeText,
+    focusSkills: context.focusSkills || interview.focusSkills,
+    roleProfile: context.roleProfile || interview.roleProfile,
+    language: context.language || interview.language,
+  };
 
   const totalCount = interview.expectedQuestionCount > 0
     ? interview.expectedQuestionCount
@@ -120,6 +132,22 @@ async function runQuestionGenerationPipeline(interviewId, context) {
   });
 
   try {
+    if (!generationContext.roleProfile
+      && (generationContext.jobDescription?.trim() || generationContext.resumeText?.trim())) {
+      try {
+        generationContext.roleProfile = await parseJobDescription(
+          generationContext.jobDescription || '',
+          generationContext.jobRole || interview.domain,
+          generationContext.resumeText || '',
+          { title: generationContext.title }
+        );
+        await Interview.findByIdAndUpdate(interviewId, { roleProfile: generationContext.roleProfile });
+        logger.info(`Interview context parsed before question generation for ${interviewId}`);
+      } catch (parseError) {
+        logger.warn(`Interview context parsing failed for ${interviewId}: ${parseError.message}`);
+      }
+    }
+
     const existingFirst = await Question.findOne({ interview: interviewId, order: 0 });
     let firstQuestion = existingFirst;
     if (!firstQuestion) {
@@ -131,7 +159,7 @@ async function runQuestionGenerationPipeline(interviewId, context) {
           interview.difficulty,
           1,
           {
-            ...context,
+            ...generationContext,
             _forcedCategory: getCategoryForIndex(0, totalCount, interview.type),
             _forcedIndex: 0,
             _forcedCount: totalCount,
@@ -190,7 +218,7 @@ async function runQuestionGenerationPipeline(interviewId, context) {
         interview.difficulty,
         totalCount - 1,
         {
-          ...context,
+          ...generationContext,
           _startIndex: 1,
           _forcedCount: totalCount,
           requestTimeoutMs: Number(process.env.REMAINING_QUESTIONS_TIMEOUT_MS || 60000),
@@ -258,7 +286,10 @@ function ensureQuestionGeneration(interview, context) {
  */
 const createInterview = async (req, res, next) => {
   try {
-    startInterviewWarmup({ requestId: req.requestId || 'create-interview-warmup' });
+    startInterviewWarmup({
+      requestId: req.requestId || 'create-interview-warmup',
+      language: req.body.language || 'english',
+    });
     const { title, type, difficulty, domain, duration, scheduledAt, jobRole, focusSkills, jobDescription, resumeText, language } = req.body;
     const rawGenerationKey = String(req.get('idempotency-key') || '').trim();
     const generationKey = /^[A-Za-z0-9._:-]{1,128}$/.test(rawGenerationKey) ? rawGenerationKey : undefined;
@@ -298,18 +329,6 @@ const createInterview = async (req, res, next) => {
     stopCreateDb();
 
     // ── Step 2: Parse job description asynchronously (non-blocking) ───────────
-    let roleProfile = null;
-    if (jobDescription && jobDescription.trim()) {
-      parseJobDescription(jobDescription, jobRole || domain)
-        .then(async (parsed) => {
-          await Interview.findByIdAndUpdate(interview._id, { roleProfile: parsed });
-          logger.info(`Job description parsed for interview ${interview._id}`);
-        })
-        .catch((parseError) => {
-          logger.warn(`Job description parsing failed for ${interview._id}: ${parseError.message}`);
-        });
-    }
-
     // ── Step 3: Seed conversation history and save ───────────────────────────
     const conversationHistory = [
       {
@@ -337,7 +356,10 @@ const createInterview = async (req, res, next) => {
     // ── Step 5: Generate remaining questions in the background ───────────────
     const bgContext = {
       type, domain, difficulty, jobRole, jobDescription, resumeText,
-      focusSkills, roleProfile, language: interview.language,
+      focusSkills, language: interview.language,
+      title: interview.title,
+      duration: interview.duration,
+      scheduledAt: interview.scheduledAt,
       candidateName: req.user.name,
       requestId: req.requestId,
     };
@@ -361,6 +383,7 @@ const warmInterviewServices = async (req, res, next) => {
     const warmup = startInterviewWarmup({
       requestId: req.requestId || `warmup-${req.user._id}`,
       force: req.query.force === 'true',
+      language: req.query.language,
     });
     ApiResponse.success(res, { warmup }, 'Interview services are warming in the background', 202);
   } catch (error) {

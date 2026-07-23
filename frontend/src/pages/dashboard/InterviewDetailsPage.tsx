@@ -89,6 +89,25 @@ export default function InterviewDetailsPage() {
     return () => setImmersive(false);
   }, [pagePhase, setImmersive]);
 
+  // A zero-active-worker RunPod endpoint can scale down between long answers.
+  // Keep both model endpoints alive only while this interview page is in use.
+  useEffect(() => {
+    if (pagePhase !== "ready" && pagePhase !== "active") return;
+
+    const keepWarm = () => {
+      if (document.visibilityState === "visible") {
+        void interviewService.startInterviewWarmup(true, interview?.language).catch(() => {});
+      }
+    };
+    keepWarm();
+    const intervalId = window.setInterval(keepWarm, 120_000);
+    document.addEventListener("visibilitychange", keepWarm);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", keepWarm);
+    };
+  }, [pagePhase, interview?.language]);
+
   /* ── Fetch interview data (once per interviewId) ──────────── */
   useEffect(() => {
     if (loadedInterviewIdRef.current === interviewId) return;

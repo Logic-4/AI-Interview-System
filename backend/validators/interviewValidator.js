@@ -47,7 +47,16 @@ const createInterviewValidator = [
   body('jobDescription')
     .optional()
     .isString()
-    .withMessage('Job description must be a string'),
+    .withMessage('Job description must be a string')
+    .isLength({ max: 50000 })
+    .withMessage('Job description cannot exceed 50,000 characters'),
+
+  body('resumeText')
+    .optional()
+    .isString()
+    .withMessage('Resume text must be a string')
+    .isLength({ max: 50000 })
+    .withMessage('Resume text cannot exceed 50,000 characters'),
 
   body('duration')
     .optional()

@@ -86,22 +86,22 @@ export default function NewInterviewPage() {
     try {
       warmupPollCountRef.current = 0;
       setWarmupRequestError(null);
-      const status = await interviewService.startInterviewWarmup(force);
+      const status = await interviewService.startInterviewWarmup(force, language);
       setWarmup(status);
     } catch (err) {
       setWarmupRequestError(getRequestError(err));
     }
-  }, [getRequestError]);
+  }, [getRequestError, language]);
 
   // Warm only after an authenticated user reaches interview setup.
   React.useEffect(() => {
     void triggerWarmup();
   }, [triggerWarmup]);
 
-  // Step 3 rechecks the eight-minute readiness window. The backend deduplicates
-  // this request with any warmup already in progress.
+  // Force a fresh provider check at the final step. With RunPod active workers
+  // set to zero, an earlier worker may have already scaled down.
   React.useEffect(() => {
-    if (step === 3) void triggerWarmup();
+    if (step === 3) void triggerWarmup(true);
   }, [step, triggerWarmup]);
 
   React.useEffect(() => {
@@ -181,8 +181,7 @@ export default function NewInterviewPage() {
     setIsLoading(true);
     setError(null);
 
-    // A no-op while readiness is fresh; otherwise it restarts warming without
-    // delaying interview creation.
+    // Refresh if readiness expired without delaying interview creation.
     void triggerWarmup();
 
     try {
@@ -286,7 +285,7 @@ export default function NewInterviewPage() {
               </p>
               <p className={cn("text-xs mt-0.5 break-words", warmupFailure ? "text-danger" : "text-text-muted")}>
                 {warmupFailure || (warmup?.status === "ready"
-                  ? "Gemma and Somali speech are ready for your interview."
+                  ? "Gemma and the selected English/Somali speech services are ready."
                   : "You can continue configuring the interview while models load in the background.")}
               </p>
             </div>

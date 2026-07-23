@@ -3,11 +3,11 @@ import { Interview, PopulatedInterview, CreateInterviewPayload, SubmitAnswerPayl
 import { ApiResponse, PaginatedResponse } from '@/types/api';
 
 const interviewService = {
-  async startInterviewWarmup(force = false): Promise<InterviewWarmupStatus> {
+  async startInterviewWarmup(force = false, language?: 'english' | 'somali'): Promise<InterviewWarmupStatus> {
     const res = await api.post<ApiResponse<{ warmup: InterviewWarmupStatus }>>(
       '/interviews/warmup',
       undefined,
-      { params: force ? { force: true } : undefined }
+      { params: { ...(force ? { force: true } : {}), ...(language ? { language } : {}) } }
     );
     return res.data.data.warmup;
   },
