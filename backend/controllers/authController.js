@@ -63,6 +63,7 @@ const register = async (req, res, next) => {
     ApiResponse.created(res, {
       user: user.toSafeObject(),
       accessToken,
+      refreshToken,
     }, 'Registration successful');
   } catch (error) {
     next(error);
@@ -114,6 +115,7 @@ const login = async (req, res, next) => {
     ApiResponse.success(res, {
       user: user.toSafeObject(),
       accessToken,
+      refreshToken,
     }, 'Login successful');
   } catch (error) {
     next(error);
@@ -127,7 +129,7 @@ const login = async (req, res, next) => {
  */
 const refreshTokenHandler = async (req, res, next) => {
   try {
-    const token = req.cookies.refreshToken || req.body.refreshToken;
+    const token = req.cookies.refreshToken || req.body.refreshToken || req.headers['x-refresh-token'];
 
     if (!token) {
       return next(ApiError.unauthorized('No refresh token provided'));
@@ -167,7 +169,7 @@ const refreshTokenHandler = async (req, res, next) => {
 
     res.cookie('refreshToken', newRefreshToken, getRefreshCookieOptions(refreshExpiresIn, shouldRemember));
 
-    ApiResponse.success(res, { accessToken: newAccessToken }, 'Token refreshed');
+    ApiResponse.success(res, { accessToken: newAccessToken, refreshToken: newRefreshToken }, 'Token refreshed');
   } catch (error) {
     next(ApiError.unauthorized('Invalid refresh token'));
   }

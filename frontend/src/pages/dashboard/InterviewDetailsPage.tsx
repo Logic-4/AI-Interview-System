@@ -100,7 +100,8 @@ export default function InterviewDetailsPage() {
       }
     };
     keepWarm();
-    const intervalId = window.setInterval(keepWarm, 120_000);
+    const intervalMs = isSomaliLanguage(interview?.language) ? 45_000 : 120_000;
+    const intervalId = window.setInterval(keepWarm, intervalMs);
     document.addEventListener("visibilitychange", keepWarm);
     return () => {
       window.clearInterval(intervalId);

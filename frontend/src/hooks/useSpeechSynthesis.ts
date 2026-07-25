@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import toast from "react-hot-toast";
-import { getApiBaseUrl } from "../lib/apiConfig";
+import api from "../services/api";
 import { isSomaliLanguage } from "../lib/interviewHelpers";
 
 export interface WordHighlight {
@@ -31,21 +31,25 @@ export interface UseSpeechSynthesisReturn {
   provider: string | null;
 }
 
-type CachedAudio = { blob: Blob; provider: string | null };
-const audioCache = new Map<string, Promise<CachedAudio>>();
+interface CachedAudio {
+  blob: Blob;
+  provider: string | null;
+}
+
 const AUDIO_CACHE_MAX = 32;
+const audioCache = new Map<string, Promise<CachedAudio>>();
 
 function normalizeText(text: string): string {
-  return text.normalize("NFKC").replace(/\s+/g, " ").trim();
+  return String(text || "").normalize("NFKC").replace(/\s+/g, " ").trim();
 }
 
 function cacheKey(text: string, languageCode: string): string {
-  return `${languageCode.toLowerCase()}\u0000${normalizeText(text)}`;
+  return `${isSomaliLanguage(languageCode) ? "so-SO" : "en-US"}:${normalizeText(text)}`;
 }
 
-function withDeadline<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new Error(`Audio was not ready within ${timeoutMs}ms`)), timeoutMs);
+function raceWithTimeout<T>(promise: Promise<T>, ms: number, errorMessage: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(errorMessage)), ms);
     promise.then(
       (value) => { window.clearTimeout(timer); resolve(value); },
       (caught) => { window.clearTimeout(timer); reject(caught); }
@@ -59,38 +63,30 @@ async function requestAudio(text: string, languageCode: string): Promise<CachedA
   if (existing) return existing;
 
   const request = (async () => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (token) headers.Authorization = `Bearer ${token}`;
-    headers["X-Request-ID"] = typeof crypto !== "undefined" && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `tts-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort("TTS request timed out"), 50000);
+    const timeout = window.setTimeout(() => controller.abort("TTS request timed out"), 25000);
     try {
-      const response = await fetch(`${getApiBaseUrl()}/tts`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
+      const response = await api.post<Blob>(
+        '/tts',
+        {
           text: normalizeText(text),
           languageCode,
           language: isSomaliLanguage(languageCode) ? "somali" : "english",
-        }),
-        credentials: "include",
-        signal: controller.signal,
-      });
-      if (!response.ok) {
-        const body = await response.text();
-        throw new Error(`TTS API ${response.status}: ${body.slice(0, 240)}`);
-      }
-      const contentType = response.headers.get("content-type") || "";
-      if (!contentType.toLowerCase().startsWith("audio/")) {
+        },
+        {
+          responseType: 'blob',
+          signal: controller.signal,
+          timeout: 25000,
+        }
+      );
+
+      const contentType = String(response.headers['content-type'] || "");
+      if (contentType && !contentType.toLowerCase().startsWith("audio/")) {
         throw new Error(`TTS API returned ${contentType || "an unknown content type"}`);
       }
-      const blob = await response.blob();
-      if (blob.size <= 44) throw new Error("TTS API returned an empty audio file");
-      return { blob, provider: response.headers.get("x-tts-provider") };
+      const blob = response.data;
+      if (!blob || blob.size <= 44) throw new Error("TTS API returned an empty audio file");
+      return { blob, provider: String(response.headers['x-tts-provider'] || "") || null };
     } finally {
       window.clearTimeout(timeout);
     }
@@ -225,7 +221,8 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
     setError(null);
 
     try {
-      const result = await withDeadline(requestAudio(text, languageCodeRef.current), 8000);
+      const deadlineMs = isSomaliLanguage(languageCodeRef.current) ? 22000 : 12000;
+      const result = await raceWithTimeout(requestAudio(text, languageCodeRef.current), deadlineMs, "Audio request timed out");
       if (operation !== operationRef.current) return;
       setProvider(result.provider);
       setStatus("ready");

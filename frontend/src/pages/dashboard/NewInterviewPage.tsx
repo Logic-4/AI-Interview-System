@@ -95,8 +95,8 @@ export default function NewInterviewPage() {
 
   // Warm only after an authenticated user reaches interview setup.
   React.useEffect(() => {
-    void triggerWarmup();
-  }, [triggerWarmup]);
+    void triggerWarmup(language === "somali");
+  }, [triggerWarmup, language]);
 
   // Force a fresh provider check at the final step. With RunPod active workers
   // set to zero, an earlier worker may have already scaled down.

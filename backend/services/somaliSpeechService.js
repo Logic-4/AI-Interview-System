@@ -322,31 +322,52 @@ async function warmSpeechService(requestId = 'startup-warmup', language = 'all')
     { url: getEnglishAsrBaseUrl(), service: 'english_asr', timeoutMs: ENGLISH_ASR_TIMEOUT_MS },
     { url: getEnglishTtsBaseUrl(), service: 'english_tts', timeoutMs: TTS_TIMEOUT_MS },
   ].filter((entry) => {
-    if (!isRunPodUrl(entry.url)) return false;
+    if (!entry.url) return false;
     if (normalizedWarmupLanguage === 'english') return entry.service.startsWith('english_');
     if (normalizedWarmupLanguage === 'somali') return !entry.service.startsWith('english_');
     return true;
   });
 
   if (!endpoints.length) {
-    return { status: 'skipped', reason: 'not_runpod' };
+    return { status: 'skipped', reason: 'no_endpoints' };
   }
 
-  const grouped = new Map();
-  for (const endpoint of endpoints) {
-    const key = getRunPodEndpointBase(endpoint.url);
-    const group = grouped.get(key) || { ...endpoint, services: [], timeoutMs: 0 };
-    group.services.push(endpoint.service);
-    group.timeoutMs = Math.max(group.timeoutMs, endpoint.timeoutMs);
-    grouped.set(key, group);
+  const runpodEndpoints = endpoints.filter((e) => isRunPodUrl(e.url));
+  const httpEndpoints = endpoints.filter((e) => !isRunPodUrl(e.url));
+
+  const promises = [];
+
+  if (runpodEndpoints.length > 0) {
+    const grouped = new Map();
+    for (const endpoint of runpodEndpoints) {
+      const key = getRunPodEndpointBase(endpoint.url);
+      const group = grouped.get(key) || { ...endpoint, services: [], timeoutMs: 0 };
+      group.services.push(endpoint.service);
+      group.timeoutMs = Math.max(group.timeoutMs, endpoint.timeoutMs);
+      grouped.set(key, group);
+    }
+    for (const group of grouped.values()) {
+      promises.push(
+        callSpeechRunPod(
+          group.url,
+          { action: 'warmup', service: group.services.length > 1 ? 'all' : group.services[0], requestId },
+          group.timeoutMs
+        ).catch((err) => ({ service: group.services.join(','), error: err.message }))
+      );
+    }
   }
-  const results = await Promise.all([...grouped.values()].map((group) => callSpeechRunPod(
-    group.url,
-    { action: 'warmup', service: group.services.length > 1 ? 'all' : group.services[0], requestId },
-    group.timeoutMs
-  )));
+
+  for (const httpEp of httpEndpoints) {
+    promises.push(
+      fetch(`${httpEp.url}/health`, { signal: AbortSignal.timeout(5000) })
+        .then((res) => ({ service: httpEp.service, status: res.status }))
+        .catch((err) => ({ service: httpEp.service, error: err.message }))
+    );
+  }
+
+  const results = await Promise.all(promises);
   if (results.length === 1) return results[0];
-  return { status: 'ready', service: 'split', results };
+  return { status: 'ready', results };
 }
 
 module.exports = {

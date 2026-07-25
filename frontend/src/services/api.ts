@@ -50,16 +50,21 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       try {
-        // Call refresh endpoint
+        const storedRefreshToken = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+        // Call refresh endpoint with fallback payload/header
         const res = await axios.post(
           `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1"}/auth/refresh-token`,
-          {},
-          { withCredentials: true }
+          { refreshToken: storedRefreshToken },
+          {
+            withCredentials: true,
+            headers: storedRefreshToken ? { 'X-Refresh-Token': storedRefreshToken } : undefined,
+          }
         );
         
-        const { accessToken } = res.data.data;
+        const { accessToken, refreshToken: newRefreshToken } = res.data.data || {};
         if (typeof window !== 'undefined') {
-          localStorage.setItem('accessToken', accessToken);
+          if (accessToken) localStorage.setItem('accessToken', accessToken);
+          if (newRefreshToken) localStorage.setItem('refreshToken', newRefreshToken);
         }
         
         // Update auth header for future requests
@@ -73,6 +78,7 @@ api.interceptors.response.use(
         // Refresh failed — clear ALL auth state, then redirect
         if (typeof window !== 'undefined') {
           localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
           localStorage.removeItem('auth-storage');
           // Also clear the accessToken cookie so middleware doesn't block the login page
           try { document.cookie = 'accessToken=; Max-Age=0; path=/;'; } catch {}
