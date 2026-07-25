@@ -19,6 +19,12 @@ import router from './router/index';
 import { Provider } from 'react-redux';
 import store from './store/index';
 
+// Handle dynamic module load failures (network drop, CDN timeout, or fresh deployment)
+window.addEventListener('vite:preloadError', (event) => {
+    event.preventDefault();
+    window.location.reload();
+});
+
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <React.StrictMode>
         <Provider store={store}>

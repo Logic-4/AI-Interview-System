@@ -1,22 +1,48 @@
-import { lazy } from 'react';
+import { lazy, ComponentType } from 'react';
 
-const LandingPage = lazy(() => import('../pages/LandingPage'));
-const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
-const RegisterPage = lazy(() => import('../pages/auth/RegisterPage'));
-const ForgotPasswordPage = lazy(() => import('../pages/auth/ForgotPasswordPage'));
-const ResetPasswordPage = lazy(() => import('../pages/auth/ResetPasswordPage'));
-const AuthCallbackPage = lazy(() => import('../pages/auth/AuthCallbackPage'));
-const MaintenancePage = lazy(() => import('../pages/MaintenancePage'));
+/**
+ * Resilient lazy loader that retries dynamic chunk imports.
+ * Automatically handles transient network drops, CDN timeouts, or new deployments.
+ */
+const lazyWithRetry = <T extends ComponentType<any>>(
+    componentImport: () => Promise<{ default: T }>
+) =>
+    lazy(async () => {
+        const pageRefreshed = JSON.parse(
+            window.sessionStorage.getItem('lazy_retry_refreshed') || 'false'
+        );
+        try {
+            const component = await componentImport();
+            window.sessionStorage.setItem('lazy_retry_refreshed', 'false');
+            return component;
+        } catch (error) {
+            if (!pageRefreshed) {
+                window.sessionStorage.setItem('lazy_retry_refreshed', 'true');
+                window.location.reload();
+                return new Promise<{ default: T }>(() => {});
+            }
+            window.sessionStorage.setItem('lazy_retry_refreshed', 'false');
+            throw error;
+        }
+    });
 
-const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
-const InterviewsHistoryPage = lazy(() => import('../pages/dashboard/InterviewsHistoryPage'));
-const NewInterviewPage = lazy(() => import('../pages/dashboard/NewInterviewPage'));
-const InterviewDetailsPage = lazy(() => import('../pages/dashboard/InterviewDetailsPage'));
-const InterviewReportPage = lazy(() => import('../pages/dashboard/InterviewReportPage'));
-const InterviewReviewPage = lazy(() => import('../pages/dashboard/InterviewReviewPage'));
-const AnalyticsPage = lazy(() => import('../pages/dashboard/AnalyticsPage'));
-const ProfilePage = lazy(() => import('../pages/dashboard/ProfilePage'));
-const SettingsPage = lazy(() => import('../pages/dashboard/SettingsPage'));
+const LandingPage = lazyWithRetry(() => import('../pages/LandingPage'));
+const LoginPage = lazyWithRetry(() => import('../pages/auth/LoginPage'));
+const RegisterPage = lazyWithRetry(() => import('../pages/auth/RegisterPage'));
+const ForgotPasswordPage = lazyWithRetry(() => import('../pages/auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazyWithRetry(() => import('../pages/auth/ResetPasswordPage'));
+const AuthCallbackPage = lazyWithRetry(() => import('../pages/auth/AuthCallbackPage'));
+const MaintenancePage = lazyWithRetry(() => import('../pages/MaintenancePage'));
+
+const DashboardPage = lazyWithRetry(() => import('../pages/dashboard/DashboardPage'));
+const InterviewsHistoryPage = lazyWithRetry(() => import('../pages/dashboard/InterviewsHistoryPage'));
+const NewInterviewPage = lazyWithRetry(() => import('../pages/dashboard/NewInterviewPage'));
+const InterviewDetailsPage = lazyWithRetry(() => import('../pages/dashboard/InterviewDetailsPage'));
+const InterviewReportPage = lazyWithRetry(() => import('../pages/dashboard/InterviewReportPage'));
+const InterviewReviewPage = lazyWithRetry(() => import('../pages/dashboard/InterviewReviewPage'));
+const AnalyticsPage = lazyWithRetry(() => import('../pages/dashboard/AnalyticsPage'));
+const ProfilePage = lazyWithRetry(() => import('../pages/dashboard/ProfilePage'));
+const SettingsPage = lazyWithRetry(() => import('../pages/dashboard/SettingsPage'));
 
 const routes = [
     // Blank Layout routes (Auth, Landing, Mock interview flow)
