@@ -129,7 +129,8 @@ const login = async (req, res, next) => {
  */
 const refreshTokenHandler = async (req, res, next) => {
   try {
-    const token = req.cookies.refreshToken || req.body.refreshToken || req.headers['x-refresh-token'];
+    const rawToken = req.cookies?.refreshToken || req.body?.refreshToken || req.headers['x-refresh-token'];
+    const token = typeof rawToken === 'string' && rawToken !== 'null' && rawToken !== 'undefined' && rawToken.trim() ? rawToken.trim() : null;
 
     if (!token) {
       return next(ApiError.unauthorized('No refresh token provided'));
@@ -146,10 +147,7 @@ const refreshTokenHandler = async (req, res, next) => {
 
     const storedToken = user.refreshTokens.find((t) => t.token === token && t.expiresAt > new Date());
     if (!storedToken) {
-      // Token reuse detected — clear all tokens (security measure)
-      user.refreshTokens = [];
-      await user.save();
-      return next(ApiError.unauthorized('Invalid refresh token. All sessions revoked.'));
+      return next(ApiError.unauthorized('Invalid or expired refresh token'));
     }
 
     // Rotate: remove old token, generate new pair

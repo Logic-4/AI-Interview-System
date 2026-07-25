@@ -50,14 +50,15 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       try {
-        const storedRefreshToken = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
-        // Call refresh endpoint with fallback payload/header
+        const stored = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+        const validRefreshToken = stored && stored !== 'null' && stored !== 'undefined' ? stored : undefined;
+
         const res = await axios.post(
           `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1"}/auth/refresh-token`,
-          { refreshToken: storedRefreshToken },
+          validRefreshToken ? { refreshToken: validRefreshToken } : {},
           {
             withCredentials: true,
-            headers: storedRefreshToken ? { 'X-Refresh-Token': storedRefreshToken } : undefined,
+            headers: validRefreshToken ? { 'X-Refresh-Token': validRefreshToken } : undefined,
           }
         );
         
@@ -75,12 +76,17 @@ api.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
+        // Protect active interview session: never auto-logout a candidate while taking an interview!
+        const isInterviewSession = typeof window !== 'undefined' && window.location.pathname.startsWith('/interviews/');
+        if (isInterviewSession) {
+          return Promise.reject(refreshError);
+        }
+
         // Refresh failed — clear ALL auth state, then redirect
         if (typeof window !== 'undefined') {
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
           localStorage.removeItem('auth-storage');
-          // Also clear the accessToken cookie so middleware doesn't block the login page
           try { document.cookie = 'accessToken=; Max-Age=0; path=/;'; } catch {}
           try {
             await axios.post(
