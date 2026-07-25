@@ -24,7 +24,6 @@ const { startSomaliSpeech, stopSomaliSpeech } = require('./utils/somaliSpeechPro
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const interviewRoutes = require('./routes/interviewRoutes');
-const questionRoutes = require('./routes/questionRoutes');
 const feedbackRoutes = require('./routes/feedbackRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 // RunPod configuration is loaded directly from environment variables (.env)
@@ -91,7 +90,6 @@ app.get('/api/v1/health', (req, res) => {
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/interviews', interviewRoutes);
-app.use('/api/v1/questions', questionRoutes);
 app.use('/api/v1/feedback', feedbackRoutes);
 app.use('/api/v1/uploads', uploadRoutes);
 // Dynamic configuration endpoints are removed (loaded from env)

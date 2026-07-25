@@ -17,7 +17,6 @@ const InterviewReviewPage = lazy(() => import('../pages/dashboard/InterviewRevie
 const AnalyticsPage = lazy(() => import('../pages/dashboard/AnalyticsPage'));
 const ProfilePage = lazy(() => import('../pages/dashboard/ProfilePage'));
 const SettingsPage = lazy(() => import('../pages/dashboard/SettingsPage'));
-const QuestionsPage = lazy(() => import('../pages/dashboard/QuestionsPage'));
 
 const routes = [
     // Blank Layout routes (Auth, Landing, Mock interview flow)
@@ -101,11 +100,6 @@ const routes = [
     {
         path: '/settings',
         element: <SettingsPage />,
-        layout: 'default',
-    },
-    {
-        path: '/questions',
-        element: <QuestionsPage />,
         layout: 'default',
     },
 ];

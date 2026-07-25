@@ -10,7 +10,6 @@ import {
     PlusCircle,
     History,
     BarChart3,
-    HelpCircle,
     ChevronDown
 } from 'lucide-react';
 
@@ -32,7 +31,6 @@ const Sidebar = () => {
         { path: '/interviews/new', label: t('New Interview'), icon: PlusCircle, end: true },
         { path: '/interviews', label: t('History'), icon: History, end: true },
         { path: '/analytics', label: t('Analytics'), icon: BarChart3, end: false },
-        { path: '/questions', label: t('Questions Library'), icon: HelpCircle, end: false },
     ];
 
     return (

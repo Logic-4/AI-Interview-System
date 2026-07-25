@@ -31,35 +31,3 @@ export interface Question {
   createdAt?: string;
   updatedAt?: string;
 }
-
-export interface QuestionBankItem {
-  _id: string;
-  text: string;
-  category: string;
-  domain: string;
-  difficulty: QuestionDifficulty;
-  type: QuestionCategory;
-  sampleAnswer?: string;
-  tags?: string[];
-  usageCount?: number;
-  isActive?: boolean;
-  creator?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface QuestionBankListParams {
-  page?: number;
-  limit?: number;
-  domain?: string;
-  difficulty?: QuestionDifficulty;
-  type?: QuestionCategory;
-  search?: string;
-}
-
-export interface GenerateQuestionsPayload {
-  type: QuestionCategory;
-  domain: string;
-  difficulty: QuestionDifficulty;
-  count: number;
-}
