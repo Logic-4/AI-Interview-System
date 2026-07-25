@@ -133,7 +133,7 @@ const Header = () => {
                                         <span className="hidden sm:block font-bold text-sm text-[#1E2433] dark:text-white-dark group-hover:text-primary transition-colors">
                                             {user ? user.name : 'Guest User'}
                                         </span>
-                                        <img className="w-9 h-9 rounded-full object-cover saturate-50 group-hover:saturate-100 ring-2 ring-primary/20" src={user?.avatar || "/assets/images/user-profile.jpeg"} alt="userProfile" />
+                                        <img className="w-9 h-9 rounded-full object-cover ring-2 ring-primary/20" src={user?.avatar || "/assets/images/user-profile.jpeg"} alt="userProfile" />
                                     </div>
                                 }
                             >
