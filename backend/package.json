@@ -13,6 +13,7 @@
     "migrate:core-product": "node scripts/migrateCoreProduct.js",
     "seed:demo": "node scripts/seedDemoData.js",
     "seed:superadmin": "node scripts/seedSuperadmin.js",
+    "seed:company": "node scripts/seedCompanyPortal.js",
     "lint": "eslint ."
   },
   "keywords": [
@@ -25,8 +26,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "bcryptjs": "^2.4.3",
     "@vercel/blob": "^0.27.0",
+    "ai-interview-system-root": "file:..",
+    "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

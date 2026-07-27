@@ -56,7 +56,8 @@ const LoginPage = () => {
                 if (!active) return;
 
                 setUser(user);
-                navigate(redirectPath, { replace: true });
+                const targetPath = sanitizeRedirectPath(searchParams.get('from'), user);
+                navigate(targetPath, { replace: true });
             } catch {
                 if (!active) return;
                 logout();
@@ -70,7 +71,7 @@ const LoginPage = () => {
         return () => {
             active = false;
         };
-    }, [logout, redirectPath, navigate, setUser]);
+    }, [logout, searchParams, navigate, setUser]);
 
     useEffect(() => {
         const errorMsg = searchParams.get('error');
@@ -89,7 +90,8 @@ const LoginPage = () => {
         try {
             const { user, accessToken } = await authService.login({ email, password, rememberMe });
             login(user, accessToken, rememberMe);
-            navigate(redirectPath, { replace: true });
+            const targetPath = sanitizeRedirectPath(searchParams.get('from'), user);
+            navigate(targetPath, { replace: true });
         } catch (err: unknown) {
             const message =
                 axios.isAxiosError(err) && typeof err.response?.data?.message === 'string'

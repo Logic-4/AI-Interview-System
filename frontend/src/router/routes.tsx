@@ -1,4 +1,5 @@
 import { lazy, ComponentType } from 'react';
+import { Navigate } from 'react-router-dom';
 import SuperadminEntryRoute from '../components/auth/SuperadminEntryRoute';
 
 /**
@@ -48,6 +49,16 @@ const InterviewReviewPage = lazyWithRetry(() => import('../pages/dashboard/Inter
 const AnalyticsPage = lazyWithRetry(() => import('../pages/dashboard/AnalyticsPage'));
 const ProfilePage = lazyWithRetry(() => import('../pages/dashboard/ProfilePage'));
 const SettingsPage = lazyWithRetry(() => import('../pages/dashboard/SettingsPage'));
+
+const CompanyDashboardPage = lazyWithRetry(() => import('../pages/company/CompanyDashboardPage'));
+const PostJobPage = lazyWithRetry(() => import('../pages/company/PostJobPage'));
+const CompanyJobsPage = lazyWithRetry(() => import('../pages/company/CompanyJobsPage'));
+const CompanyApplicationsPage = lazyWithRetry(() => import('../pages/company/CompanyApplicationsPage'));
+const CompanyCandidatesPage = lazyWithRetry(() => import('../pages/company/CompanyCandidatesPage'));
+const CompanyShortlistPage = lazyWithRetry(() => import('../pages/company/CompanyShortlistPage'));
+const CompanyInterviewsPage = lazyWithRetry(() => import('../pages/company/CompanyInterviewsPage'));
+const CompanyAssessmentsPage = lazyWithRetry(() => import('../pages/company/CompanyAssessmentsPage'));
+const CompanySettingsPage = lazyWithRetry(() => import('../pages/company/CompanySettingsPage'));
 
 const routes = [
     // Blank Layout routes (Auth, Landing, Mock interview flow)
@@ -156,6 +167,58 @@ const routes = [
     {
         path: '/superadmin/settings',
         element: <SuperadminSettingsPage />,
+        layout: 'default',
+    },
+    
+    // Company Portal routes
+    {
+        path: '/company',
+        element: <Navigate to="/company/dashboard" replace />,
+        layout: 'default',
+    },
+    {
+        path: '/company/dashboard',
+        element: <CompanyDashboardPage />,
+        layout: 'default',
+    },
+    {
+        path: '/company/jobs/new',
+        element: <PostJobPage />,
+        layout: 'default',
+    },
+    {
+        path: '/company/jobs',
+        element: <CompanyJobsPage />,
+        layout: 'default',
+    },
+    {
+        path: '/company/applications',
+        element: <CompanyApplicationsPage />,
+        layout: 'default',
+    },
+    {
+        path: '/company/candidates',
+        element: <CompanyCandidatesPage />,
+        layout: 'default',
+    },
+    {
+        path: '/company/shortlist',
+        element: <CompanyShortlistPage />,
+        layout: 'default',
+    },
+    {
+        path: '/company/interviews',
+        element: <CompanyInterviewsPage />,
+        layout: 'default',
+    },
+    {
+        path: '/company/assessments',
+        element: <CompanyAssessmentsPage />,
+        layout: 'default',
+    },
+    {
+        path: '/company/settings',
+        element: <CompanySettingsPage />,
         layout: 'default',
     },
 ];

@@ -16,6 +16,13 @@ const companySchema = new mongoose.Schema(
       unique: true,
       match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email'],
     },
+    logo: { type: String, default: '' },
+    phone: { type: String, default: '', trim: true },
+    website: { type: String, default: '', trim: true },
+    address: { type: String, default: '', trim: true },
+    description: { type: String, default: '', trim: true },
+    preferredLanguage: { type: String, default: 'English' },
+    timezone: { type: String, default: 'UTC' },
     status: {
       type: String,
       enum: ['active', 'suspended', 'disabled'],

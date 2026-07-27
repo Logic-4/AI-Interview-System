@@ -12,7 +12,13 @@ import {
     History,
     BarChart3,
     ChevronDown,
-    Settings
+    Settings,
+    Briefcase,
+    FileText,
+    Users,
+    Star,
+    Video,
+    Award
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -40,7 +46,19 @@ const Sidebar = () => {
         { path: '/superadmin/companies', label: 'Companies', icon: History, end: false },
         { path: '/superadmin/settings', label: 'Profile & Security', icon: Settings, end: false },
     ];
-    const navItems = user?.role === 'superadmin' ? superadminNavItems : userNavItems;
+    const companyNavItems = [
+        { path: '/company/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
+        { path: '/company/jobs/new', label: 'Post Job', icon: PlusCircle, end: true },
+        { path: '/company/applications', label: 'Applications', icon: FileText, end: false },
+        { path: '/company/candidates', label: 'Candidates', icon: Users, end: false },
+        { path: '/company/shortlist', label: 'Shortlist', icon: Star, end: false },
+        { path: '/company/interviews', label: 'Interviews', icon: Video, end: false },
+        { path: '/company/assessments', label: 'Assessments', icon: Award, end: false },
+        { path: '/company/settings', label: 'Settings', icon: Settings, end: false },
+    ];
+
+    const isCompany = user?.role === 'company' || (user?.role === 'admin' && (user as any)?.company);
+    const navItems = user?.role === 'superadmin' ? superadminNavItems : isCompany ? companyNavItems : userNavItems;
 
     return (
         <div className={semidark ? 'dark' : ''}>
@@ -49,10 +67,10 @@ const Sidebar = () => {
             >
                 <div className="bg-white dark:bg-black h-full">
                     <div className="flex justify-between items-center px-4 py-3">
-                        <NavLink to={user?.role === 'superadmin' ? '/superadmin/dashboard' : '/'} className="main-logo flex items-center shrink-0">
+                        <NavLink to={user?.role === 'superadmin' ? '/superadmin/dashboard' : isCompany ? '/company/dashboard' : '/'} className="main-logo flex items-center shrink-0">
                             <img className="w-8 ml-[5px] flex-none object-contain" src="/ai-interview-logo.svg" alt="logo" />
                             <span className="text-2xl ltr:ml-1.5 rtl:mr-1.5 font-semibold align-middle lg:inline dark:text-white-light">
-                                {user?.role === 'superadmin' ? 'Super Admin' : 'InterviewAI'}
+                                {user?.role === 'superadmin' ? 'Super Admin' : isCompany ? 'RecruitAI' : 'InterviewAI'}
                             </span>
                         </NavLink>
 

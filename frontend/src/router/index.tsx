@@ -23,8 +23,12 @@ const finalRoutes = routes.map((route) => {
     const isGuest = GUEST_PATHS.some((p) => route.path === p || route.path.startsWith(p + '/'));
     
     const isSuperadmin = route.path.startsWith('/superadmin/') && route.path !== '/superadmin/login';
+    const isCompany = route.path.startsWith('/company/') || route.path === '/company';
+
     if (isSuperadmin) {
         element = <RoleProtectedRoute role="superadmin" loginPath="/superadmin/login">{element}</RoleProtectedRoute>;
+    } else if (isCompany) {
+        element = <RoleProtectedRoute role="company" loginPath="/login">{element}</RoleProtectedRoute>;
     } else if (isProtected) {
         element = <ProtectedRoute>{element}</ProtectedRoute>;
     } else if (isGuest) {

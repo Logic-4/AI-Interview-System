@@ -35,8 +35,8 @@ const userSchema = new mongoose.Schema(
     role: {
       type: String,
       enum: {
-        values: ['user', 'admin', 'interviewer', 'superadmin'],
-        message: 'Role must be user, admin, interviewer, or superadmin',
+        values: ['user', 'candidate', 'company', 'admin', 'interviewer', 'superadmin'],
+        message: 'Role must be user, candidate, company, admin, interviewer, or superadmin',
       },
       default: 'user',
     },
