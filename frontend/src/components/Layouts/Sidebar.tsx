@@ -5,12 +5,14 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { toggleSidebar } from '../../store/themeConfigSlice';
 import { IRootState } from '../../store';
 import { useEffect } from 'react';
+import { useAuthStore } from '../../stores/authStore';
 import {
     LayoutDashboard,
     PlusCircle,
     History,
     BarChart3,
-    ChevronDown
+    ChevronDown,
+    Settings
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -19,6 +21,7 @@ const Sidebar = () => {
     const location = useLocation();
     const dispatch = useDispatch();
     const { t } = useTranslation();
+    const user = useAuthStore((state) => state.user);
 
     useEffect(() => {
         if (window.innerWidth < 1024 && themeConfig.sidebar) {
@@ -26,12 +29,18 @@ const Sidebar = () => {
         }
     }, [location]);
 
-    const navItems = [
+    const userNavItems = [
         { path: '/dashboard', label: t('Dashboard'), icon: LayoutDashboard, end: true },
         { path: '/interviews/new', label: t('New Interview'), icon: PlusCircle, end: true },
         { path: '/interviews', label: t('History'), icon: History, end: true },
         { path: '/analytics', label: t('Analytics'), icon: BarChart3, end: false },
     ];
+    const superadminNavItems = [
+        { path: '/superadmin/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
+        { path: '/superadmin/companies', label: 'Companies', icon: History, end: false },
+        { path: '/superadmin/settings', label: 'Profile & Security', icon: Settings, end: false },
+    ];
+    const navItems = user?.role === 'superadmin' ? superadminNavItems : userNavItems;
 
     return (
         <div className={semidark ? 'dark' : ''}>
@@ -40,10 +49,10 @@ const Sidebar = () => {
             >
                 <div className="bg-white dark:bg-black h-full">
                     <div className="flex justify-between items-center px-4 py-3">
-                        <NavLink to="/" className="main-logo flex items-center shrink-0">
+                        <NavLink to={user?.role === 'superadmin' ? '/superadmin/dashboard' : '/'} className="main-logo flex items-center shrink-0">
                             <img className="w-8 ml-[5px] flex-none object-contain" src="/ai-interview-logo.svg" alt="logo" />
                             <span className="text-2xl ltr:ml-1.5 rtl:mr-1.5 font-semibold align-middle lg:inline dark:text-white-light">
-                                InterviewAI
+                                {user?.role === 'superadmin' ? 'Super Admin' : 'InterviewAI'}
                             </span>
                         </NavLink>
 

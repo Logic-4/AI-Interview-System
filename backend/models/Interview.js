@@ -8,6 +8,14 @@ const interviewSchema = new mongoose.Schema(
       required: [true, 'User is required'],
       index: true,
     },
+    // New tenant-aware interviews are scoped to their owning company. Legacy
+    // training interviews remain valid without a company during migration.
+    company: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Company',
+      default: null,
+      index: true,
+    },
     title: {
       type: String,
       required: [true, 'Interview title is required'],
@@ -174,6 +182,7 @@ const interviewSchema = new mongoose.Schema(
 
 // Indexes
 interviewSchema.index({ user: 1, status: 1 });
+interviewSchema.index({ company: 1, createdAt: -1 });
 interviewSchema.index({ user: 1, createdAt: -1 });
 interviewSchema.index({ type: 1, difficulty: 1 });
 interviewSchema.index({ isDeleted: 1 });

@@ -35,10 +35,32 @@ const userSchema = new mongoose.Schema(
     role: {
       type: String,
       enum: {
-        values: ['user', 'admin', 'interviewer'],
-        message: 'Role must be user, admin, or interviewer',
+        values: ['user', 'admin', 'interviewer', 'superadmin'],
+        message: 'Role must be user, admin, interviewer, or superadmin',
       },
       default: 'user',
+    },
+    // Tenant membership is optional while the legacy interview-training accounts
+    // are migrated. New organisation accounts are always associated with a Company.
+    company: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Company',
+      default: null,
+      index: true,
+    },
+    username: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      minlength: [3, 'Username must be at least 3 characters'],
+      maxlength: [50, 'Username cannot exceed 50 characters'],
+      sparse: true,
+      unique: true,
+    },
+    accountStatus: {
+      type: String,
+      enum: ['active', 'disabled'],
+      default: 'active',
     },
     avatar: {
       type: String,
@@ -102,6 +124,7 @@ const userSchema = new mongoose.Schema(
 
 // Index for efficient queries
 userSchema.index({ role: 1 });
+userSchema.index({ company: 1, role: 1 });
 userSchema.index({ createdAt: -1 });
 
 // Pre-save hook — hash password

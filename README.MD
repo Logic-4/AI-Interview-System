@@ -296,6 +296,25 @@ After multiple sessions, the candidate should:
 
 ## Local Somali speech services
 
+## Superadmin first deployment
+
+Create the initial platform administrator explicitly during deployment; no
+superadmin credentials are hard-coded in the application. Set these variables
+in the deployment environment, then run the command once from `backend`:
+
+```env
+SUPERADMIN_NAME=Platform Administrator
+SUPERADMIN_EMAIL=admin@example.com
+SUPERADMIN_PASSWORD=Use-a-strong-password-1
+```
+
+```bash
+npm run seed:superadmin
+```
+
+The command safely creates the account, or updates the existing superadmin and
+revokes its active sessions. Sign in at `/superadmin/login`.
+
 Somali uses Python ASR/TTS on ports **8001** (ASR) and **8002** (TTS). English speech uses the dedicated Whisper Turbo + Kokoro worker described below.
 
 **One-time Somali setup** (required — the bundled `Skydheere/.venv` may point to another machine's Python):

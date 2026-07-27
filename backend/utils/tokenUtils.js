@@ -1,14 +1,19 @@
 const jwt = require('jsonwebtoken');
 const units = { s: 1000, m: 60000, h: 3600000, d: 86400000 };
 
+// Keep compatibility with the original deployment variables while allowing
+// explicit access-token variables in newer environments.
+const getAccessSecret = () => process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
+const getAccessExpiresIn = () => process.env.JWT_ACCESS_EXPIRES_IN || process.env.JWT_EXPIRES_IN || '15m';
+
 /**
  * Generate an access token for a user
  * @param {Object} payload - { id, email, role }
  * @returns {string} JWT access token
  */
 const generateAccessToken = (payload) => {
-  return jwt.sign(payload, process.env.JWT_ACCESS_SECRET, {
-    expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
+  return jwt.sign(payload, getAccessSecret(), {
+    expiresIn: getAccessExpiresIn(),
   });
 };
 
@@ -29,7 +34,7 @@ const generateRefreshToken = (payload, expiresIn = process.env.JWT_REFRESH_EXPIR
  * @returns {Object} decoded payload
  */
 const verifyAccessToken = (token) => {
-  return jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+  return jwt.verify(token, getAccessSecret());
 };
 
 /**

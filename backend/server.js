@@ -29,6 +29,8 @@ const uploadRoutes = require('./routes/uploadRoutes');
 // RunPod configuration is loaded directly from environment variables (.env)
 const ttsRoutes = require('./routes/ttsRoutes');
 const sttRoutes = require('./routes/sttRoutes');
+const superadminAuthRoutes = require('./routes/superadminAuthRoutes');
+const superadminRoutes = require('./routes/superadminRoutes');
 
 // ─── Initialize Express App ─────────────────────────
 const app = express();
@@ -88,6 +90,8 @@ app.get('/api/v1/health', (req, res) => {
 
 // ─── API Routes ──────────────────────────────────────
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/superadmin/auth', superadminAuthRoutes);
+app.use('/api/v1/superadmin', superadminRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/interviews', interviewRoutes);
 app.use('/api/v1/feedback', feedbackRoutes);

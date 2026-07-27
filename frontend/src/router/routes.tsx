@@ -1,4 +1,5 @@
 import { lazy, ComponentType } from 'react';
+import SuperadminEntryRoute from '../components/auth/SuperadminEntryRoute';
 
 /**
  * Resilient lazy loader that retries dynamic chunk imports.
@@ -33,6 +34,10 @@ const ForgotPasswordPage = lazyWithRetry(() => import('../pages/auth/ForgotPassw
 const ResetPasswordPage = lazyWithRetry(() => import('../pages/auth/ResetPasswordPage'));
 const AuthCallbackPage = lazyWithRetry(() => import('../pages/auth/AuthCallbackPage'));
 const MaintenancePage = lazyWithRetry(() => import('../pages/MaintenancePage'));
+const SuperadminLoginPage = lazyWithRetry(() => import('../pages/superadmin/SuperadminLoginPage'));
+const SuperadminDashboardPage = lazyWithRetry(() => import('../pages/superadmin/SuperadminDashboardPage'));
+const CompaniesPage = lazyWithRetry(() => import('../pages/superadmin/CompaniesPage'));
+const SuperadminSettingsPage = lazyWithRetry(() => import('../pages/superadmin/SuperadminSettingsPage'));
 
 const DashboardPage = lazyWithRetry(() => import('../pages/dashboard/DashboardPage'));
 const InterviewsHistoryPage = lazyWithRetry(() => import('../pages/dashboard/InterviewsHistoryPage'));
@@ -81,6 +86,16 @@ const routes = [
         element: <AuthCallbackPage />,
         layout: 'blank',
     },
+    {
+        path: '/superadmin/login',
+        element: <SuperadminLoginPage />,
+        layout: 'blank',
+    },
+    {
+        path: '/superadmin',
+        element: <SuperadminEntryRoute />,
+        layout: 'blank',
+    },
     
     // Default Layout routes (Dashboard pages)
     {
@@ -126,6 +141,21 @@ const routes = [
     {
         path: '/settings',
         element: <SettingsPage />,
+        layout: 'default',
+    },
+    {
+        path: '/superadmin/dashboard',
+        element: <SuperadminDashboardPage />,
+        layout: 'default',
+    },
+    {
+        path: '/superadmin/companies',
+        element: <CompaniesPage />,
+        layout: 'default',
+    },
+    {
+        path: '/superadmin/settings',
+        element: <SuperadminSettingsPage />,
         layout: 'default',
     },
 ];

@@ -5,7 +5,7 @@ import { IRootState } from '../../store';
 import { toggleRTL, toggleTheme, toggleSidebar } from '../../store/themeConfigSlice';
 import { useTranslation } from 'react-i18next';
 import Dropdown from '../Dropdown';
-import { Menu, Search, XCircle, Sun, Moon, Monitor, User, LogOut } from 'lucide-react';
+import { Menu, Search, XCircle, Sun, Moon, Monitor, User, Settings, LogOut } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import authService from '../../services/authService';
 
@@ -45,7 +45,7 @@ const Header = () => {
             await authService.logout();
         } finally {
             logout();
-            navigate('/login');
+            navigate(user?.role === 'superadmin' ? '/superadmin/login' : '/login');
         }
     };
 
@@ -151,12 +151,18 @@ const Header = () => {
                                             </div>
                                         </div>
                                     </li>
-                                    <li>
+                                    {user?.role !== 'superadmin' && <li>
                                         <Link to="/profile" className="dark:hover:text-white">
                                             <User className="w-4.5 h-4.5 ltr:mr-2 rtl:ml-2 shrink-0" />
                                             {t('Profile')}
                                         </Link>
-                                    </li>
+                                    </li>}
+                                    {user?.role === 'superadmin' && <li>
+                                        <Link to="/superadmin/settings" className="dark:hover:text-white">
+                                            <Settings className="w-4.5 h-4.5 ltr:mr-2 rtl:ml-2 shrink-0" />
+                                            Profile & Security
+                                        </Link>
+                                    </li>}
                                     <li className="border-t border-white-light dark:border-white-light/10">
                                         <button type="button" className="text-danger !py-3 w-full flex items-center hover:bg-white-light/90 dark:hover:bg-dark/60 px-4" onClick={handleLogout}>
                                             <LogOut className="w-4.5 h-4.5 ltr:mr-2 rtl:ml-2 rotate-90 shrink-0" />

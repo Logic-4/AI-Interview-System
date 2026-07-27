@@ -310,6 +310,7 @@ const createInterview = async (req, res, next) => {
     // ── Step 1: Create the interview record immediately ──────────────────────
     const interview = await Interview.create({
       user: req.user._id,
+      company: req.user.company || null,
       title,
       type,
       difficulty,

@@ -12,6 +12,7 @@
     "benchmark:pipeline": "node scripts/benchmarkPipeline.js",
     "migrate:core-product": "node scripts/migrateCoreProduct.js",
     "seed:demo": "node scripts/seedDemoData.js",
+    "seed:superadmin": "node scripts/seedSuperadmin.js",
     "lint": "eslint ."
   },
   "keywords": [

@@ -1,5 +1,6 @@
 const { verifyAccessToken } = require('../utils/tokenUtils');
 const User = require('../models/User');
+const Company = require('../models/Company');
 const ApiError = require('../utils/ApiError');
 const { stageTimer } = require('./requestContext');
 
@@ -29,6 +30,15 @@ const protect = async (req, _res, next) => {
     stopAuth();
     if (!user) {
       return next(ApiError.unauthorized('User no longer exists'));
+    }
+    if (user.accountStatus !== 'active') {
+      return next(ApiError.forbidden('This account has been disabled'));
+    }
+    if (user.company) {
+      const company = await Company.findById(user.company).select('status');
+      if (!company || company.status !== 'active') {
+        return next(ApiError.forbidden('This company account is not active'));
+      }
     }
 
     req.user = user;

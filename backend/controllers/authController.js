@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const User = require('../models/User');
+const Company = require('../models/Company');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { generateAccessToken, generateRefreshToken, verifyRefreshToken, getTokenExpiry, getExpiryMs } = require('../utils/tokenUtils');
@@ -86,11 +87,21 @@ const login = async (req, res, next) => {
     if (!user) {
       return next(ApiError.unauthorized('Invalid email or password'));
     }
+    if (user.role === 'superadmin') {
+      return next(ApiError.unauthorized('Please use the superadmin portal to sign in'));
+    }
 
     // Compare password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return next(ApiError.unauthorized('Invalid email or password'));
+    }
+    if (user.accountStatus !== 'active') {
+      return next(ApiError.forbidden('This account has been disabled'));
+    }
+    if (user.company) {
+      const company = await Company.findById(user.company).select('status');
+      if (!company || company.status !== 'active') return next(ApiError.forbidden('This company account is not active'));
     }
 
     // Generate tokens

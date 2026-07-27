@@ -40,6 +40,7 @@ api.interceptors.response.use(
       '/auth/forgot-password',
       '/auth/reset-password',
       '/auth/logout',
+      '/superadmin/auth/login',
     ].some((path) => requestUrl.includes(path));
 
     if (isAuthRequest) {
@@ -101,9 +102,10 @@ api.interceptors.response.use(
             .some((path) => window.location.pathname.startsWith(path));
 
           if (isAuthRoute) {
-            window.location.href = '/login';
+            window.location.href = window.location.pathname.startsWith('/superadmin') ? '/superadmin/login' : '/login';
           } else {
-            window.location.href = `/login?from=${encodeURIComponent(currentPath)}`;
+            const loginPath = window.location.pathname.startsWith('/superadmin') ? '/superadmin/login' : '/login';
+            window.location.href = `${loginPath}?from=${encodeURIComponent(currentPath)}`;
           }
         }
         return Promise.reject(refreshError);

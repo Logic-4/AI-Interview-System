@@ -3,6 +3,7 @@ import BlankLayout from '../components/Layouts/BlankLayout';
 import DefaultLayout from '../components/Layouts/DefaultLayout';
 import ProtectedRoute from '../components/auth/ProtectedRoute';
 import GuestRoute from '../components/auth/GuestRoute';
+import RoleProtectedRoute from '../components/auth/RoleProtectedRoute';
 import { routes } from './routes';
 
 const PROTECTED_PATHS = [
@@ -21,7 +22,10 @@ const finalRoutes = routes.map((route) => {
     const isProtected = PROTECTED_PATHS.some((p) => route.path === p || route.path.startsWith(p + '/'));
     const isGuest = GUEST_PATHS.some((p) => route.path === p || route.path.startsWith(p + '/'));
     
-    if (isProtected) {
+    const isSuperadmin = route.path.startsWith('/superadmin/') && route.path !== '/superadmin/login';
+    if (isSuperadmin) {
+        element = <RoleProtectedRoute role="superadmin" loginPath="/superadmin/login">{element}</RoleProtectedRoute>;
+    } else if (isProtected) {
         element = <ProtectedRoute>{element}</ProtectedRoute>;
     } else if (isGuest) {
         element = <GuestRoute>{element}</GuestRoute>;

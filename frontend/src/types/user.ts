@@ -3,7 +3,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'user' | 'admin' | 'interviewer';
+  role: 'user' | 'admin' | 'interviewer' | 'superadmin';
   avatar?: string;
   bio?: string;
   skills?: string[];
