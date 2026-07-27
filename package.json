@@ -5,7 +5,8 @@
   "main": "backend/server.js",
   "scripts": {
     "start": "node backend/server.js",
-    "heroku-postbuild": "npm install --prefix backend"
+    "heroku-postbuild": "npm install --prefix backend",
+    "seed:superadmin": "npm --prefix backend run seed:superadmin"
   },
   "engines": {
     "node": "20.x"
