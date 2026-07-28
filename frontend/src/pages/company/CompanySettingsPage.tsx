@@ -97,11 +97,10 @@ const CompanySettingsPage = () => {
       <div className="flex border-b border-white-light dark:border-white-light/10">
         <button
           type="button"
-          className={`flex items-center gap-2 border-b-2 px-4 py-3 font-semibold text-sm transition-all ${
-            activeTab === 'profile'
+          className={`flex items-center gap-2 border-b-2 px-4 py-3 font-semibold text-sm transition-all ${activeTab === 'profile'
               ? 'border-primary text-primary'
               : 'border-transparent text-white-dark hover:text-black dark:hover:text-white'
-          }`}
+            }`}
           onClick={() => setActiveTab('profile')}
         >
           <Building2 className="h-4 w-4" /> Company Information
@@ -109,11 +108,10 @@ const CompanySettingsPage = () => {
 
         <button
           type="button"
-          className={`flex items-center gap-2 border-b-2 px-4 py-3 font-semibold text-sm transition-all ${
-            activeTab === 'account'
+          className={`flex items-center gap-2 border-b-2 px-4 py-3 font-semibold text-sm transition-all ${activeTab === 'account'
               ? 'border-primary text-primary'
               : 'border-transparent text-white-dark hover:text-black dark:hover:text-white'
-          }`}
+            }`}
           onClick={() => setActiveTab('account')}
         >
           <KeyRound className="h-4 w-4" /> Account Settings

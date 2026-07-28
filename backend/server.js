@@ -32,6 +32,7 @@ const sttRoutes = require('./routes/sttRoutes');
 const superadminAuthRoutes = require('./routes/superadminAuthRoutes');
 const superadminRoutes = require('./routes/superadminRoutes');
 const companyPortalRoutes = require('./routes/companyPortalRoutes');
+const publicCompanyRoutes = require('./routes/publicCompanyRoutes');
 
 // ─── Initialize Express App ─────────────────────────
 const app = express();
@@ -94,6 +95,7 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/superadmin/auth', superadminAuthRoutes);
 app.use('/api/v1/superadmin', superadminRoutes);
 app.use('/api/v1/company', companyPortalRoutes);
+app.use('/api/v1/public/companies', publicCompanyRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/interviews', interviewRoutes);
 app.use('/api/v1/feedback', feedbackRoutes);

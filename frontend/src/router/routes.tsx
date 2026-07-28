@@ -21,7 +21,7 @@ const lazyWithRetry = <T extends ComponentType<any>>(
             if (!pageRefreshed) {
                 window.sessionStorage.setItem('lazy_retry_refreshed', 'true');
                 window.location.reload();
-                return new Promise<{ default: T }>(() => {});
+                return new Promise<{ default: T }>(() => { });
             }
             window.sessionStorage.setItem('lazy_retry_refreshed', 'false');
             throw error;
@@ -39,6 +39,8 @@ const SuperadminLoginPage = lazyWithRetry(() => import('../pages/superadmin/Supe
 const SuperadminDashboardPage = lazyWithRetry(() => import('../pages/superadmin/SuperadminDashboardPage'));
 const CompaniesPage = lazyWithRetry(() => import('../pages/superadmin/CompaniesPage'));
 const SuperadminSettingsPage = lazyWithRetry(() => import('../pages/superadmin/SuperadminSettingsPage'));
+const PublicCompanyProfilePage = lazyWithRetry(() => import('../pages/public/PublicCompanyProfilePage'));
+const PublicJobDetailsPage = lazyWithRetry(() => import('../pages/public/PublicJobDetailsPage'));
 
 const DashboardPage = lazyWithRetry(() => import('../pages/dashboard/DashboardPage'));
 const InterviewsHistoryPage = lazyWithRetry(() => import('../pages/dashboard/InterviewsHistoryPage'));
@@ -65,6 +67,16 @@ const routes = [
     {
         path: '/',
         element: <LandingPage />,
+        layout: 'blank',
+    },
+    {
+        path: '/jobs/:jobId',
+        element: <PublicJobDetailsPage />,
+        layout: 'blank',
+    },
+    {
+        path: '/companies/:companyId',
+        element: <PublicCompanyProfilePage />,
         layout: 'blank',
     },
     {
@@ -107,7 +119,7 @@ const routes = [
         element: <SuperadminEntryRoute />,
         layout: 'blank',
     },
-    
+
     // Default Layout routes (Dashboard pages)
     {
         path: '/dashboard',
@@ -169,7 +181,7 @@ const routes = [
         element: <SuperadminSettingsPage />,
         layout: 'default',
     },
-    
+
     // Company Portal routes
     {
         path: '/company',

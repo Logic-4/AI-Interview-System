@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Briefcase, Plus, Search, Trash2, Play, Pause, Pencil } from 'lucide-react';
+import { Briefcase, Plus, Search, Trash2, Play, Pause, Pencil, Link as LinkIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { setPageTitle } from '@/store/themeConfigSlice';
 import companyService from '@/services/companyService';
@@ -48,6 +48,12 @@ const CompanyJobsPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const copyJobLink = (jobId: string) => {
+    const publicUrl = `${window.location.origin}/jobs/${jobId}`;
+    void navigator.clipboard.writeText(publicUrl);
+    toast.success('Job link copied');
   };
 
   useEffect(() => {
@@ -190,6 +196,13 @@ const CompanyJobsPage = () => {
                         <td className="text-xs">{dateTime(job.createdAt)}</td>
                         <td>
                           <div className="flex justify-end gap-2">
+                            <button
+                              title="Copy Link"
+                              className="btn btn-sm btn-outline-secondary p-2"
+                              onClick={() => copyJobLink(job._id)}
+                            >
+                              <LinkIcon className="h-4 w-4" />
+                            </button>
                             <button
                               title="Edit Job"
                               className="btn btn-sm btn-outline-info p-2"

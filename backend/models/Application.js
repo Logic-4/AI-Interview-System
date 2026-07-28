@@ -31,6 +31,15 @@ const applicationSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
     },
+    candidatePhone: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    profilePhotoUrl: {
+      type: String,
+      default: '',
+    },
     resumeUrl: {
       type: String,
       default: '',
@@ -43,6 +52,15 @@ const applicationSchema = new mongoose.Schema(
     coverLetter: {
       type: String,
       default: '',
+    },
+    selectedInterviewDate: {
+      type: Date,
+      default: null,
+    },
+    selectedInterviewTime: {
+      type: String,
+      default: '',
+      trim: true,
     },
     appliedDate: {
       type: Date,
