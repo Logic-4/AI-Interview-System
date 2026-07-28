@@ -53,6 +53,11 @@ const companyService = {
     return response.data.data.job;
   },
 
+  async getJobById(id: string): Promise<{ job: Job }> {
+    const job = await this.getJob(id);
+    return { job };
+  },
+
   async createJob(payload: Partial<JobPayload>): Promise<Job> {
     const response = await api.post<ApiResponse<{ job: Job }>>('/company/jobs', payload);
     return response.data.data.job;

@@ -2,29 +2,34 @@ const { body } = require('express-validator');
 
 const jobValidationRules = [
   body('title')
+    .optional()
     .trim()
     .notEmpty()
-    .withMessage('Job title is required')
+    .withMessage('Job title cannot be empty')
     .isLength({ max: 150 })
     .withMessage('Job title cannot exceed 150 characters'),
 
   body('department')
+    .optional()
     .trim()
     .notEmpty()
-    .withMessage('Department is required'),
+    .withMessage('Department cannot be empty'),
 
   body('employmentType')
+    .optional()
     .isIn(['full-time', 'part-time', 'contract', 'internship'])
     .withMessage('Employment type must be full-time, part-time, contract, or internship'),
 
   body('workplaceType')
+    .optional()
     .isIn(['on-site', 'remote', 'hybrid'])
     .withMessage('Workplace type must be on-site, remote, or hybrid'),
 
   body('location')
+    .optional()
     .trim()
     .notEmpty()
-    .withMessage('Location is required'),
+    .withMessage('Location cannot be empty'),
 
   body('numberOfHiresNeeded')
     .optional()
@@ -32,13 +37,20 @@ const jobValidationRules = [
     .withMessage('Number of hires needed must be at least 1'),
 
   body('description')
+    .optional()
     .trim()
     .notEmpty()
-    .withMessage('Job description is required'),
+    .withMessage('Job description cannot be empty'),
 
   body('experienceLevel')
+    .optional()
     .isIn(['junior', 'mid', 'senior', 'lead'])
     .withMessage('Experience level must be junior, mid, senior, or lead'),
+
+  body('status')
+    .optional()
+    .isIn(['draft', 'published', 'paused', 'closed'])
+    .withMessage('Status must be draft, published, paused, or closed'),
 
   body('interviewLanguage')
     .optional()

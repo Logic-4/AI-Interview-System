@@ -1,11 +1,12 @@
 import { useState, ChangeEvent, FormEvent, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
-import { Users, Calendar, Info, CheckCircle2, ChevronRight } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { CheckCircle2, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { setPageTitle } from '@/store/themeConfigSlice';
 import companyService from '@/services/companyService';
 import { JobPayload } from '@/types/companyPortal';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 const defaultForm: JobPayload = {
   title: '',
@@ -46,8 +47,12 @@ const defaultForm: JobPayload = {
 const PostJobPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('edit');
+
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [loadingJob, setLoadingJob] = useState(false);
   const [form, setForm] = useState<JobPayload>(defaultForm);
 
   const [reqSkillsInput, setReqSkillsInput] = useState('');
@@ -55,8 +60,62 @@ const PostJobPage = () => {
   const [focusSkillsInput, setFocusSkillsInput] = useState('');
 
   useEffect(() => {
-    dispatch(setPageTitle('Post a Job | RecruitAI'));
-  }, [dispatch]);
+    dispatch(setPageTitle(editId ? 'Edit Job | RecruitAI' : 'Post a Job | RecruitAI'));
+  }, [dispatch, editId]);
+
+  useEffect(() => {
+    const fetchJob = async () => {
+      if (!editId) return;
+      setLoadingJob(true);
+      try {
+        const j = await companyService.getJob(editId);
+        if (j) {
+          setForm({
+            title: j.title || '',
+            department: j.department || '',
+            employmentType: j.employmentType || 'full-time',
+            workplaceType: j.workplaceType || 'on-site',
+            location: j.location || '',
+            numberOfHiresNeeded: j.numberOfHiresNeeded || 1,
+            maxApplications: j.maxApplications,
+            applicationDeadline: j.applicationDeadline ? j.applicationDeadline.slice(0, 10) : '',
+            status: j.status || 'published',
+            description: j.description || '',
+            responsibilities: j.responsibilities || '',
+            requiredSkills: j.requiredSkills || [],
+            preferredSkills: j.preferredSkills || [],
+            experienceLevel: j.experienceLevel || 'mid',
+            education: j.education || '',
+            requiredEducation: j.requiredEducation || j.education || '',
+            salaryRange: j.salaryRange || '',
+            benefitsNotes: j.benefitsNotes || '',
+            interviewLanguage: j.interviewLanguage || 'English',
+            interviewType: j.interviewType || 'mixed',
+            difficulty: j.difficulty || 'mid',
+            targetJobRole: j.targetJobRole || '',
+            durationMinutes: j.durationMinutes || 30,
+            focusSkills: j.focusSkills || [],
+            numberOfQuestions: j.numberOfQuestions || 5,
+            resumeRequired: j.resumeRequired !== false,
+            coverLetterRequired: Boolean(j.coverLetterRequired),
+            allowCandidateSelectTime: j.allowCandidateSelectTime !== false,
+            completionDeadline: j.completionDeadline ? j.completionDeadline.slice(0, 10) : '',
+            interviewExpiryDate: j.interviewExpiryDate
+              ? j.interviewExpiryDate.slice(0, 10)
+              : j.completionDeadline
+              ? j.completionDeadline.slice(0, 10)
+              : '',
+            passingScoreThreshold: j.passingScoreThreshold ?? 70,
+          });
+        }
+      } catch (err: any) {
+        toast.error('Failed to load existing job details');
+      } finally {
+        setLoadingJob(false);
+      }
+    };
+    void fetchJob();
+  }, [editId]);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const target = e.target;
@@ -102,11 +161,16 @@ const PostJobPage = () => {
 
     setSaving(true);
     try {
-      await companyService.createJob({ ...form, status: publishStatus });
-      toast.success(publishStatus === 'published' ? 'Job published successfully!' : 'Job draft saved!');
+      if (editId) {
+        await companyService.updateJob(editId, { ...form, status: publishStatus });
+        toast.success(publishStatus === 'published' ? 'Job updated successfully!' : 'Job draft saved!');
+      } else {
+        await companyService.createJob({ ...form, status: publishStatus });
+        toast.success(publishStatus === 'published' ? 'Job published successfully!' : 'Job draft saved!');
+      }
       navigate('/company/jobs');
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to create job');
+      toast.error(err.response?.data?.message || (editId ? 'Failed to update job' : 'Failed to create job'));
     } finally {
       setSaving(false);
     }
@@ -116,29 +180,34 @@ const PostJobPage = () => {
     { number: 1, title: 'Job Details' },
     { number: 2, title: 'Hiring Plan' },
     { number: 3, title: 'Interview Setup' },
-    { number: 4, title: 'Review & Publish' },
   ];
 
+  if (loadingJob) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-4xl mx-auto">
       {/* Breadcrumb */}
       <div className="text-xs font-semibold text-white-dark flex items-center gap-2">
         <span>Jobs</span>
         <ChevronRight className="h-3 w-3" />
-        <span className="text-black dark:text-white">Post a Job</span>
+        <span className="text-black dark:text-white">{editId ? 'Edit Job' : 'Post a Job'}</span>
       </div>
 
       {/* Page Title */}
       <div>
-        <h1 className="text-2xl font-bold text-black dark:text-white">Post a Job</h1>
-        <p className="mt-1 text-sm text-white-dark">Create a job in a few simple steps.</p>
+        <h1 className="text-2xl font-bold text-black dark:text-white">{editId ? 'Edit Job' : 'Post a Job'}</h1>
+        <p className="mt-1 text-sm text-white-dark">
+          {editId ? 'Modify requisition details and interview parameters.' : 'Create a job in a few simple steps.'}
+        </p>
       </div>
 
-      {/* Main Grid: Form Left, Sidebar Right */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Left Form Area */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Step Wizard Header */}
+      {/* Step Wizard Header */}
           <div className="panel py-4">
             <div className="flex items-center justify-between px-2">
               {steps.map((step, idx) => (
@@ -179,7 +248,7 @@ const PostJobPage = () => {
             </div>
           </div>
           {/* STEP 1: JOB DETAILS */}
-          {(currentStep === 1 || currentStep === 4) && (
+          {currentStep === 1 && (
             <div className="panel space-y-5">
               <div>
                 <h2 className="text-lg font-bold text-black dark:text-white">Section 1: Basic Job Information</h2>
@@ -362,13 +431,13 @@ const PostJobPage = () => {
                       value={prefSkillsInput}
                       onChange={(e) => setPrefSkillsInput(e.target.value)}
                     />
-                    <button type="button" className="btn btn-outline-secondary" onClick={addPreferredSkill}>
+                    <button type="button" className="btn btn-outline-primary" onClick={addPreferredSkill}>
                       Add
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2 mt-2">
                     {form.preferredSkills.map((sk, i) => (
-                      <span key={i} className="badge badge-outline-secondary flex items-center gap-1">
+                      <span key={i} className="badge badge-outline-primary flex items-center gap-1">
                         {sk}
                         <button type="button" onClick={() => removePreferredSkill(i)}>
                           &times;
@@ -408,7 +477,7 @@ const PostJobPage = () => {
           )}
 
           {/* STEP 2: HIRING PLAN */}
-          {(currentStep === 2 || currentStep === 4) && (
+          {currentStep === 2 && (
             <div className="panel space-y-5">
               <h2 className="text-lg font-bold text-black dark:text-white">Hiring Plan & Capacity</h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -465,7 +534,7 @@ const PostJobPage = () => {
           )}
 
           {/* STEP 3: INTERVIEW CONFIGURATION */}
-          {(currentStep === 3 || currentStep === 4) && (
+          {currentStep === 3 && (
             <div className="panel space-y-5">
               <h2 className="text-lg font-bold text-black dark:text-white">Section 3: Interview Configuration</h2>
               <p className="text-xs text-white-dark">Configure the automated AI Mock Interview parameters for applicants.</p>
@@ -504,21 +573,7 @@ const PostJobPage = () => {
                   </select>
                 </div>
 
-                {/* 3. Target Job Role * */}
-                <div>
-                  <label htmlFor="targetJobRole">Target Job Role *</label>
-                  <input
-                    id="targetJobRole"
-                    name="targetJobRole"
-                    className="form-input"
-                    placeholder="Machine Learning Engineer Intern"
-                    value={form.targetJobRole}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-
-                {/* 4. Interview Difficulty * */}
+                {/* 3. Interview Difficulty * */}
                 <div>
                   <label htmlFor="difficulty">Interview Difficulty *</label>
                   <select
@@ -533,32 +588,6 @@ const PostJobPage = () => {
                     <option value="senior">Senior</option>
                     <option value="lead">Lead</option>
                   </select>
-                </div>
-
-                {/* 5. Focus Skills / Assessment Criteria * */}
-                <div className="sm:col-span-2">
-                  <label>Focus Skills / Assessment Criteria *</label>
-                  <div className="flex gap-2">
-                    <input
-                      className="form-input flex-1"
-                      placeholder="e.g. Python Programming, Machine Learning Fundamentals, Problem Solving"
-                      value={focusSkillsInput}
-                      onChange={(e) => setFocusSkillsInput(e.target.value)}
-                    />
-                    <button type="button" className="btn btn-outline-primary" onClick={addFocusSkill}>
-                      Add Skill
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {(form.focusSkills || []).map((sk, i) => (
-                      <span key={i} className="badge badge-outline-primary flex items-center gap-1">
-                        {sk}
-                        <button type="button" onClick={() => removeFocusSkill(i)}>
-                          &times;
-                        </button>
-                      </span>
-                    ))}
-                  </div>
                 </div>
 
                 {/* 6. Interview Duration (minutes) */}
@@ -693,7 +722,7 @@ const PostJobPage = () => {
                 Save Draft
               </button>
 
-              {currentStep < 4 ? (
+              {currentStep < 3 ? (
                 <button
                   type="button"
                   className="btn btn-primary"
@@ -708,65 +737,11 @@ const PostJobPage = () => {
                   disabled={saving}
                   onClick={() => void handleSubmit('published')}
                 >
-                  {saving ? 'Publishing...' : 'Publish Job'}
+                  {editId ? (saving ? 'Updating...' : 'Update Job') : (saving ? 'Publishing...' : 'Publish Job')}
                 </button>
               )}
             </div>
           </div>
-        </div>
-
-        {/* Right Info Card (Matches Provided Screenshot) */}
-        <div className="space-y-6">
-          <div className="panel space-y-6">
-            <h3 className="text-base font-bold text-black dark:text-white border-b border-white-light dark:border-white-light/10 pb-3">
-              What you'll configure next
-            </h3>
-
-            {/* Hiring Plan Section Info */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm font-bold text-black dark:text-white">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Users className="h-4 w-4" />
-                </span>
-                <span>Hiring Plan</span>
-              </div>
-              <ul className="text-xs text-white-dark space-y-1.5 pl-9 list-disc">
-                <li>Number of hires</li>
-                <li>Application limit</li>
-                <li>Application deadline</li>
-              </ul>
-            </div>
-
-            {/* Interview Setup Section Info */}
-            <div className="space-y-2 pt-3 border-t border-white-light dark:border-white-light/10">
-              <div className="flex items-center gap-2 text-sm font-bold text-black dark:text-white">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Calendar className="h-4 w-4" />
-                </span>
-                <span>Interview Setup</span>
-              </div>
-              <ul className="text-xs text-white-dark space-y-1.5 pl-9 list-disc">
-                <li>Interview Language ({form.interviewLanguage})</li>
-                <li>Interview Type ({form.interviewType})</li>
-                <li>Target Job Role ({form.targetJobRole || 'Not set'})</li>
-                <li>Difficulty ({form.difficulty})</li>
-                <li>Focus Skills ({form.focusSkills?.length || 0})</li>
-                <li>Duration ({form.durationMinutes} mins)</li>
-                <li>Questions ({form.numberOfQuestions})</li>
-                <li>Passing Score ({form.passingScoreThreshold}%)</li>
-                <li>Expiry Date ({form.interviewExpiryDate || form.completionDeadline || 'None'})</li>
-                <li>Candidate Requirements</li>
-              </ul>
-            </div>
-
-            {/* Notice Callout Box */}
-            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex gap-3 text-xs text-primary">
-              <Info className="h-5 w-5 shrink-0" />
-              <p>You can review and edit all details before publishing the job.</p>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };
