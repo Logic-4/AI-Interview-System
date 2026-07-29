@@ -47,6 +47,28 @@ const uploadAvatar = async (fileBuffer, userId) => {
   };
 };
 
+const uploadCandidateFile = async (fileBuffer, mimetype, originalname, folder = 'candidates') => {
+  const ext = originalname ? originalname.split('.').pop() : 'bin';
+  const filename = `${folder}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    logger.warn('BLOB_READ_WRITE_TOKEN not set in environment. Using data URI for local dev.');
+    const base64 = fileBuffer.toString('base64');
+    return { url: `data:${mimetype};base64,${base64}`, pathname: filename };
+  }
+
+  const blob = await put(filename, fileBuffer, {
+    access: 'public',
+    contentType: mimetype,
+  });
+
+  logger.info(`Candidate file uploaded to Vercel Blob: ${blob.url}`);
+  return {
+    url: blob.url,
+    pathname: blob.pathname,
+  };
+};
+
 const deleteBlobUrls = async (urls = []) => {
   const uniqueUrls = [...new Set(urls.filter((url) => typeof url === 'string' && url.trim()))];
   if (!uniqueUrls.length) return { deleted: 0, failed: [] };
@@ -65,5 +87,6 @@ module.exports = {
   uploadRecording,
   uploadAudio,
   uploadAvatar,
+  uploadCandidateFile,
   deleteBlobUrls,
 };

@@ -93,15 +93,23 @@ export const JobApplicationFormModal = ({ job, isOpen, onClose }: JobApplication
 
     setSubmitting(true);
     try {
-      const mockPhotoUrl = photoFile ? `https://storage.recruitai.app/avatars/${Date.now()}_${photoFile.name}` : photoPreview;
-      const mockResumeUrl = resumeFile ? `https://storage.recruitai.app/resumes/${Date.now()}_${resumeFile.name}` : '';
+      let uploadedPhotoUrl = photoPreview;
+      let uploadedResumeUrl = '';
+
+      if (photoFile) {
+        uploadedPhotoUrl = await publicCompanyService.uploadBlobFile(photoFile, 'photos');
+      }
+
+      if (job.resumeRequired && resumeFile) {
+        uploadedResumeUrl = await publicCompanyService.uploadBlobFile(resumeFile, 'resumes');
+      }
 
       await publicCompanyService.submitJobApplication(job._id, {
         fullName: fullName.trim(),
         email: email.trim().toLowerCase(),
         phone: phone.trim(),
-        profilePhotoUrl: mockPhotoUrl,
-        resumeUrl: job.resumeRequired ? mockResumeUrl : undefined,
+        profilePhotoUrl: uploadedPhotoUrl,
+        resumeUrl: job.resumeRequired ? uploadedResumeUrl : undefined,
         coverLetter: job.coverLetterRequired ? coverLetter.trim() : undefined,
         selectedInterviewDate: job.allowCandidateSelectTime ? selectedDate : undefined,
         selectedInterviewTime: job.allowCandidateSelectTime ? selectedTime : undefined,

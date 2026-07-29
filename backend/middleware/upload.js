@@ -27,12 +27,16 @@ const fileFilter = (req, file, cb) => {
     'image/jpeg',
     'image/png',
     'image/webp',
+    // Documents (for resumes)
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   ];
 
   if (allowedMimeTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new ApiError(400, `File type '${file.mimetype}' is not supported. Allowed: audio, video, images.`), false);
+    cb(new ApiError(400, `File type '${file.mimetype}' is not supported. Allowed: audio, video, images, pdf, doc, docx.`), false);
   }
 };
 

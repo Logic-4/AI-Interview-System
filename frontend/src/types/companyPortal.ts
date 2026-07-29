@@ -65,9 +65,13 @@ export interface Application {
   };
   candidateName: string;
   candidateEmail: string;
+  candidatePhone?: string;
+  profilePhotoUrl?: string;
   resumeUrl?: string;
   resumeStatus: ResumeStatus;
   coverLetter?: string;
+  selectedInterviewDate?: string;
+  selectedInterviewTime?: string;
   appliedDate: string;
   status: ApplicationStatus;
   isShortlisted: boolean;

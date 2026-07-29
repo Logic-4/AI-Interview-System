@@ -175,9 +175,44 @@ const applyPublicJob = async (req, res, next) => {
   }
 };
 
+const { uploadCandidateFile } = require('../services/blobService');
+
+/**
+ * @desc    Upload candidate profile photo or resume directly to Vercel Blob
+ * @route   POST /api/v1/public/companies/upload-blob
+ * @access  Public
+ */
+const uploadCandidateBlobFile = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please upload a valid file (image or PDF/DOCX document)',
+      });
+    }
+
+    const folder = req.body.folder || 'candidate-files';
+    const result = await uploadCandidateFile(
+      req.file.buffer,
+      req.file.mimetype,
+      req.file.originalname,
+      folder
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'File uploaded to Vercel Blob successfully',
+      data: { url: result.url },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getPublicCompanyProfile,
   getPublicCompanyJobs,
   getPublicJobDetails,
   applyPublicJob,
+  uploadCandidateBlobFile,
 };

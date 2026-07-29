@@ -42,6 +42,20 @@ const publicCompanyService = {
     return response.data.data.job;
   },
 
+  async uploadBlobFile(file: File, folder: string = 'candidates'): Promise<string> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', folder);
+
+    const response = await api.post<ApiResponse<{ url: string }>>('/public/companies/upload-blob', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    return response.data.data.url;
+  },
+
   async submitJobApplication(jobId: string, payload: JobApplicationPayload): Promise<any> {
     const response = await api.post<ApiResponse<any>>(`/public/companies/jobs/${jobId}/apply`, payload);
     return response.data.data;
