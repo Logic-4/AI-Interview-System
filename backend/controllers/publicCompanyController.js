@@ -142,6 +142,21 @@ const applyPublicJob = async (req, res, next) => {
       });
     }
 
+    // ─── Duplicate application check ─────────────────────────────────────────
+    const existingApplication = await Application.findOne({
+      job: job._id,
+      candidateEmail: email.trim().toLowerCase(),
+      candidatePhone: phone.trim(),
+    });
+
+    if (existingApplication) {
+      return res.status(409).json({
+        success: false,
+        message: 'You have already applied for this job.',
+      });
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     // Create Application record
     const application = await Application.create({
       job: job._id,
@@ -166,9 +181,9 @@ const applyPublicJob = async (req, res, next) => {
     });
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(400).json({
+      return res.status(409).json({
         success: false,
-        message: 'An application with this email or user has already been submitted for this job',
+        message: 'You have already applied for this job.',
       });
     }
     next(error);

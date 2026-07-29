@@ -8,6 +8,7 @@ import {
   FileText,
   Calendar as CalendarIcon,
   CheckCircle2,
+  AlertCircle,
   Camera,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -44,6 +45,7 @@ export const JobApplicationFormModal = ({ job, isOpen, onClose }: JobApplication
   // Status state
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [alreadyApplied, setAlreadyApplied] = useState(false);
 
   if (!isOpen) return null;
 
@@ -118,7 +120,13 @@ export const JobApplicationFormModal = ({ job, isOpen, onClose }: JobApplication
       setSubmitted(true);
       toast.success('Application submitted successfully!');
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to submit application');
+      const status = (err as any).response?.status;
+      const msg: string = (err as any).response?.data?.message || '';
+      if (status === 409 || msg.toLowerCase().includes('already applied')) {
+        setAlreadyApplied(true);
+        return;
+      }
+      toast.error(msg || 'Failed to submit application');
     } finally {
       setSubmitting(false);
     }
@@ -135,6 +143,7 @@ export const JobApplicationFormModal = ({ job, isOpen, onClose }: JobApplication
     setSelectedDate('');
     setSelectedTime('');
     setSubmitted(false);
+    setAlreadyApplied(false);
     onClose();
   };
 
@@ -190,6 +199,27 @@ export const JobApplicationFormModal = ({ job, isOpen, onClose }: JobApplication
             <div className="pt-4">
               <button type="button" onClick={resetForm} className="btn btn-primary px-8">
                 Done
+              </button>
+            </div>
+          </div>
+        ) : alreadyApplied ? (
+          /* ─── Already Applied Screen ─── */
+          <div className="py-8 text-center space-y-4">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-warning/10 text-warning">
+              <AlertCircle className="h-10 w-10" />
+            </div>
+            <h3 className="text-2xl font-bold text-black dark:text-white">Already Applied</h3>
+            <p className="text-sm text-white-dark max-w-md mx-auto">
+              You have already submitted an application for{' '}
+              <span className="font-semibold text-black dark:text-white">{job.title}</span>.
+              Only one application per job is allowed.
+            </p>
+            <p className="text-xs text-white-dark max-w-sm mx-auto">
+              If you believe this is a mistake, please contact the employer directly.
+            </p>
+            <div className="pt-4">
+              <button type="button" onClick={resetForm} className="btn btn-outline-warning px-8">
+                Close
               </button>
             </div>
           </div>

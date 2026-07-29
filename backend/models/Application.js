@@ -104,5 +104,9 @@ const applicationSchema = new mongoose.Schema(
 applicationSchema.index({ company: 1, status: 1 });
 applicationSchema.index({ company: 1, isShortlisted: 1 });
 applicationSchema.index({ job: 1, candidate: 1 }, { unique: true });
+applicationSchema.index(
+  { job: 1, candidateEmail: 1, candidatePhone: 1 },
+  { unique: true, name: 'unique_job_email_phone' }
+);
 
 module.exports = mongoose.model('Application', applicationSchema);
