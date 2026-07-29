@@ -48,9 +48,19 @@ const statusBadge = (status: ApplicationStatus) => {
 };
 
 /**
- * CandidateAvatar - Clean avatar with automatic image error fallback
+ * CandidateAvatar - Clean avatar with automatic image error fallback and click handler
  */
-const CandidateAvatar = ({ src, name, size = 'md' }: { src?: string; name: string; size?: 'sm' | 'md' | 'lg' | 'xl' }) => {
+const CandidateAvatar = ({
+  src,
+  name,
+  size = 'md',
+  onClick,
+}: {
+  src?: string;
+  name: string;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  onClick?: () => void;
+}) => {
   const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
@@ -72,7 +82,11 @@ const CandidateAvatar = ({ src, name, size = 'md' }: { src?: string; name: strin
         src={src}
         alt={name}
         onError={() => setImgError(true)}
-        className={`${sizeClasses} rounded-full object-cover border-2 border-white dark:border-slate-800 shadow-md shrink-0`}
+        onClick={onClick}
+        className={`${sizeClasses} rounded-full object-cover border-2 border-white dark:border-slate-800 shadow-md shrink-0 ${
+          onClick ? 'cursor-pointer hover:scale-105 transition hover:ring-2 hover:ring-primary' : ''
+        }`}
+        title={onClick ? 'Click to view full photo' : undefined}
       />
     );
   }
@@ -88,7 +102,11 @@ const CandidateAvatar = ({ src, name, size = 'md' }: { src?: string; name: strin
 
   return (
     <div
-      className={`${sizeClasses} flex items-center justify-center rounded-full bg-gradient-to-tr from-primary via-indigo-600 to-purple-600 font-bold text-white shadow-md border-2 border-white dark:border-slate-800 shrink-0`}
+      onClick={onClick}
+      className={`${sizeClasses} flex items-center justify-center rounded-full bg-gradient-to-tr from-primary via-indigo-600 to-purple-600 font-bold text-white shadow-md border-2 border-white dark:border-slate-800 shrink-0 ${
+        onClick ? 'cursor-pointer hover:scale-105 transition' : ''
+      }`}
+      title={onClick ? 'Click to view avatar' : undefined}
     >
       {initials}
     </div>
@@ -104,6 +122,7 @@ const CompanyApplicationsPage = () => {
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
   const [detailApp, setDetailApp] = useState<Application | null>(null);
+  const [previewPhoto, setPreviewPhoto] = useState<{ url: string; name: string } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -214,7 +233,12 @@ const CompanyApplicationsPage = () => {
                       <tr key={app._id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                         <td>
                           <div className="flex items-center gap-3">
-                            <CandidateAvatar src={app.profilePhotoUrl} name={app.candidateName} size="md" />
+                            <CandidateAvatar
+                              src={app.profilePhotoUrl}
+                              name={app.candidateName}
+                              size="md"
+                              onClick={app.profilePhotoUrl ? () => setPreviewPhoto({ url: app.profilePhotoUrl || '', name: app.candidateName }) : undefined}
+                            />
                             <div>
                               <div className="font-semibold text-black dark:text-white">{app.candidateName}</div>
                               <div className="text-xs text-white-dark">{app.candidateEmail}</div>
@@ -289,7 +313,12 @@ const CompanyApplicationsPage = () => {
             {/* Modal Header */}
             <div className="p-6 border-b border-white-light dark:border-white-light/10 bg-slate-50/50 dark:bg-slate-800/40 flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <CandidateAvatar src={detailApp.profilePhotoUrl} name={detailApp.candidateName} size="lg" />
+                <CandidateAvatar
+                  src={detailApp.profilePhotoUrl}
+                  name={detailApp.candidateName}
+                  size="lg"
+                  onClick={detailApp.profilePhotoUrl ? () => setPreviewPhoto({ url: detailApp.profilePhotoUrl || '', name: detailApp.candidateName }) : undefined}
+                />
                 <div>
                   <div className="flex items-center gap-2.5">
                     <h2 className="text-xl font-bold text-black dark:text-white leading-tight">
@@ -529,6 +558,40 @@ const CompanyApplicationsPage = () => {
               <button type="button" className="btn btn-primary px-6 btn-sm" onClick={() => setDetailApp(null)}>
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Photo Lightbox Preview Modal ─── */}
+      {previewPhoto && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fadeIn"
+          onClick={() => setPreviewPhoto(null)}
+        >
+          <div
+            className="relative max-w-2xl max-h-[85vh] bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-white/10 space-y-0"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-white/10 text-white bg-slate-800/60">
+              <div>
+                <h3 className="font-bold text-sm text-white">{previewPhoto.name}</h3>
+                <p className="text-[11px] text-slate-400">Candidate Profile Photo (Vercel Blob)</p>
+              </div>
+              <button
+                type="button"
+                className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition"
+                onClick={() => setPreviewPhoto(null)}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6 flex items-center justify-center bg-black/50">
+              <img
+                src={previewPhoto.url}
+                alt={previewPhoto.name}
+                className="max-h-[70vh] max-w-full object-contain rounded-xl shadow-2xl border border-white/10"
+              />
             </div>
           </div>
         </div>
