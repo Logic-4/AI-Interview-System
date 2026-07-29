@@ -400,7 +400,7 @@ const CompanyApplicationsPage = () => {
                           className="btn btn-primary btn-sm w-full flex items-center justify-center gap-1.5"
                         >
                           <ExternalLink className="h-4 w-4" />
-                          <span>View Resume (PDF)</span>
+                          <span>View Resume (PDF / DOCX)</span>
                         </a>
                         <a
                           href={detailApp.resumeUrl}

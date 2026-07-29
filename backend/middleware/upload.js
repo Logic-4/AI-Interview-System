@@ -31,12 +31,18 @@ const fileFilter = (req, file, cb) => {
     'application/pdf',
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/x-docx',
+    'application/vnd.ms-word',
+    'application/octet-stream',
   ];
 
-  if (allowedMimeTypes.includes(file.mimetype)) {
+  const ext = path.extname(file.originalname).toLowerCase();
+  const allowedExtensions = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.webp', '.webm', '.mp3', '.wav', '.ogg', '.m4a', '.mp4', '.mov', '.avi'];
+
+  if (allowedMimeTypes.includes(file.mimetype) || allowedExtensions.includes(ext)) {
     cb(null, true);
   } else {
-    cb(new ApiError(400, `File type '${file.mimetype}' is not supported. Allowed: audio, video, images, pdf, doc, docx.`), false);
+    cb(new ApiError(400, `File type '${file.mimetype}' is not supported. Allowed: pdf, doc, docx, audio, video, images.`), false);
   }
 };
 
