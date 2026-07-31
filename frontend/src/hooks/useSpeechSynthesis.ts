@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import toast from "react-hot-toast";
-import api from "../services/api";
 import { isSomaliLanguage } from "../lib/interviewHelpers";
 
 export interface WordHighlight {
@@ -15,8 +14,6 @@ export type TtsStatus = "idle" | "preparing" | "ready" | "playing" | "retrying-f
 
 export interface UseSpeechSynthesisReturn {
   speak: (text: string, onPlay?: () => void) => Promise<void>;
-  prefetch: (text: string) => Promise<boolean>;
-  prefetchMany: (texts: string[]) => Promise<void>;
   cancel: () => void;
   pause: () => void;
   resume: () => void;
@@ -31,71 +28,29 @@ export interface UseSpeechSynthesisReturn {
   provider: string | null;
 }
 
-interface CachedAudio {
-  blob: Blob;
-  provider: string | null;
-}
-
-const AUDIO_CACHE_MAX = 32;
-const audioCache = new Map<string, Promise<CachedAudio>>();
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+const SAMPLE_RATE = 24000;
 
 function normalizeText(text: string): string {
   return String(text || "").normalize("NFKC").replace(/\s+/g, " ").trim();
 }
 
-function cacheKey(text: string, languageCode: string): string {
-  return `${isSomaliLanguage(languageCode) ? "so-SO" : "en-US"}:${normalizeText(text)}`;
+function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
 }
 
-function raceWithTimeout<T>(promise: Promise<T>, ms: number, errorMessage: string): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new Error(errorMessage)), ms);
-    promise.then(
-      (value) => { window.clearTimeout(timer); resolve(value); },
-      (caught) => { window.clearTimeout(timer); reject(caught); }
-    );
-  });
-}
-
-async function requestAudio(text: string, languageCode: string): Promise<CachedAudio> {
-  const key = cacheKey(text, languageCode);
-  const existing = audioCache.get(key);
-  if (existing) return existing;
-
-  const request = (async () => {
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort("TTS request timed out"), 25000);
-    try {
-      const response = await api.post<Blob>(
-        '/tts',
-        {
-          text: normalizeText(text),
-          languageCode,
-          language: isSomaliLanguage(languageCode) ? "somali" : "english",
-        },
-        {
-          responseType: 'blob',
-          signal: controller.signal,
-          timeout: 25000,
-        }
-      );
-
-      const contentType = String(response.headers['content-type'] || "");
-      if (contentType && !contentType.toLowerCase().startsWith("audio/")) {
-        throw new Error(`TTS API returned ${contentType || "an unknown content type"}`);
-      }
-      const blob = response.data;
-      if (!blob || blob.size <= 44) throw new Error("TTS API returned an empty audio file");
-      return { blob, provider: String(response.headers['x-tts-provider'] || "") || null };
-    } finally {
-      window.clearTimeout(timeout);
-    }
-  })();
-
-  audioCache.set(key, request);
-  request.catch(() => audioCache.delete(key));
-  while (audioCache.size > AUDIO_CACHE_MAX) audioCache.delete(audioCache.keys().next().value as string);
-  return request;
+/** Converts a little-endian 16-bit PCM byte buffer into normalized Float32 samples. */
+function pcm16ToFloat32(bytes: Uint8Array): Float32Array {
+  const sampleCount = Math.floor(bytes.length / 2);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, sampleCount * 2);
+  const out = new Float32Array(sampleCount);
+  for (let i = 0; i < sampleCount; i++) {
+    out[i] = view.getInt16(i * 2, true) / 32768;
+  }
+  return out;
 }
 
 export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSynthesisReturn {
@@ -107,49 +62,41 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
   const [error, setError] = useState<string | null>(null);
   const [provider, setProvider] = useState<string | null>(null);
 
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const nextStartTimeRef = useRef(0);
+  const activeSourcesRef = useRef<AudioBufferSourceNode[]>([]);
+  const pendingByteRef = useRef<Uint8Array | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const browserUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const playResolveRef = useRef<(() => void) | null>(null);
-  const objectUrlRef = useRef<string | null>(null);
   const languageCodeRef = useRef(languageCode);
   const operationRef = useRef(0);
   languageCodeRef.current = languageCode;
 
-  const releaseObjectUrl = useCallback(() => {
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    objectUrlRef.current = null;
+  const getAudioContext = useCallback((): AudioContext => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContext();
+    }
+    return audioContextRef.current;
+  }, []);
+
+  const stopActiveSources = useCallback(() => {
+    for (const node of activeSourcesRef.current) {
+      try { node.onended = null; node.stop(); } catch { /* already stopped */ }
+    }
+    activeSourcesRef.current = [];
+    pendingByteRef.current = null;
   }, []);
 
   useEffect(() => {
-    const audio = new Audio();
-    audioRef.current = audio;
-    audio.onplay = () => { setIsSpeaking(true); setIsPaused(false); setStatus("playing"); };
-    audio.onpause = () => { if (!audio.ended && audio.currentTime > 0) setIsPaused(true); };
-    audio.onended = () => {
-      setIsSpeaking(false);
-      setIsPaused(false);
-      setStatus("ready");
-      releaseObjectUrl();
-      playResolveRef.current?.();
-      playResolveRef.current = null;
-    };
-    audio.onerror = () => {
-      setIsSpeaking(false);
-      setIsPaused(false);
-      setStatus("unavailable");
-      releaseObjectUrl();
-      playResolveRef.current?.();
-      playResolveRef.current = null;
-    };
     return () => {
       operationRef.current += 1;
-      audio.pause();
-      audio.removeAttribute("src");
-      releaseObjectUrl();
+      abortControllerRef.current?.abort();
+      stopActiveSources();
       window.speechSynthesis?.cancel();
-      audioRef.current = null;
+      audioContextRef.current?.close().catch(() => {});
+      audioContextRef.current = null;
     };
-  }, [releaseObjectUrl]);
+  }, [stopActiveSources]);
 
   const speakWithBrowserFallback = useCallback((text: string, onPlay?: () => void) => new Promise<boolean>((resolve) => {
     if (!window.speechSynthesis) return resolve(false);
@@ -182,60 +129,118 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
     window.speechSynthesis.speak(utterance);
   }), []);
 
-  const prefetch = useCallback(async (text: string): Promise<boolean> => {
-    if (!normalizeText(text)) return false;
-    try {
-      await requestAudio(text, languageCodeRef.current);
-      setStatus((current) => current === "idle" || current === "preparing" ? "ready" : current);
-      return true;
-    } catch {
-      return false;
-    }
-  }, []);
-
-  const prefetchMany = useCallback(async (texts: string[]) => {
-    const queue = [...new Set(texts.map(normalizeText).filter(Boolean))];
-    let cursor = 0;
-    const worker = async () => {
-      while (cursor < queue.length) {
-        const text = queue[cursor++];
-        await prefetch(text);
-      }
-    };
-    await Promise.all(Array.from({ length: Math.min(2, queue.length) }, worker));
-  }, [prefetch]);
-
   const speak = useCallback(async (text: string, onPlay?: () => void): Promise<void> => {
-    const audio = audioRef.current;
-    if (!audio || !normalizeText(text)) return;
+    const cleaned = normalizeText(text);
+    if (!cleaned) return;
     const operation = ++operationRef.current;
 
-    audio.pause();
-    audio.currentTime = 0;
-    releaseObjectUrl();
+    abortControllerRef.current?.abort();
+    stopActiveSources();
     window.speechSynthesis?.cancel();
-    playResolveRef.current?.();
-    playResolveRef.current = null;
     setIsFetchingTTS(true);
     setStatus("preparing");
     setError(null);
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const deadlineMs = isSomaliLanguage(languageCodeRef.current) ? 22000 : 12000;
+    const timeoutTimer = window.setTimeout(() => controller.abort("TTS request timed out"), deadlineMs);
+
     try {
-      const deadlineMs = isSomaliLanguage(languageCodeRef.current) ? 22000 : 12000;
-      const result = await raceWithTimeout(requestAudio(text, languageCodeRef.current), deadlineMs, "Audio request timed out");
-      if (operation !== operationRef.current) return;
-      setProvider(result.provider);
-      setStatus("ready");
-      const audioUrl = URL.createObjectURL(result.blob);
-      objectUrlRef.current = audioUrl;
-      audio.src = audioUrl;
-      setIsFetchingTTS(false);
-      await new Promise<void>((resolve) => {
-        playResolveRef.current = resolve;
-        audio.play().then(() => onPlay?.()).catch(() => resolve());
+      const audioContext = getAudioContext();
+      if (audioContext.state === "suspended") await audioContext.resume();
+
+      const response = await fetch(`${API_BASE_URL}/tts`, {
+        method: "POST",
+        credentials: "include",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          text: cleaned,
+          languageCode: languageCodeRef.current,
+          language: isSomaliLanguage(languageCodeRef.current) ? "somali" : "english",
+        }),
+        signal: controller.signal,
       });
-    } catch (caught) {
+
+      if (!response.ok || !response.body) {
+        throw new Error(`TTS request failed with status ${response.status}`);
+      }
       if (operation !== operationRef.current) return;
+
+      setProvider(response.headers.get("x-tts-provider"));
+      nextStartTimeRef.current = audioContext.currentTime + 0.05;
+      let firstChunk = true;
+      let lastNode: AudioBufferSourceNode | null = null;
+      const playbackResolver: { resolve: () => void } = { resolve: () => {} };
+      const playbackDone = new Promise<void>((resolve) => { playbackResolver.resolve = resolve; });
+
+      const scheduleChunk = (bytes: Uint8Array) => {
+        const samples = pcm16ToFloat32(bytes);
+        if (!samples.length) return;
+        const buffer = audioContext.createBuffer(1, samples.length, SAMPLE_RATE);
+        buffer.copyToChannel(samples as Float32Array<ArrayBuffer>, 0);
+        const node = audioContext.createBufferSource();
+        node.buffer = buffer;
+        node.connect(audioContext.destination);
+        const startAt = Math.max(nextStartTimeRef.current, audioContext.currentTime);
+        node.start(startAt);
+        nextStartTimeRef.current = startAt + buffer.duration;
+        activeSourcesRef.current.push(node);
+        lastNode = node;
+      };
+
+      const reader = response.body.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (operation !== operationRef.current) { reader.cancel().catch(() => {}); return; }
+        if (done) break;
+        if (!value || !value.length) continue;
+
+        let bytes = value;
+        if (pendingByteRef.current) {
+          const merged = new Uint8Array(pendingByteRef.current.length + bytes.length);
+          merged.set(pendingByteRef.current, 0);
+          merged.set(bytes, pendingByteRef.current.length);
+          bytes = merged;
+          pendingByteRef.current = null;
+        }
+        if (bytes.length % 2 !== 0) {
+          pendingByteRef.current = bytes.subarray(bytes.length - 1);
+          bytes = bytes.subarray(0, bytes.length - 1);
+        }
+        if (!bytes.length) continue;
+
+        if (firstChunk) {
+          firstChunk = false;
+          window.clearTimeout(timeoutTimer);
+          setIsFetchingTTS(false);
+          setStatus("playing");
+          setIsSpeaking(true);
+          setIsPaused(false);
+          onPlay?.();
+        }
+        scheduleChunk(bytes);
+      }
+
+      if (firstChunk) {
+        // Stream ended with no audio at all.
+        throw new Error("TTS stream returned no audio");
+      }
+
+      if (lastNode) {
+        (lastNode as AudioBufferSourceNode).onended = () => playbackResolver.resolve();
+      } else {
+        playbackResolver.resolve();
+      }
+      await playbackDone;
+      if (operation !== operationRef.current) return;
+      setIsSpeaking(false);
+      setIsPaused(false);
+      setStatus("ready");
+    } catch (caught) {
+      window.clearTimeout(timeoutTimer);
+      if (operation !== operationRef.current) return;
+      stopActiveSources();
       const message = caught instanceof Error ? caught.message : "Speech synthesis failed";
       setError(message);
       setIsFetchingTTS(false);
@@ -251,38 +256,39 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
         setProvider("browser-fallback");
         setStatus("ready");
       }
+    } finally {
+      window.clearTimeout(timeoutTimer);
     }
-  }, [releaseObjectUrl, speakWithBrowserFallback]);
+  }, [getAudioContext, stopActiveSources, speakWithBrowserFallback]);
 
   const cancel = useCallback(() => {
     operationRef.current += 1;
-    audioRef.current?.pause();
-    if (audioRef.current) audioRef.current.currentTime = 0;
-    releaseObjectUrl();
+    abortControllerRef.current?.abort();
+    stopActiveSources();
     window.speechSynthesis?.cancel();
     browserUtteranceRef.current = null;
-    playResolveRef.current?.();
-    playResolveRef.current = null;
     setIsSpeaking(false);
     setIsPaused(false);
     setIsFetchingTTS(false);
     setStatus("idle");
-  }, [releaseObjectUrl]);
+  }, [stopActiveSources]);
 
   const pause = useCallback(() => {
-    if (audioRef.current && !audioRef.current.paused) audioRef.current.pause();
+    audioContextRef.current?.suspend().catch(() => {});
     window.speechSynthesis?.pause();
+    setIsPaused(true);
   }, []);
 
   const resume = useCallback(() => {
-    if (audioRef.current?.src && audioRef.current.paused && !audioRef.current.ended) void audioRef.current.play();
+    audioContextRef.current?.resume().catch(() => {});
     window.speechSynthesis?.resume();
+    setIsPaused(false);
   }, []);
 
   return {
-    speak, prefetch, prefetchMany, cancel, pause, resume,
+    speak, cancel, pause, resume,
     isSpeaking, isPaused, isFetchingTTS, highlight,
-    voiceName: isSomaliLanguage(languageCode) ? "Somali TTS" : "Kokoro TTS",
+    voiceName: isSomaliLanguage(languageCode) ? "Gemini TTS (Somali)" : "Gemini TTS",
     ready: status === "ready" || status === "playing",
     status, error, provider,
   };

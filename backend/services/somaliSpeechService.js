@@ -1,15 +1,8 @@
-const crypto = require('crypto');
 const logger = require('../utils/logger');
+const geminiSpeechService = require('./geminiSpeechService');
 
 const ASR_TIMEOUT_MS = Number(process.env.SOMALI_ASR_TIMEOUT_MS || 90000);
-const ENGLISH_ASR_TIMEOUT_MS = Number(process.env.ENGLISH_ASR_TIMEOUT_MS || 90000);
-const TTS_TIMEOUT_MS = Number(process.env.SOMALI_TTS_TIMEOUT_MS || 45000);
-const TTS_FALLBACK_TIMEOUT_MS = Number(process.env.TTS_FALLBACK_TIMEOUT_MS || 12000);
 const RUNPOD_POLL_MS = Number(process.env.RUNPOD_POLL_MS || 500);
-const TTS_CACHE_MAX = Number(process.env.TTS_CACHE_MAX || 128);
-const TTS_CACHE_TTL_MS = Number(process.env.TTS_CACHE_TTL_MS || 6 * 60 * 60 * 1000);
-const TTS_CIRCUIT_OPEN_MS = Number(process.env.TTS_CIRCUIT_OPEN_MS || 60000);
-const TTS_MODEL_VERSION = process.env.TTS_MODEL_VERSION || 'v1';
 
 function trimBaseUrl(url) {
   return (url || '').trim().replace(/\/+$/, '');
@@ -17,18 +10,6 @@ function trimBaseUrl(url) {
 
 function getAsrBaseUrl() {
   return trimBaseUrl(process.env.SOMALI_ASR_URL || 'http://127.0.0.1:8001');
-}
-
-function getEnglishAsrBaseUrl() {
-  return trimBaseUrl(process.env.ENGLISH_ASR_URL || '');
-}
-
-function getEnglishTtsBaseUrl() {
-  return trimBaseUrl(process.env.ENGLISH_TTS_URL || '');
-}
-
-function getTtsBaseUrl() {
-  return trimBaseUrl(process.env.SOMALI_TTS_URL || 'http://127.0.0.1:8002');
 }
 
 function normalizeLanguage(language) {
@@ -58,7 +39,7 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function callSpeechRunPod(endpointUrl, payload, timeoutMs = TTS_TIMEOUT_MS) {
+async function callSpeechRunPod(endpointUrl, payload, timeoutMs) {
   const base = getRunPodEndpointBase(endpointUrl);
   const startedAt = Date.now();
   const runResponse = await fetch(`${base}/run`, {
@@ -84,7 +65,7 @@ async function callSpeechRunPod(endpointUrl, payload, timeoutMs = TTS_TIMEOUT_MS
     }
     if (Date.now() - startedAt >= timeoutMs) {
       const error = new Error(`RunPod speech job timed out after ${timeoutMs}ms`);
-      error.code = 'TTS_TIMEOUT';
+      error.code = 'ASR_TIMEOUT';
       throw error;
     }
     await sleep(RUNPOD_POLL_MS);
@@ -101,20 +82,27 @@ async function callSpeechRunPod(endpointUrl, payload, timeoutMs = TTS_TIMEOUT_MS
   return output;
 }
 
+/**
+ * Transcribes a recorded answer. English routes to Gemini's audio
+ * understanding (services/geminiSpeechService.js); Somali stays on the
+ * dedicated RunPod/local wav2vec2 ASR worker.
+ */
 async function transcribeAudio(fileBuffer, originalname = 'answer.webm', mimetype = 'audio/webm', languageCode = 'so-SO') {
-  const isEnglish = normalizeLanguage(languageCode) === 'en-US';
-  const asrUrl = isEnglish ? getEnglishAsrBaseUrl() : getAsrBaseUrl();
-  const timeoutMs = isEnglish ? ENGLISH_ASR_TIMEOUT_MS : ASR_TIMEOUT_MS;
-  if (!asrUrl) throw new Error(`${isEnglish ? 'English' : 'Somali'} ASR URL is not configured`);
+  if (normalizeLanguage(languageCode) === 'en-US') {
+    return normalizeText(await geminiSpeechService.transcribeAudioEnglish(fileBuffer, mimetype, originalname));
+  }
+
+  const asrUrl = getAsrBaseUrl();
+  if (!asrUrl) throw new Error('Somali ASR URL is not configured');
 
   if (isRunPodUrl(asrUrl)) {
     const output = await callSpeechRunPod(asrUrl, {
       action: 'transcribe',
       audio_data: fileBuffer.toString('base64'),
       filename: originalname,
-    }, timeoutMs);
+    }, ASR_TIMEOUT_MS);
     const transcription = normalizeText(output.transcription || '');
-    logger.info(`${isEnglish ? 'English' : 'Somali'} ASR transcription received via RunPod (${transcription.length} chars)`);
+    logger.info(`Somali ASR transcription received via RunPod (${transcription.length} chars)`);
     return transcription;
   }
 
@@ -125,263 +113,48 @@ async function transcribeAudio(fileBuffer, originalname = 'answer.webm', mimetyp
     response = await fetch(`${asrUrl}/transcribe`, {
       method: 'POST',
       body: form,
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: AbortSignal.timeout(ASR_TIMEOUT_MS),
     });
   } catch (error) {
-    throw new Error(`${isEnglish ? 'English' : 'Somali'} ASR is unreachable (${error.message})`);
+    throw new Error(`Somali ASR is unreachable (${error.message})`);
   }
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`${isEnglish ? 'English' : 'Somali'} ASR failed with ${response.status}: ${body.slice(0, 300)}`);
+    throw new Error(`Somali ASR failed with ${response.status}: ${body.slice(0, 300)}`);
   }
   const data = await response.json();
   return normalizeText(data.transcription || data.text || '');
 }
 
-const cache = new Map();
-const inFlight = new Map();
-const circuits = new Map();
-
-function cacheKey(text, languageCode, provider, voice) {
-  return crypto.createHash('sha256').update(JSON.stringify({
-    text: normalizeText(text),
-    languageCode: normalizeLanguage(languageCode),
-    provider,
-    voice: voice || '',
-    modelVersion: TTS_MODEL_VERSION,
-  })).digest('hex');
-}
-
-function getCached(key) {
-  const entry = cache.get(key);
-  if (!entry) return null;
-  if (entry.expiresAt <= Date.now()) {
-    cache.delete(key);
-    return null;
-  }
-  cache.delete(key);
-  cache.set(key, entry);
-  return { ...entry.value, cacheStatus: 'hit' };
-}
-
-function setCached(key, value) {
-  while (cache.size >= TTS_CACHE_MAX) cache.delete(cache.keys().next().value);
-  cache.set(key, { value, expiresAt: Date.now() + TTS_CACHE_TTL_MS });
-}
-
-function getCircuit(provider) {
-  if (!circuits.has(provider)) circuits.set(provider, { failures: 0, openUntil: 0 });
-  return circuits.get(provider);
-}
-
-function assertProviderAvailable(provider) {
-  const state = getCircuit(provider);
-  if (state.openUntil > Date.now()) {
-    const error = new Error(`${provider} circuit is open`);
-    error.code = 'TTS_CIRCUIT_OPEN';
-    throw error;
-  }
-}
-
-function recordProviderResult(provider, success, immediate = false) {
-  const state = getCircuit(provider);
-  if (success) {
-    state.failures = 0;
-    state.openUntil = 0;
-    return;
-  }
-  state.failures += 1;
-  if (immediate || state.failures >= 3) state.openUntil = Date.now() + TTS_CIRCUIT_OPEN_MS;
-}
-
-function validateAudio(audio, contentType) {
-  if (!Buffer.isBuffer(audio) || audio.length <= 44) throw new Error('TTS returned empty or incomplete audio');
-  const type = String(contentType || 'audio/wav').toLowerCase();
-  if (!type.startsWith('audio/')) throw new Error(`TTS returned unsupported content type: ${type}`);
-  if (type.includes('wav') && (audio.subarray(0, 4).toString('ascii') !== 'RIFF' || audio.subarray(8, 12).toString('ascii') !== 'WAVE')) {
-    throw new Error('TTS returned a corrupt WAV container');
-  }
-}
-
-async function synthesizeRunPod(url, text, languageCode, timeoutMs, voice) {
-  const output = await callSpeechRunPod(url, {
-    action: 'synthesize',
-    text,
-    language: normalizeLanguage(languageCode) === 'so-SO' ? 'somali' : 'english',
-    languageCode: normalizeLanguage(languageCode),
-    ...(voice ? { voice } : {}),
-  }, timeoutMs);
-  const audio = Buffer.from(output.audio_data || '', 'base64');
-  const contentType = output.content_type || 'audio/wav';
-  validateAudio(audio, contentType);
-  return { audio, contentType, model: output.model || '' };
-}
-
-async function synthesizeSomaliHttp(url, text, timeoutMs) {
-  const outputFilename = `tts_${Date.now()}_${crypto.randomBytes(6).toString('hex')}.wav`;
-  const response = await fetch(`${url}/synthesize`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, output_filename: outputFilename, language: 'so-SO' }),
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-  if (!response.ok) throw new Error(`Somali TTS synth returned ${response.status}: ${(await response.text()).slice(0, 200)}`);
-  const data = await response.json().catch(() => ({}));
-  const filename = data.output_filename || data.filename || outputFilename;
-  const audioResponse = await fetch(`${url}/audio/${encodeURIComponent(filename)}`, {
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-  if (!audioResponse.ok) throw new Error(`Somali TTS audio returned ${audioResponse.status}`);
-  const audio = Buffer.from(await audioResponse.arrayBuffer());
-  const contentType = audioResponse.headers.get('content-type') || 'audio/wav';
-  validateAudio(audio, contentType);
-  return { audio, contentType, model: data.model || '' };
-}
-
-function providersFor(languageCode) {
-  const isSomali = normalizeLanguage(languageCode) === 'so-SO';
-  const providers = [];
-  if (isSomali) {
-    const primary = getTtsBaseUrl();
-    if (primary) providers.push({ name: 'somali-primary', url: primary, kind: isRunPodUrl(primary) ? 'runpod' : 'somali-http', timeoutMs: TTS_TIMEOUT_MS });
-    const fallback = trimBaseUrl(process.env.SOMALI_TTS_FALLBACK_URL || '');
-    if (fallback && fallback !== primary) providers.push({ name: 'somali-fallback', url: fallback, kind: isRunPodUrl(fallback) ? 'runpod' : 'somali-http', timeoutMs: TTS_FALLBACK_TIMEOUT_MS });
-  } else {
-    const englishTtsUrl = getEnglishTtsBaseUrl();
-    if (englishTtsUrl) providers.push({ name: 'kokoro-english', url: englishTtsUrl, kind: 'runpod', voice: (process.env.KOKORO_VOICE || 'af_heart').trim(), timeoutMs: TTS_TIMEOUT_MS });
-  }
-  return providers;
-}
-
-async function synthesizeWithProvider(provider, text, languageCode) {
-  if (provider.kind === 'runpod') return synthesizeRunPod(provider.url, text, languageCode, provider.timeoutMs, provider.voice);
-  if (provider.kind === 'somali-http') return synthesizeSomaliHttp(provider.url, text, provider.timeoutMs);
-  throw new Error(`Unsupported speech provider: ${provider.kind}`);
-}
-
-async function synthesizeSpeech(text, languageCode = 'en-US', options = {}) {
-  const normalizedText = normalizeText(text);
-  const normalizedLanguage = normalizeLanguage(languageCode);
-  if (!normalizedText) throw new Error('Text is required for TTS');
-  if (normalizedText.length > 1000) throw new Error('Text exceeds the 1000 character TTS limit');
-
-  const attempts = [];
-  const providers = providersFor(normalizedLanguage);
-  for (const provider of providers) {
-    const cached = getCached(cacheKey(normalizedText, normalizedLanguage, provider.name, provider.voice));
-    if (cached) return cached;
-  }
-
-  for (const provider of providers) {
-    const key = cacheKey(normalizedText, normalizedLanguage, provider.name, provider.voice);
-    if (inFlight.has(key)) return inFlight.get(key);
-
-    const task = (async () => {
-      const startedAt = Date.now();
-      try {
-        assertProviderAvailable(provider.name);
-        const generated = await synthesizeWithProvider(provider, normalizedText, normalizedLanguage);
-        const value = {
-          ...generated,
-          provider: provider.name,
-          languageCode: normalizedLanguage,
-          cacheStatus: 'miss',
-          totalMs: Date.now() - startedAt,
-        };
-        recordProviderResult(provider.name, true);
-        setCached(key, value);
-        logger.info(JSON.stringify({ event: 'tts_complete', requestId: options.requestId, provider: provider.name, languageCode: normalizedLanguage, totalMs: value.totalMs, audioBytes: value.audio.length }));
-        return value;
-      } catch (error) {
-        recordProviderResult(provider.name, false, [401, 403, 404].includes(error.statusCode));
-        attempts.push({ provider: provider.name, message: error.message, totalMs: Date.now() - startedAt });
-        throw error;
-      } finally {
-        inFlight.delete(key);
-      }
-    })();
-    inFlight.set(key, task);
-    try {
-      return await task;
-    } catch (error) {
-      logger.warn(JSON.stringify({ event: 'tts_provider_failed', requestId: options.requestId, provider: provider.name, languageCode: normalizedLanguage, message: error.message }));
-    }
-  }
-
-  const error = new Error(`No usable ${normalizedLanguage} speech provider is available`);
-  error.code = 'TTS_UNAVAILABLE';
-  error.attempts = attempts;
-  throw error;
-}
-
+/**
+ * Warms the Somali ASR endpoint. English STT runs on Gemini, which has no
+ * meaningful cold-start to warm, so English warmup requests are a no-op.
+ */
 async function warmSpeechService(requestId = 'startup-warmup', language = 'all') {
   const normalizedWarmupLanguage = String(language || 'all').toLowerCase();
-  const endpoints = [
-    { url: getAsrBaseUrl(), service: 'asr', timeoutMs: ASR_TIMEOUT_MS },
-    { url: getTtsBaseUrl(), service: 'somali_tts', timeoutMs: TTS_TIMEOUT_MS },
-    { url: getEnglishAsrBaseUrl(), service: 'english_asr', timeoutMs: ENGLISH_ASR_TIMEOUT_MS },
-    { url: getEnglishTtsBaseUrl(), service: 'english_tts', timeoutMs: TTS_TIMEOUT_MS },
-  ].filter((entry) => {
-    if (!entry.url) return false;
-    if (normalizedWarmupLanguage === 'english') return entry.service.startsWith('english_');
-    if (normalizedWarmupLanguage === 'somali') return !entry.service.startsWith('english_');
-    return true;
-  });
+  if (normalizedWarmupLanguage === 'english') {
+    return { status: 'skipped', reason: 'gemini_no_warmup_needed' };
+  }
 
-  if (!endpoints.length) {
+  const asrUrl = getAsrBaseUrl();
+  if (!asrUrl) {
     return { status: 'skipped', reason: 'no_endpoints' };
   }
 
-  const runpodEndpoints = endpoints.filter((e) => isRunPodUrl(e.url));
-  const httpEndpoints = endpoints.filter((e) => !isRunPodUrl(e.url));
-
-  const promises = [];
-
-  if (runpodEndpoints.length > 0) {
-    const grouped = new Map();
-    for (const endpoint of runpodEndpoints) {
-      const key = getRunPodEndpointBase(endpoint.url);
-      const group = grouped.get(key) || { ...endpoint, services: [], timeoutMs: 0 };
-      group.services.push(endpoint.service);
-      group.timeoutMs = Math.max(group.timeoutMs, endpoint.timeoutMs);
-      grouped.set(key, group);
-    }
-    for (const group of grouped.values()) {
-      promises.push(
-        callSpeechRunPod(
-          group.url,
-          { action: 'warmup', service: group.services.length > 1 ? 'all' : group.services[0], requestId },
-          group.timeoutMs
-        ).catch((err) => ({ service: group.services.join(','), error: err.message }))
-      );
-    }
+  if (isRunPodUrl(asrUrl)) {
+    return callSpeechRunPod(asrUrl, { action: 'warmup', service: 'asr', requestId }, ASR_TIMEOUT_MS)
+      .catch((err) => ({ service: 'asr', error: err.message }));
   }
 
-  for (const httpEp of httpEndpoints) {
-    promises.push(
-      fetch(`${httpEp.url}/health`, { signal: AbortSignal.timeout(5000) })
-        .then((res) => ({ service: httpEp.service, status: res.status }))
-        .catch((err) => ({ service: httpEp.service, error: err.message }))
-    );
-  }
-
-  const results = await Promise.all(promises);
-  if (results.length === 1) return results[0];
-  return { status: 'ready', results };
+  return fetch(`${asrUrl}/health`, { signal: AbortSignal.timeout(5000) })
+    .then((res) => ({ service: 'asr', status: res.status }))
+    .catch((err) => ({ service: 'asr', error: err.message }));
 }
 
 module.exports = {
   transcribeAudio,
-  synthesizeSpeech,
   warmSpeechService,
   getAsrBaseUrl,
-  getEnglishAsrBaseUrl,
-  getEnglishTtsBaseUrl,
-  getTtsBaseUrl,
   normalizeLanguage,
   normalizeText,
-  validateAudio,
-  _cache: cache,
-  _inFlight: inFlight,
-  _circuits: circuits,
 };

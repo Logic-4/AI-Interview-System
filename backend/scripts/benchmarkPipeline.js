@@ -2,7 +2,15 @@ const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
 
 const { generateInterviewQuestions } = require('../services/gemmaService');
-const { synthesizeSpeech } = require('../services/somaliSpeechService');
+const { synthesizeSpeechStream } = require('../services/geminiSpeechService');
+
+async function synthesizeSpeech(text, languageCode) {
+  let bytes = 0;
+  for await (const chunk of synthesizeSpeechStream(text, languageCode)) {
+    bytes += chunk.length;
+  }
+  return bytes;
+}
 
 function percentile(sorted, value) {
   if (!sorted.length) return null;
@@ -61,9 +69,7 @@ async function main() {
   const ttsText = questionLanguage === 'somali'
     ? 'Sidee ayaad u sharxi lahayd khibraddaada React?'
     : 'How would you explain your experience with React?';
-  const tts = await measure('tts', runs, (index) => synthesizeSpeech(ttsText, ttsCode, {
-    requestId: `benchmark-tts-${index + 1}`,
-  }));
+  const tts = await measure('tts', runs, () => synthesizeSpeech(ttsText, ttsCode));
 
   console.log(JSON.stringify({ timestamp: new Date().toISOString(), runs, questionLanguage, results: [question, tts] }, null, 2));
   if (!question.summary.succeeded || !tts.summary.succeeded) process.exitCode = 1;

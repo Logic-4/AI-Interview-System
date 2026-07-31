@@ -74,39 +74,30 @@ function splitPythonCommand(python) {
 function getSomaliSpeechSettings() {
   const repoRoot = path.resolve(__dirname, '../..');
   const asrUrl = trimBaseUrl(process.env.SOMALI_ASR_URL || 'http://127.0.0.1:8001');
-  const ttsUrl = trimBaseUrl(process.env.SOMALI_TTS_URL || 'http://127.0.0.1:8002');
   const asrPort = parsePortFromUrl(asrUrl, 8001);
-  const ttsPort = parsePortFromUrl(ttsUrl, 8002);
 
   const venvCandidates = process.platform === 'win32'
     ? [
       path.join(repoRoot, 'Models', '.venv', 'Scripts', 'python.exe'),
       path.join(repoRoot, 'Models', 'Skydheere', '.venv', 'Scripts', 'python.exe'),
-      path.join(repoRoot, 'Models', 'tts-service', '.venv', 'Scripts', 'python.exe'),
     ]
     : [
       path.join(repoRoot, 'Models', '.venv', 'bin', 'python'),
       path.join(repoRoot, 'Models', 'Skydheere', '.venv', 'bin', 'python'),
-      path.join(repoRoot, 'Models', 'tts-service', '.venv', 'bin', 'python'),
     ];
 
   const defaultPython = resolvePython(process.env.SOMALI_PYTHON, venvCandidates);
   const asrPython = resolvePython(process.env.SOMALI_ASR_PYTHON || process.env.SOMALI_PYTHON, venvCandidates) || defaultPython;
-  const ttsPython = resolvePython(process.env.SOMALI_TTS_PYTHON || process.env.SOMALI_PYTHON, venvCandidates) || defaultPython;
 
   const autoStart = process.env.SOMALI_AUTO_START === 'true';
 
   return {
     repoRoot,
     asrUrl,
-    ttsUrl,
     asrPort,
-    ttsPort,
     asrPython,
-    ttsPython,
     autoStart,
     modelsDir: path.join(repoRoot, 'Models'),
-    ttsDir: path.join(repoRoot, 'Models', 'tts-service'),
   };
 }
 

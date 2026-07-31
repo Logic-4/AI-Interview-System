@@ -5,7 +5,7 @@ const Feedback = require('../models/Feedback');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { parseJobDescription, generateInterviewQuestions, processInterviewTurn, isPlaceholderAnswer } = require('../services/gemmaService');
-const { transcribeAudio, synthesizeSpeech } = require('../services/somaliSpeechService');
+const { transcribeAudio } = require('../services/somaliSpeechService');
 const { uploadAudio, deleteBlobUrls } = require('../services/blobService');
 const logger = require('../utils/logger');
 const { stageTimer } = require('../middleware/requestContext');
@@ -202,14 +202,6 @@ async function runQuestionGenerationPipeline(interviewId, context) {
       interviewId: String(interviewId),
       totalMs: Date.now() - startedAt,
     }));
-
-    void synthesizeSpeech(firstQuestion.text, interview.language, { requestId: context.requestId })
-      .catch((error) => logger.warn(JSON.stringify({
-        event: 'first_question_tts_prefetch_failed',
-        requestId: context.requestId,
-        interviewId: String(interviewId),
-        message: error.message,
-      })));
 
     if (totalCount > 1) {
       const generatedRemaining = await generateInterviewQuestions(

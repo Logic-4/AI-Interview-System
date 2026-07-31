@@ -2,9 +2,7 @@ const { spawn } = require('child_process');
 const { getSomaliSpeechSettings, splitPythonCommand } = require('./somaliSpeechSettings');
 
 let asrChild = null;
-let ttsChild = null;
 let ownedAsr = false;
-let ownedTts = false;
 
 function spawnPythonService(python, uvicornArgs, cwd) {
   const { cmd, baseArgs } = splitPythonCommand(python);
@@ -42,10 +40,6 @@ function attachLogs(child, tag, logger) {
 
 function spawnAsr(python, port, cwd) {
   return spawnPythonService(python, ['stt_service:app', '--host', '127.0.0.1', '--port', String(port)], cwd);
-}
-
-function spawnTts(python, port, cwd) {
-  return spawnPythonService(python, ['main:app', '--host', '127.0.0.1', '--port', String(port)], cwd);
 }
 
 async function waitForService(url, attempts, delayMs, logger, label) {
@@ -106,55 +100,8 @@ async function startSomaliAsr(settings, logger, waitForReady = false) {
   return { started: true, url: asrUrl, reason: 'spawned_not_ready' };
 }
 
-async function startSomaliTts(settings, logger, waitForReady = false) {
-  const { ttsUrl, ttsPort, ttsPython, ttsDir } = settings;
-  const attempts = waitForReady ? 60 : 10;
-
-  if (await isServiceHealthy(ttsUrl)) {
-    logger.info(`[somali-tts] Already running at ${ttsUrl}`);
-    return { started: false, url: ttsUrl, reason: 'already_running' };
-  }
-
-  logger.info(`[somali-tts] Starting on port ${ttsPort} (${ttsPython})…`);
-  logger.info('[somali-tts] First launch may take 30–90s while the TTS model loads.');
-
-  ttsChild = spawnTts(ttsPython, ttsPort, ttsDir);
-  ownedTts = true;
-
-  ttsChild.on('error', (err) => {
-    logger.warn(`[somali-tts] Could not start: ${err.message}`);
-    logger.warn('[somali-tts] Run once: node scripts/setup-somali-speech.js');
-    ttsChild = null;
-    ownedTts = false;
-  });
-
-  attachLogs(ttsChild, 'somali-tts', logger);
-
-  ttsChild.on('exit', (code) => {
-    if (ownedTts && code !== 0 && code !== null) {
-      logger.warn(`[somali-tts] Process exited with code ${code}`);
-    }
-    ttsChild = null;
-    ownedTts = false;
-  });
-
-  const ready = await waitForService(ttsUrl, attempts, 2000, logger, 'somali-tts');
-  if (ready) {
-    logger.info(`[somali-tts] Ready at ${ttsUrl}`);
-    return { started: true, url: ttsUrl, reason: 'spawned' };
-  }
-
-  if (!waitForReady) {
-    logger.info(`[somali-tts] Starting in background — TTS may take 30–90s on first run`);
-    return { started: true, url: ttsUrl, reason: 'warming_up' };
-  }
-
-  logger.warn(`[somali-tts] Spawned but not healthy yet at ${ttsUrl}`);
-  return { started: true, url: ttsUrl, reason: 'spawned_not_ready' };
-}
-
 /**
- * Start Somali ASR (8001) and TTS (8002) when SOMALI_AUTO_START is enabled.
+ * Start Somali ASR (8001) when SOMALI_AUTO_START is enabled.
  */
 async function startSomaliSpeech(logger = console, options = {}) {
   const { waitForReady = false } = options;
@@ -162,13 +109,12 @@ async function startSomaliSpeech(logger = console, options = {}) {
 
   if (!settings.autoStart) {
     logger.info('[somali-speech] Auto-start disabled (SOMALI_AUTO_START=false or production mode)');
-    return { asr: { started: false, reason: 'disabled' }, tts: { started: false, reason: 'disabled' } };
+    return { asr: { started: false, reason: 'disabled' } };
   }
 
   const asr = await startSomaliAsr(settings, logger, waitForReady);
-  const tts = await startSomaliTts(settings, logger, waitForReady);
 
-  return { asr, tts };
+  return { asr };
 }
 
 function killChild(child, logger, label) {
@@ -187,11 +133,8 @@ function killChild(child, logger, label) {
 
 function stopSomaliSpeech(logger = console) {
   if (ownedAsr) killChild(asrChild, logger, 'somali-asr');
-  if (ownedTts) killChild(ttsChild, logger, 'somali-tts');
   asrChild = null;
-  ttsChild = null;
   ownedAsr = false;
-  ownedTts = false;
 }
 
 module.exports = { startSomaliSpeech, stopSomaliSpeech, isServiceHealthy };

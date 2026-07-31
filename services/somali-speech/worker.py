@@ -1,42 +1,31 @@
 """
-Unified Somali and English ASR and TTS serverless worker for RunPod.
-Handles speech-to-text (transcription) and text-to-speech (synthesis) for both Somali and English.
+Somali ASR serverless worker for RunPod.
+Handles speech-to-text (transcription) for Somali audio.
 """
 
 from __future__ import annotations
 
 import base64
 import os
-import re
 import tempfile
 import time
 import traceback
-import unicodedata
 from pathlib import Path
 from typing import Any, Dict
 
 import numpy as np
-import scipy.io.wavfile
 import soundfile as sf
 import torch
 from scipy.signal import resample_poly
-from transformers import AutoModelForCTC, AutoProcessor, AutoTokenizer, VitsModel
+from transformers import AutoModelForCTC, AutoProcessor
 
 # Paths and configuration
 device = "cuda" if torch.cuda.is_available() else "cpu"
 ASR_MODEL_ID = os.environ.get("ASR_MODEL_ID", "skydheere/wav2vec2-large-mms-1b-somalia")
-SOM_TTS_MODEL_ID = os.environ.get("SOM_TTS_MODEL_ID", "facebook/mms-tts-som")
-ENG_TTS_MODEL_ID = os.environ.get("ENG_TTS_MODEL_ID", "facebook/mms-tts-eng")
 
 # Singletons for memory efficiency
 asr_processor = None
 asr_model = None
-
-som_tts_tokenizer = None
-som_tts_model = None
-
-eng_tts_tokenizer = None
-eng_tts_model = None
 
 
 def validate_cuda_runtime() -> Dict[str, Any]:
@@ -90,28 +79,6 @@ def load_asr() -> None:
     asr_model = AutoModelForCTC.from_pretrained(ASR_MODEL_ID).to(device)
     asr_model.eval()
     print("ASR model loaded successfully.")
-
-
-def load_som_tts() -> None:
-    global som_tts_tokenizer, som_tts_model
-    if som_tts_model is not None:
-        return
-    print(f"Loading Somali TTS model {SOM_TTS_MODEL_ID} on {device}…")
-    som_tts_tokenizer = AutoTokenizer.from_pretrained(SOM_TTS_MODEL_ID)
-    som_tts_model = VitsModel.from_pretrained(SOM_TTS_MODEL_ID).to(device)
-    som_tts_model.eval()
-    print("Somali TTS model loaded successfully.")
-
-
-def load_eng_tts() -> None:
-    global eng_tts_tokenizer, eng_tts_model
-    if eng_tts_model is not None:
-        return
-    print(f"Loading English TTS model {ENG_TTS_MODEL_ID} on {device}…")
-    eng_tts_tokenizer = AutoTokenizer.from_pretrained(ENG_TTS_MODEL_ID)
-    eng_tts_model = VitsModel.from_pretrained(ENG_TTS_MODEL_ID).to(device)
-    eng_tts_model.eval()
-    print("English TTS model loaded successfully.")
 
 
 def _load_audio_av(audio_path: Path) -> tuple[np.ndarray, int]:
@@ -215,107 +182,14 @@ def handle_transcribe(payload: Dict[str, Any]) -> Dict[str, Any]:
             pass
 
 
-def handle_synthesize(payload: Dict[str, Any]) -> Dict[str, Any]:
-    text = payload.get("text")
-    if not text or not text.strip():
-        return {"error": "Missing text in payload"}
-
-    language = str(payload.get("language") or payload.get("languageCode") or "somali").strip().lower()
-    is_english = language in {"english", "en", "en-us", "en-gb"} or language.startswith("en-")
-
-    load_started_at = time.perf_counter()
-    if is_english:
-        load_eng_tts()
-        tokenizer = eng_tts_tokenizer
-        model = eng_tts_model
-        model_name = ENG_TTS_MODEL_ID
-    else:
-        load_som_tts()
-        tokenizer = som_tts_tokenizer
-        model = som_tts_model
-        model_name = SOM_TTS_MODEL_ID
-    model_load_ms = round((time.perf_counter() - load_started_at) * 1000, 1)
-
-    cleaned_text = unicodedata.normalize("NFKC", str(text))
-    cleaned_text = re.sub(r"\s+", " ", cleaned_text).strip()
-    if len(cleaned_text) > 1000:
-        return {"error": "Text exceeds the 1000 character synthesis limit"}
-    inputs = tokenizer(text=cleaned_text, return_tensors="pt")
-    inputs = {key: val.to(device) for key, val in inputs.items()}
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-        tmp_path = Path(tmp.name)
-
-    try:
-        generation_started_at = time.perf_counter()
-        with torch.inference_mode():
-            outputs = model(**inputs)
-        waveform = outputs.waveform[0].detach().float().cpu().numpy()
-        if waveform.size == 0 or not np.isfinite(waveform).all():
-            raise ValueError("Model returned an empty or non-finite waveform")
-
-        peak = float(np.max(np.abs(waveform)))
-        if peak > 0:
-            waveform = waveform / max(peak, 1.0)
-        pcm16 = np.clip(waveform * 32767.0, -32768, 32767).astype(np.int16)
-        
-        scipy.io.wavfile.write(
-            str(tmp_path),
-            rate=model.config.sampling_rate,
-            data=pcm16,
-        )
-
-        with open(tmp_path, "rb") as f:
-            audio_bytes = f.read()
-            if len(audio_bytes) <= 44 or not audio_bytes.startswith(b"RIFF"):
-                raise ValueError("Generated WAV is empty or invalid")
-            audio_data_b64 = base64.b64encode(audio_bytes).decode("utf-8")
-
-        return {
-            "audio_data": audio_data_b64,
-            "content_type": "audio/wav",
-            "sample_rate": model.config.sampling_rate,
-            "device": device,
-            "model": model_name,
-            "duration_seconds": round(len(pcm16) / model.config.sampling_rate, 3),
-            "audio_bytes": len(audio_bytes),
-            "_timing": {
-                "modelLoadMs": model_load_ms,
-                "generationMs": round((time.perf_counter() - generation_started_at) * 1000, 1),
-            },
-        }
-    except Exception as err:
-        traceback.print_exc()
-        return {"error": f"TTS failed: {str(err)}", "detail": traceback.format_exc()}
-    finally:
-        try:
-            tmp_path.unlink(missing_ok=True)
-        except OSError:
-            pass
-
-
 def dispatch(payload: Dict[str, Any]) -> Dict[str, Any]:
     action = (payload.get("action") or "health").strip().lower()
     if action == "transcribe":
         return handle_transcribe(payload)
-    elif action == "synthesize":
-        return handle_synthesize(payload)
     elif action == "warmup":
-        service = str(payload.get("service") or "somali_tts").lower()
+        service = str(payload.get("service") or "asr").lower()
         started_at = time.perf_counter()
-        model_timings: Dict[str, float] = {}
-        if service in {"all", "interview", "somali_all"}:
-            model_started_at = time.perf_counter()
-            load_som_tts()
-            model_timings["somali_tts_ms"] = round((time.perf_counter() - model_started_at) * 1000, 1)
-            model_started_at = time.perf_counter()
-            load_asr()
-            model_timings["asr_ms"] = round((time.perf_counter() - model_started_at) * 1000, 1)
-        elif service in {"somali_tts", "tts", "somali"}:
-            load_som_tts()
-        elif service in {"english_tts", "english"}:
-            load_eng_tts()
-        elif service == "asr":
+        if service in {"all", "interview", "asr", "somali_all"}:
             load_asr()
         else:
             return {"error": f"Unknown warmup service: {service}"}
@@ -323,10 +197,8 @@ def dispatch(payload: Dict[str, Any]) -> Dict[str, Any]:
             "status": "ready",
             "service": service,
             "load_ms": round((time.perf_counter() - started_at) * 1000, 1),
-            "model_timings": model_timings,
             "models": {
                 "asr": ASR_MODEL_ID if asr_model is not None else "not_loaded",
-                "somali_tts": SOM_TTS_MODEL_ID if som_tts_model is not None else "not_loaded",
             },
         }
     elif action == "health":
@@ -334,8 +206,6 @@ def dispatch(payload: Dict[str, Any]) -> Dict[str, Any]:
             "status": "ok",
             "device": device,
             "asr_model": ASR_MODEL_ID if asr_model is not None else "not_loaded",
-            "somali_tts_model": SOM_TTS_MODEL_ID if som_tts_model is not None else "not_loaded",
-            "english_tts_model": ENG_TTS_MODEL_ID if eng_tts_model is not None else "not_loaded",
         }
     else:
         return {"error": f"Unknown action: {action}"}
