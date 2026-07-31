@@ -779,6 +779,7 @@ const submitAnswer = async (req, res, next) => {
     question.timeSpent = (question.timeSpent || 0) + (timeSpent || 0);
 
     if (!isFollowUp) {
+      // Topic is complete — commit final score and mark answered
       question.score = evaluation.evaluationStatus === 'completed' && typeof evaluation.score === 'number'
         ? evaluation.score
         : null;
@@ -786,6 +787,13 @@ const submitAnswer = async (req, res, next) => {
       question.isAnswered = true;
       question.evaluationStatus = evaluation.evaluationStatus;
     } else {
+      // Topic is still open (follow-up pending).
+      // Save a tentative score so the question always has a value on record;
+      // the next successful turn will overwrite it when the topic closes.
+      if (evaluation.evaluationStatus === 'completed' && typeof evaluation.score === 'number') {
+        question.score = evaluation.score;
+        question.aiFeedback = evaluation.feedback;
+      }
       question.evaluationStatus = 'pending';
     }
     await question.save();

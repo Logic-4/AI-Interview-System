@@ -198,13 +198,17 @@ function normalizeEvaluation(evaluation) {
       evaluationStatus: 'missing',
     };
   }
+  const score = evaluation.score != null ? clampScore(evaluation.score) : null;
+  // Map 'ok' (Python worker success signal) to 'completed' for downstream consistency
+  const rawStatus = evaluation.evaluationStatus;
+  const statusIsSuccess = rawStatus === 'ok' || rawStatus === 'completed';
   return {
-    score: evaluation.score != null ? clampScore(evaluation.score) : null,
-    feedback: evaluation.feedback || '',
+    score,
+    feedback: (evaluation.feedback || '').slice(0, 350),
     strengths: Array.isArray(evaluation.strengths) ? evaluation.strengths.slice(0, 3) : [],
     improvements: Array.isArray(evaluation.improvements) ? evaluation.improvements.slice(0, 3) : [],
-    suggestedAnswer: evaluation.suggestedAnswer || '',
-    evaluationStatus: evaluation.evaluationStatus || 'ok',
+    suggestedAnswer: (evaluation.suggestedAnswer || '').slice(0, 350),
+    evaluationStatus: score !== null && statusIsSuccess ? 'completed' : (rawStatus || 'failed'),
   };
 }
 
@@ -524,6 +528,7 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
       difficultyLabel: difficultyLabel || toDifficultyLabel(difficulty),
       targetSkill,
       supportingSkills,
+      skills: uniqueSkills,
       questionIndex: absoluteIndex,
       totalQuestions: totalCount,
       responsibilities: roleProfile?.responsibilities || [],

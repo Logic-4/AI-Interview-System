@@ -158,10 +158,13 @@ const registerInterviewHandlers = (io) => {
           });
 
           if (interview && interview.status === 'in-progress') {
-            // Calculate score
-            const answered = interview.questions.filter((q) => q.isAnswered);
+            // Calculate score — exclude null-scored questions (failed/pending evaluations)
+            // to avoid dragging the average down for unevaluated answers.
+            const answered = interview.questions.filter(
+              (q) => q.isAnswered && typeof q.score === 'number' && q.score !== null
+            );
             const avgScore = answered.length > 0
-              ? Math.round(answered.reduce((s, q) => s + (q.score || 0), 0) / answered.length)
+              ? Math.round(answered.reduce((s, q) => s + q.score, 0) / answered.length)
               : 0;
 
             interview.status = 'completed';

@@ -17,12 +17,14 @@ import {
   X,
   Briefcase,
   Copy,
+  MoreHorizontal,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { setPageTitle } from '@/store/themeConfigSlice';
 import companyService from '@/services/companyService';
 import { Application, ApplicationStatus, ApprovalStatus } from '@/types/companyPortal';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import Dropdown from '@/components/Dropdown';
 
 const approvalBadge = (status: ApprovalStatus) =>
   ({ approved: 'success', rejected: 'danger', pending: 'warning' })[status] || 'secondary';
@@ -211,9 +213,9 @@ const CompanyApplicationsPage = () => {
       <div className="panel">
         <div className="mb-5 flex flex-col gap-3 md:flex-row">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white-dark" />
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white-dark pointer-events-none z-10" />
             <input
-              className="form-input pl-9"
+              className="form-input pl-10"
               placeholder="Search by candidate name, email, or phone..."
               value={search}
               onChange={(e) => {
@@ -247,25 +249,25 @@ const CompanyApplicationsPage = () => {
           </div>
         ) : (
           <>
-            <div className="table-responsive">
-              <table>
+            <div className="table-responsive overflow-x-auto w-full">
+              <table className="w-full text-left align-middle min-w-[850px]">
                 <thead>
-                  <tr>
-                    <th>Candidate</th>
-                    <th>Job Title</th>
-                    <th>Phone Number</th>
-                    <th>Applied Date</th>
-                    <th>Status</th>
-                    <th>Approval</th>
-                    <th className="text-right">Actions</th>
+                  <tr className="border-b border-white-light dark:border-[#1b2e4b]">
+                    <th className="min-w-[220px]">Candidate</th>
+                    <th className="min-w-[170px]">Job Title</th>
+                    <th className="min-w-[130px]">Phone Number</th>
+                    <th className="min-w-[150px]">Applied Date</th>
+                    <th className="min-w-[130px]">Status</th>
+                    <th className="min-w-[120px]">Approval</th>
+                    <th className="min-w-[90px] text-center">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-white-light dark:divide-[#1b2e4b]">
                   {applications.map((app) => {
                     const jobTitle = typeof app.job === 'object' ? app.job?.title : 'Role';
                     return (
-                      <tr key={app._id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                        <td>
+                      <tr key={app._id} className="hover:bg-slate-50/60 dark:hover:bg-[#1b2e4b]/20 transition-colors">
+                        <td className="whitespace-nowrap">
                           <div className="flex items-center gap-3">
                             <CandidateAvatar
                               src={app.profilePhotoUrl}
@@ -279,38 +281,80 @@ const CompanyApplicationsPage = () => {
                             </div>
                           </div>
                         </td>
-                        <td className="font-medium text-black dark:text-white">{jobTitle}</td>
-                        <td className="text-xs">{app.candidatePhone || 'N/A'}</td>
-                        <td className="text-xs">{dateTime(app.appliedDate)}</td>
-                        <td>
+                        <td className="whitespace-nowrap font-medium text-black dark:text-white">{jobTitle}</td>
+                        <td className="whitespace-nowrap text-xs">{app.candidatePhone || 'N/A'}</td>
+                        <td className="whitespace-nowrap text-xs">{dateTime(app.appliedDate)}</td>
+                        <td className="whitespace-nowrap">
                           <span className={`badge badge-outline-${statusBadge(app.status)} capitalize`}>
-                            {app.status.replace('_', ' ')}
+                            {app.status.replace(/_/g, ' ')}
                           </span>
                         </td>
-                        <td>
+                        <td className="whitespace-nowrap">
                           <span className={`badge badge-outline-${approvalBadge(app.approvalStatus)} capitalize`}>
                             {app.approvalStatus}
                           </span>
                         </td>
-                        <td>
-                          <div className="flex justify-end gap-2">
-                            {app.approvalStatus !== 'approved' && (
-                              <button
-                                title="Approve Application"
-                                className="btn btn-sm btn-outline-success p-2"
-                                onClick={() => void handleApprove(app._id)}
-                              >
-                                <CheckCircle2 className="h-4 w-4" />
-                              </button>
-                            )}
-                            <button
-                              title="View Candidate Details"
-                              className="btn btn-sm btn-outline-primary flex items-center gap-1.5 px-3"
-                              onClick={() => setDetailApp(app)}
+                        <td className="whitespace-nowrap text-center">
+                          <div className="dropdown flex justify-center">
+                            <Dropdown
+                              offset={[0, 5]}
+                              placement="bottom-end"
+                              btnClassName="btn btn-sm btn-outline-secondary p-1 hover:bg-slate-100 dark:hover:bg-[#1b2e4b] rounded-lg"
+                              button={<MoreHorizontal className="h-5 w-5" />}
                             >
-                              <Eye className="h-4 w-4" />
-                              <span>View Candidate</span>
-                            </button>
+                              <ul className="w-48 text-xs font-semibold bg-white dark:bg-[#0e1726] border border-white-light dark:border-[#1b2e4b] shadow-lg rounded-xl p-1.5 space-y-1 z-50 text-left">
+                                <li>
+                                  <button
+                                    type="button"
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-left rounded-lg hover:bg-white-light/80 dark:hover:bg-dark/40 text-primary transition-colors"
+                                    onClick={() => setDetailApp(app)}
+                                  >
+                                    <Eye className="h-4 w-4 shrink-0" />
+                                    <span>View Candidate</span>
+                                  </button>
+                                </li>
+
+                                {app.approvalStatus !== 'approved' && app.approvalStatus !== 'rejected' && (
+                                  <li>
+                                    <button
+                                      type="button"
+                                      className="w-full flex items-center gap-2.5 px-3 py-2 text-left rounded-lg hover:bg-success/10 text-success transition-colors"
+                                      onClick={() => void handleApprove(app._id)}
+                                    >
+                                      <CheckCircle2 className="h-4 w-4 shrink-0" />
+                                      <span>Approve Application</span>
+                                    </button>
+                                  </li>
+                                )}
+
+                                <li>
+                                  <button
+                                    type="button"
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-left rounded-lg hover:bg-warning/10 text-warning transition-colors"
+                                    onClick={() => void updateStatus(app._id, 'shortlisted', true)}
+                                  >
+                                    <Star className="h-4 w-4 shrink-0" />
+                                    <span>Move to Shortlist</span>
+                                  </button>
+                                </li>
+
+                                {app.approvalStatus !== 'rejected' && (
+                                  <li>
+                                    <button
+                                      type="button"
+                                      className="w-full flex items-center gap-2.5 px-3 py-2 text-left rounded-lg hover:bg-danger/10 text-danger transition-colors"
+                                      onClick={() => {
+                                        setDetailApp(app);
+                                        setRejectReasonOpen(true);
+                                      }}
+                                    >
+                                      <XCircle className="h-4 w-4 shrink-0" />
+                                      <span>Reject Candidate</span>
+                                    </button>
+                                  </li>
+                                )}
+                              </ul>
+                            </Dropdown>
                           </div>
                         </td>
                       </tr>

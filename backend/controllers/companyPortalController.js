@@ -477,15 +477,35 @@ const scheduleInterview = async (req, res, next) => {
         if (application.approvalStatus !== 'approved') {
           return next(ApiError.badRequest('Candidate must be approved before scheduling an interview'));
         }
-        candidateId = application.candidate;
+        candidateId = candidateId || application.candidate;
         job = await Job.findById(application.job);
       }
     }
 
-    if (!candidateId) return next(ApiError.badRequest('Candidate is required for scheduling an interview'));
+    if (!candidateId && !application) return next(ApiError.badRequest('Candidate is required for scheduling an interview'));
 
-    candidate = await User.findById(candidateId);
+    if (candidateId) {
+      candidate = await User.findById(candidateId);
+    }
+
+    if (!candidate && application?.candidateEmail) {
+      candidate = await User.findOne({ email: application.candidateEmail.trim().toLowerCase() });
+    }
+
+    if (!candidate && application) {
+      candidate = await User.create({
+        name: application.candidateName || 'Candidate',
+        email: application.candidateEmail.trim().toLowerCase(),
+        role: 'candidate',
+      });
+    }
+
     if (!candidate) return next(ApiError.notFound('Candidate user not found'));
+
+    if (application && String(application.candidate) !== String(candidate._id)) {
+      application.candidate = candidate._id;
+      await application.save();
+    }
 
     // Pull the interview configuration and parsed resume from the Job +
     // Application when scheduling from an application; req.body can still

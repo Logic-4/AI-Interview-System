@@ -341,13 +341,18 @@ def normalize_turn_response(parsed: Optional[dict], raw_text: str = "") -> dict:
         is_topic_complete = not is_follow_up
 
     score_raw = evaluation.get("score")
+    # Apply minimum score floor: any on-topic substantive answer scores at least 10
+    # to distinguish from a placeholder / no-answer (which scores 0).
+    clamped_score = clamp_score(score_raw) if score_raw is not None else None
+    if clamped_score is not None and 1 <= clamped_score < 10:
+        clamped_score = 10
     return {
         "evaluation": {
-            "score": clamp_score(score_raw) if score_raw is not None else None,
-            "feedback": (evaluation.get("feedback") or "")[:200],
+            "score": clamped_score,
+            "feedback": (evaluation.get("feedback") or "")[:350],
             "strengths": (evaluation.get("strengths") or [])[:3],
             "improvements": (evaluation.get("improvements") or [])[:3],
-            "suggestedAnswer": (evaluation.get("suggestedAnswer") or "")[:200],
+            "suggestedAnswer": (evaluation.get("suggestedAnswer") or "")[:350],
         },
         "nextInterviewerResponse": (parsed.get("nextInterviewerResponse") or "Thank you.")[:300],
         "isFollowUp": is_follow_up and not is_topic_complete,
@@ -472,9 +477,11 @@ def handle_interview_turn(data: dict) -> dict:
         ),
     }.get((type_str or "mixed").lower(), "Evaluate clarity, relevance, and depth of the candidate's answer.")
 
+    difficulty_level = difficulty_hint(question_difficulty)
+
     system_prompt = (
         f"You are an expert {domain} interviewer for: {role}.\n"
-        f"Interview type: {type_str}. Difficulty: {difficulty_hint(question_difficulty)}.\n"
+        f"Interview type: {type_str}. Difficulty: {difficulty_level}.\n"
         f"{type_eval_hint}\n"
         f"{lang_hint}\n\n"
         f"{somali_note}"
@@ -486,24 +493,30 @@ def handle_interview_turn(data: dict) -> dict:
         system_prompt += f"\nJOB CONTEXT:\n{role_context}\n"
 
     system_prompt += (
-        "\nSCORING (use consistently):\n"
-        "- 90-100: Excellent — accurate, complete, strong examples.\n"
-        "- 80-89: Good — mostly correct, minor gaps.\n"
-        "- 65-79: Partial — some understanding, missing key points.\n"
-        "- 40-64: Weak — significant gaps or vague.\n"
-        "- Below 40: Off-topic, incorrect, or no substantive answer.\n\n"
+        f"\nDIFFICULTY CALIBRATION: This is a {difficulty_level}-level question. "
+        f"Score against {difficulty_level} expectations — do NOT apply a senior bar to a junior question.\n\n"
+        "SCORING SCALE (apply consistently and generously for correct answers):\n"
+        "- 85-100: Excellent — thorough, accurate, strong examples or clear reasoning.\n"
+        "- 70-84:  Good — correct answer with minor gaps or lacking depth. A solid, clear, mostly-correct "
+        "answer should score in this range.\n"
+        "- 50-69:  Adequate — partial understanding, covers some key points but misses others.\n"
+        "- 25-49:  Weak — significant gaps, vague, or mostly incorrect.\n"
+        "- 0-24:   Off-topic, clearly wrong, or no real attempt.\n"
+        "CALIBRATION: A clear, relevant, mostly-correct answer for this difficulty level "
+        "should score 72–82. Reserve 90+ for exceptional depth and insight.\n\n"
         "BEHAVIOR:\n"
-        "1. nextInterviewerResponse: 1-2 short sentences max.\n"
-        "2. Partial answer → isFollowUp=true, isTopicComplete=false, one short follow-up.\n"
-        "3. Good complete answer → isFollowUp=false, isTopicComplete=true.\n"
+        "1. nextInterviewerResponse: 1-2 short sentences max. Be warm and professional.\n"
+        "2. Partial answer → isFollowUp=true, isTopicComplete=false, one short targeted follow-up.\n"
+        "3. Good or complete answer → isFollowUp=false, isTopicComplete=true.\n"
         "4. If the candidate asks YOU a question (role, team, process, expectations), "
         "answer it briefly and professionally in nextInterviewerResponse, set answeredCandidateQuestion=true. "
         "For outro category, always answer their questions. Stay on topic after answering.\n"
         "5. If they ask for clarification on YOUR question, rephrase briefly — do not repeat the full original question.\n"
         "6. Never ask the same question twice verbatim; if already answered, acknowledge and move on.\n\n"
-        "Keep JSON string values under 120 characters.\n"
+        "FEEDBACK QUALITY: Write feedback that is specific, actionable, and explains WHY the score was given. "
+        "Mention what the candidate did well and what exactly was missing (if anything).\n"
         "Return ONLY raw JSON:\n"
-        '{"evaluation": {"score": 85, "feedback": "...", "strengths": ["..."], '
+        '{"evaluation": {"score": 78, "feedback": "...", "strengths": ["..."], '
         '"improvements": ["..."], "suggestedAnswer": "..."}, '
         '"nextInterviewerResponse": "...", "isFollowUp": false, "isTopicComplete": true, '
         '"answeredCandidateQuestion": false}'
@@ -527,7 +540,7 @@ def handle_interview_turn(data: dict) -> dict:
     else:
         messages.append({"role": "user", "content": instruction})
 
-    parsed, raw = generate_json_response(messages, max_new_tokens=220, temperature=0.2)
+    parsed, raw = generate_json_response(messages, max_new_tokens=320, temperature=0.2)
     return normalize_turn_response(parsed, raw)
 
 
@@ -796,7 +809,8 @@ def handle_feedback(data: dict) -> dict:
 
     score_anchor = (
         f"The per-question average score is {turn_average}. "
-        f"Use the SAME 0-100 scale for category scores. overallScore should be close to {turn_average} (±5).\n\n"
+        f"Your overallScore MUST equal {turn_average}. "
+        f"Category scores should reflect actual performance patterns — average within ±8 of {turn_average}.\n\n"
         if turn_average is not None
         else ""
     )
@@ -806,18 +820,26 @@ def handle_feedback(data: dict) -> dict:
             "role": "user",
             "content": (
                 "You are an interview coach providing post-session feedback for a PRACTICE interview.\n"
-                "Be constructive and specific. Use the per-question scores as ground truth.\n\n"
+                "Be constructive, specific, and encouraging. Reference actual answers where possible.\n\n"
                 f"{score_anchor}"
-                "SCORING (same scale as per-question evaluation):\n"
-                "- 90-100: Excellent\n"
-                "- 80-89: Good\n"
-                "- 65-79: Partial\n"
-                "- 40-64: Weak\n"
-                "- Below 40: Off-topic or incorrect\n\n"
-                "LENGTH LIMITS:\n"
-                "- feedback strings under 80 chars; detailedFeedback under 200 chars.\n"
-                "- max 3 strengths, 3 improvements, 3 recommendations.\n"
-                "- For non-technical interviews, set codeQuality score from communication/structure, not coding.\n\n"
+                "SCORING SCALE (consistent with per-question scores):\n"
+                "- 85-100: Excellent — thorough, accurate, strong examples\n"
+                "- 70-84:  Good — correct with minor gaps\n"
+                "- 50-69:  Adequate — partial understanding, key gaps\n"
+                "- 25-49:  Weak — significant gaps or vague\n"
+                "- 0-24:   Off-topic or no real attempt\n\n"
+                "CATEGORY GUIDANCE:\n"
+                "- communication: clarity, structure, articulation of ideas\n"
+                "- technicalAccuracy: correctness of technical claims and concepts\n"
+                "- problemSolving: reasoning approach and logical breakdown\n"
+                "- codeQuality: for non-technical interviews, score based on structured thinking and precision\n"
+                "- confidence: delivery, directness, and composure\n\n"
+                "LENGTH REQUIREMENTS:\n"
+                "- Each category feedback: 60-150 chars, specific and actionable\n"
+                "- detailedFeedback: 150-300 chars, summarize overall performance\n"
+                "- strengths: 3 items, each 40-100 chars\n"
+                "- improvements: 3 items, each 40-100 chars, concrete and actionable\n"
+                "- recommendations: 3 items, each 40-100 chars, specific next steps\n\n"
                 "Return ONLY raw JSON with keys: overallScore, categories "
                 "(communication, technicalAccuracy, problemSolving, codeQuality, confidence — each with score and feedback), "
                 "strengths, improvements, detailedFeedback, recommendations.\n\n"
@@ -826,24 +848,27 @@ def handle_feedback(data: dict) -> dict:
         }
     ]
 
-    parsed, raw = generate_json_response(messages, max_new_tokens=550, temperature=0.2)
+    parsed, raw = generate_json_response(messages, max_new_tokens=700, temperature=0.2)
     if parsed:
+        cats_raw = parsed.get("categories", {})
         normalized = {
+            # Always use the authoritative turn average as the overall score
             "overallScore": clamp_score(
                 turn_average if turn_average is not None else parsed.get("overallScore", 0)
             ),
             "categories": {
-                "communication": parsed.get("categories", {}).get("communication", {"score": 0, "feedback": ""}),
-                "technicalAccuracy": parsed.get("categories", {}).get("technicalAccuracy", {"score": 0, "feedback": ""}),
-                "problemSolving": parsed.get("categories", {}).get("problemSolving", {"score": 0, "feedback": ""}),
-                "codeQuality": parsed.get("categories", {}).get("codeQuality", {"score": 0, "feedback": ""}),
-                "confidence": parsed.get("categories", {}).get("confidence", {"score": 0, "feedback": ""}),
+                "communication": cats_raw.get("communication") or {"score": 0, "feedback": ""},
+                "technicalAccuracy": cats_raw.get("technicalAccuracy") or cats_raw.get("technical_accuracy") or {"score": 0, "feedback": ""},
+                "problemSolving": cats_raw.get("problemSolving") or cats_raw.get("problem_solving") or {"score": 0, "feedback": ""},
+                "codeQuality": cats_raw.get("codeQuality") or cats_raw.get("code_quality") or {"score": 0, "feedback": ""},
+                "confidence": cats_raw.get("confidence") or {"score": 0, "feedback": ""},
             },
             "strengths": parsed.get("strengths", [])[:3],
             "improvements": parsed.get("improvements", [])[:3],
-            "detailedFeedback": parsed.get("detailedFeedback", parsed.get("summary", ""))[:300],
+            "detailedFeedback": parsed.get("detailedFeedback") or parsed.get("summary") or "",
             "recommendations": parsed.get("recommendations", [])[:3],
         }
+        # Clamp all category scores and enforce minimum 10 for populated feedback
         for key in normalized["categories"]:
             cat = normalized["categories"][key]
             if isinstance(cat, dict) and cat.get("score") is not None:

@@ -90,6 +90,7 @@ const getPublicJobDetails = async (req, res, next) => {
 };
 
 const Application = require('../models/Application');
+const User = require('../models/User');
 const mongoose = require('mongoose');
 
 /**
@@ -151,11 +152,27 @@ const applyPublicJob = async (req, res, next) => {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
+    // Resolve or create a candidate User account
+    let candidateUser = req.user || null;
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!candidateUser && normalizedEmail) {
+      candidateUser = await User.findOne({ email: normalizedEmail });
+    }
+
+    if (!candidateUser) {
+      candidateUser = await User.create({
+        name: fullName.trim(),
+        email: normalizedEmail,
+        role: 'candidate',
+      });
+    }
+
     // Create Application record
     const application = await Application.create({
       job: job._id,
       company: job.company,
-      candidate: req.user?._id || new mongoose.Types.ObjectId(),
+      candidate: candidateUser._id,
       candidateName: fullName,
       candidateEmail: email,
       candidatePhone: phone,

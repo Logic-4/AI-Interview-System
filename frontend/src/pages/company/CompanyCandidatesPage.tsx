@@ -2,19 +2,20 @@ import { useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import {
   Search, Eye, Star, Calendar, XCircle, CheckCircle2, UserCheck,
-  Mail, Phone, Briefcase, Award, X, AlertTriangle,
+  Mail, Phone, Briefcase, Award, X, AlertTriangle, MoreVertical, MoreHorizontal, ChevronDown,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { setPageTitle } from '@/store/themeConfigSlice';
 import companyService from '@/services/companyService';
 import { CandidateSummary, ApplicationStatus } from '@/types/companyPortal';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import Dropdown from '@/components/Dropdown';
 
 const approvalBadge = (status: CandidateSummary['approvalStatus']) =>
   ({ approved: 'success', rejected: 'danger', pending: 'warning' })[status] || 'secondary';
 
 const statusBadge = (status: ApplicationStatus) =>
-  ({ hired: 'success', shortlisted: 'success', rejected: 'danger', interviewed: 'primary', interview_scheduled: 'primary', under_review: 'warning' })[status] || 'secondary';
+  ({ applied: 'info', hired: 'success', shortlisted: 'success', rejected: 'danger', interviewed: 'primary', interview_scheduled: 'primary', under_review: 'warning' })[status] || 'secondary';
 
 const dateShort = (v?: string) =>
   v ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(v)) : 'N/A';
@@ -332,9 +333,9 @@ const CompanyCandidatesPage = () => {
       <div className="panel">
         <div className="mb-5 flex gap-3">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white-dark" />
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white-dark pointer-events-none z-10" />
             <input
-              className="form-input pl-9"
+              className="form-input pl-10"
               placeholder="Search by name or email..."
               value={search}
               onChange={(e) => { setPage(1); setSearch(e.target.value); }}
@@ -346,23 +347,23 @@ const CompanyCandidatesPage = () => {
           <div className="flex h-64 items-center justify-center"><LoadingSpinner size="lg" /></div>
         ) : (
           <>
-            <div className="table-responsive">
-              <table>
+            <div className="table-responsive overflow-x-auto w-full">
+              <table className="w-full text-left align-middle min-w-[850px]">
                 <thead>
-                  <tr>
-                    <th>Candidate</th>
-                    <th>Applied Position</th>
-                    <th>Experience</th>
-                    <th>Interview Score</th>
-                    <th>Status</th>
-                    <th>Approval</th>
-                    <th className="text-right">Actions</th>
+                  <tr className="border-b border-white-light dark:border-[#1b2e4b]">
+                    <th className="min-w-[240px]">Candidate</th>
+                    <th className="min-w-[170px]">Applied Position</th>
+                    <th className="min-w-[110px]">Experience</th>
+                    <th className="min-w-[130px]">Interview Score</th>
+                    <th className="min-w-[150px]">Status</th>
+                    <th className="min-w-[120px]">Approval</th>
+                    <th className="min-w-[90px] text-center">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-white-light dark:divide-[#1b2e4b]">
                   {candidates.map((cand) => (
-                    <tr key={cand._id}>
-                      <td>
+                    <tr key={cand._id} className="hover:bg-slate-50/60 dark:hover:bg-[#1b2e4b]/20 transition-colors">
+                      <td className="whitespace-nowrap">
                         <div className="flex items-center gap-3">
                           <Avatar src={cand.avatar} name={cand.name} size="sm" />
                           <div>
@@ -371,9 +372,9 @@ const CompanyCandidatesPage = () => {
                           </div>
                         </div>
                       </td>
-                      <td>{cand.appliedPosition}</td>
-                      <td className="capitalize">{cand.experienceLevel}</td>
-                      <td>
+                      <td className="whitespace-nowrap font-medium">{cand.appliedPosition}</td>
+                      <td className="whitespace-nowrap capitalize">{cand.experienceLevel}</td>
+                      <td className="whitespace-nowrap">
                         {cand.interviewScore != null ? (
                           <span className={`font-bold ${cand.interviewScore >= 70 ? 'text-success' : cand.interviewScore >= 50 ? 'text-warning' : 'text-danger'}`}>
                             {cand.interviewScore}%
@@ -382,64 +383,101 @@ const CompanyCandidatesPage = () => {
                           <span className="text-xs text-white-dark">—</span>
                         )}
                       </td>
-                      <td>
+                      <td className="whitespace-nowrap">
                         <span className={`badge badge-outline-${statusBadge(cand.status)} capitalize`}>
                           {cand.status.replace(/_/g, ' ')}
                         </span>
                       </td>
-                      <td>
+                      <td className="whitespace-nowrap">
                         <span className={`badge badge-outline-${approvalBadge(cand.approvalStatus)} capitalize`}>
                           {cand.approvalStatus}
                         </span>
                       </td>
-                      <td>
-                        <div className="flex justify-end gap-1">
-                          <button className="btn btn-sm btn-outline-primary p-2" title="View Profile" onClick={() => setProfileModal(cand)}>
-                            <Eye className="h-4 w-4" />
-                          </button>
-                          {cand.approvalStatus !== 'approved' && cand.approvalStatus !== 'rejected' && (
-                            <button
-                              className="btn btn-sm btn-outline-success p-2"
-                              title="Approve"
-                              disabled={approvingId === cand._id}
-                              onClick={() => void handleApprove(cand)}
-                            >
-                              <CheckCircle2 className="h-4 w-4" />
-                            </button>
-                          )}
-                          <button
-                            className="btn btn-sm btn-outline-info p-2 disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={cand.approvalStatus === 'approved' ? 'Schedule Interview' : 'Approve first'}
-                            disabled={cand.approvalStatus !== 'approved'}
-                            onClick={() => setScheduleModal(cand)}
+                      <td className="whitespace-nowrap text-center">
+                        <div className="dropdown flex justify-center">
+                          <Dropdown
+                            offset={[0, 5]}
+                            placement="bottom-end"
+                            btnClassName="btn btn-sm btn-outline-secondary p-1 hover:bg-slate-100 dark:hover:bg-[#1b2e4b] rounded-lg"
+                            button={<MoreHorizontal className="h-5 w-5" />}
                           >
-                            <Calendar className="h-4 w-4" />
-                          </button>
-                          <button
-                            className={`btn btn-sm p-2 ${cand.isShortlisted ? 'btn-warning' : 'btn-outline-warning'}`}
-                            title={cand.isShortlisted ? 'Remove from Shortlist' : 'Shortlist'}
-                            onClick={() => void handleShortlist(cand)}
-                          >
-                            <Star className="h-4 w-4" />
-                          </button>
-                          {cand.isShortlisted && cand.approvalStatus === 'approved' && cand.status !== 'hired' && (
-                            <button
-                              className="btn btn-sm btn-primary p-2"
-                              title="Mark as Hired"
-                              onClick={() => void handleHire(cand)}
-                            >
-                              <UserCheck className="h-4 w-4" />
-                            </button>
-                          )}
-                          {cand.approvalStatus !== 'rejected' && cand.status !== 'hired' && (
-                            <button
-                              className="btn btn-sm btn-outline-danger p-2"
-                              title="Reject"
-                              onClick={() => setRejectModal(cand)}
-                            >
-                              <XCircle className="h-4 w-4" />
-                            </button>
-                          )}
+                            <ul className="w-48 text-xs font-semibold bg-white dark:bg-[#0e1726] border border-white-light dark:border-[#1b2e4b] shadow-lg rounded-xl p-1.5 space-y-1 z-50 text-left">
+                              <li>
+                                <button
+                                  type="button"
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-left rounded-lg hover:bg-white-light/80 dark:hover:bg-dark/40 text-primary transition-colors"
+                                  onClick={() => setProfileModal(cand)}
+                                >
+                                  <Eye className="h-4 w-4 shrink-0" />
+                                  <span>View Profile</span>
+                                </button>
+                              </li>
+
+                              {cand.approvalStatus !== 'approved' && cand.approvalStatus !== 'rejected' && (
+                                <li>
+                                  <button
+                                    type="button"
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-left rounded-lg hover:bg-success/10 text-success transition-colors"
+                                    disabled={approvingId === cand._id}
+                                    onClick={() => void handleApprove(cand)}
+                                  >
+                                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                                    <span>Approve Candidate</span>
+                                  </button>
+                                </li>
+                              )}
+
+                              <li>
+                                <button
+                                  type="button"
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-left rounded-lg hover:bg-info/10 text-info transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                  disabled={cand.approvalStatus !== 'approved'}
+                                  title={cand.approvalStatus === 'approved' ? 'Schedule Interview' : 'Approve candidate first'}
+                                  onClick={() => setScheduleModal(cand)}
+                                >
+                                  <Calendar className="h-4 w-4 shrink-0" />
+                                  <span>Schedule Interview</span>
+                                </button>
+                              </li>
+
+                              <li>
+                                <button
+                                  type="button"
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-left rounded-lg hover:bg-warning/10 text-warning transition-colors"
+                                  onClick={() => void handleShortlist(cand)}
+                                >
+                                  <Star className={`h-4 w-4 shrink-0 ${cand.isShortlisted ? 'fill-warning' : ''}`} />
+                                  <span>{cand.isShortlisted ? 'Remove Shortlist' : 'Add to Shortlist'}</span>
+                                </button>
+                              </li>
+
+                              {cand.isShortlisted && cand.approvalStatus === 'approved' && cand.status !== 'hired' && (
+                                <li>
+                                  <button
+                                    type="button"
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-left rounded-lg hover:bg-success/10 text-success transition-colors"
+                                    onClick={() => void handleHire(cand)}
+                                  >
+                                    <UserCheck className="h-4 w-4 shrink-0" />
+                                    <span>Mark as Hired</span>
+                                  </button>
+                                </li>
+                              )}
+
+                              {cand.approvalStatus !== 'rejected' && cand.status !== 'hired' && (
+                                <li className="border-t border-white-light dark:border-[#1b2e4b] pt-1">
+                                  <button
+                                    type="button"
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-left rounded-lg hover:bg-danger/10 text-danger transition-colors"
+                                    onClick={() => setRejectModal(cand)}
+                                  >
+                                    <XCircle className="h-4 w-4 shrink-0" />
+                                    <span>Reject Candidate</span>
+                                  </button>
+                                </li>
+                              )}
+                            </ul>
+                          </Dropdown>
                         </div>
                       </td>
                     </tr>
