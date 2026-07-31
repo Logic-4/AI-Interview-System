@@ -20,11 +20,6 @@ const jobSchema = new mongoose.Schema(
       trim: true,
       maxlength: [150, 'Job title cannot exceed 150 characters'],
     },
-    department: {
-      type: String,
-      required: [true, 'Department is required'],
-      trim: true,
-    },
     employmentType: {
       type: String,
       required: [true, 'Employment type is required'],
@@ -72,17 +67,7 @@ const jobSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Job description is required'],
     },
-    responsibilities: {
-      type: String,
-      default: '',
-    },
     requiredSkills: [
-      {
-        type: String,
-        trim: true,
-      },
-    ],
-    preferredSkills: [
       {
         type: String,
         trim: true,
@@ -105,14 +90,6 @@ const jobSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
-    salaryRange: {
-      type: String,
-      default: '',
-    },
-    benefitsNotes: {
-      type: String,
-      default: '',
-    },
     // Section 3: Interview Configuration
     interviewLanguage: {
       type: String,
@@ -123,11 +100,6 @@ const jobSchema = new mongoose.Schema(
       type: String,
       enum: ['technical', 'behavioral', 'hr', 'system-design', 'mixed'],
       default: 'mixed',
-    },
-    difficulty: {
-      type: String,
-      enum: ['junior', 'mid', 'senior', 'lead'],
-      default: 'mid',
     },
     targetJobRole: {
       type: String,
@@ -155,22 +127,6 @@ const jobSchema = new mongoose.Schema(
     resumeRequired: {
       type: Boolean,
       default: true,
-    },
-    coverLetterRequired: {
-      type: Boolean,
-      default: false,
-    },
-    allowCandidateSelectTime: {
-      type: Boolean,
-      default: true,
-    },
-    completionDeadline: {
-      type: Date,
-      default: null,
-    },
-    interviewExpiryDate: {
-      type: Date,
-      default: null,
     },
     passingScoreThreshold: {
       type: Number,

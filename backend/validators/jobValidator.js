@@ -9,12 +9,6 @@ const jobValidationRules = [
     .isLength({ max: 150 })
     .withMessage('Job title cannot exceed 150 characters'),
 
-  body('department')
-    .optional()
-    .trim()
-    .notEmpty()
-    .withMessage('Department cannot be empty'),
-
   body('employmentType')
     .optional()
     .isIn(['full-time', 'part-time', 'contract', 'internship'])
@@ -62,11 +56,6 @@ const jobValidationRules = [
     .isIn(['technical', 'behavioral', 'hr', 'system-design', 'mixed'])
     .withMessage('Interview type must be technical, behavioral, hr, system-design, or mixed'),
 
-  body('difficulty')
-    .optional()
-    .isIn(['junior', 'mid', 'senior', 'lead'])
-    .withMessage('Difficulty must be junior, mid, senior, or lead'),
-
   body('durationMinutes')
     .optional()
     .isInt({ min: 5, max: 120 })
@@ -89,11 +78,6 @@ const jobValidationRules = [
     .optional()
     .isArray()
     .withMessage('Focus skills must be an array of strings'),
-
-  body('interviewExpiryDate')
-    .optional({ nullable: true, checkFalsy: true })
-    .isISO8601()
-    .withMessage('Interview expiry date must be a valid date'),
 
   body('passingScoreThreshold')
     .optional()

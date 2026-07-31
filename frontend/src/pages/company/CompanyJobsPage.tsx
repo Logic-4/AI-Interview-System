@@ -161,7 +161,6 @@ const CompanyJobsPage = () => {
                 <thead>
                   <tr>
                     <th>Job Title</th>
-                    <th>Category</th>
                     <th>Employment Type</th>
                     <th>Location</th>
                     <th>Status</th>
@@ -187,7 +186,6 @@ const CompanyJobsPage = () => {
                             </div>
                           </div>
                         </td>
-                        <td className="font-medium text-black dark:text-white">{job.department || 'General'}</td>
                         <td className="capitalize">{job.employmentType}</td>
                         <td>{job.location}</td>
                         <td>

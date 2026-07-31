@@ -68,7 +68,6 @@ const PublicCompanyProfilePage = () => {
   const filteredJobs = jobs.filter((job) => {
     const matchesSearch =
       job.title.toLowerCase().includes(search.toLowerCase()) ||
-      (job.department && job.department.toLowerCase().includes(search.toLowerCase())) ||
       (job.location && job.location.toLowerCase().includes(search.toLowerCase()));
     const matchesType = !employmentTypeFilter || job.employmentType === employmentTypeFilter;
     return matchesSearch && matchesType;
@@ -262,9 +261,6 @@ const PublicCompanyProfilePage = () => {
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <span className="badge badge-outline-primary text-xs mb-2 inline-block">
-                        {job.department || 'General'}
-                      </span>
                       <h3 className="text-lg font-bold text-black dark:text-white transition-colors group-hover:text-primary">
                         <Link to={`/jobs/${job._id}`}>{job.title}</Link>
                       </h3>

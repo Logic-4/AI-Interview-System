@@ -48,7 +48,7 @@ const getPublicCompanyJobs = async (req, res, next) => {
     }
 
     const jobs = await Job.find({ company: companyId, status: 'published' })
-      .select('title department employmentType workplaceType location status description createdAt')
+      .select('title employmentType workplaceType location status description createdAt')
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -106,6 +106,7 @@ const applyPublicJob = async (req, res, next) => {
       phone,
       profilePhotoUrl,
       resumeUrl,
+      resumeText,
       coverLetter,
       selectedInterviewDate,
       selectedInterviewTime,
@@ -135,13 +136,6 @@ const applyPublicJob = async (req, res, next) => {
       });
     }
 
-    if (job.coverLetterRequired && !coverLetter) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cover Letter is required for this job application',
-      });
-    }
-
     // ─── Duplicate application check ─────────────────────────────────────────
     const existingApplication = await Application.findOne({
       job: job._id,
@@ -167,10 +161,11 @@ const applyPublicJob = async (req, res, next) => {
       candidatePhone: phone,
       profilePhotoUrl: profilePhotoUrl || '',
       resumeUrl: job.resumeRequired ? resumeUrl : '',
+      resumeText: job.resumeRequired ? (resumeText || '') : '',
       resumeStatus: job.resumeRequired && resumeUrl ? 'uploaded' : 'missing',
-      coverLetter: job.coverLetterRequired ? coverLetter : '',
-      selectedInterviewDate: job.allowCandidateSelectTime && selectedInterviewDate ? selectedInterviewDate : null,
-      selectedInterviewTime: job.allowCandidateSelectTime && selectedInterviewTime ? selectedInterviewTime : '',
+      coverLetter: '',
+      selectedInterviewDate: null,
+      selectedInterviewTime: '',
       status: 'applied',
     });
 
@@ -191,6 +186,7 @@ const applyPublicJob = async (req, res, next) => {
 };
 
 const { uploadCandidateFile } = require('../services/blobService');
+const { parseResumeBuffer } = require('../services/resumeParserService');
 
 /**
  * @desc    Upload candidate profile photo or resume directly to Vercel Blob
@@ -207,17 +203,17 @@ const uploadCandidateBlobFile = async (req, res, next) => {
     }
 
     const folder = req.body.folder || 'candidate-files';
-    const result = await uploadCandidateFile(
-      req.file.buffer,
-      req.file.mimetype,
-      req.file.originalname,
-      folder
-    );
+    const [result, resumeText] = await Promise.all([
+      uploadCandidateFile(req.file.buffer, req.file.mimetype, req.file.originalname, folder),
+      folder === 'resumes'
+        ? parseResumeBuffer(req.file.buffer, req.file.mimetype, req.file.originalname)
+        : Promise.resolve(''),
+    ]);
 
     res.status(200).json({
       success: true,
       message: 'File uploaded to Vercel Blob successfully',
-      data: { url: result.url },
+      data: { url: result.url, resumeText },
     });
   } catch (error) {
     next(error);

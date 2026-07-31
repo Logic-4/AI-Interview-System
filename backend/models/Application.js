@@ -44,6 +44,10 @@ const applicationSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    resumeText: {
+      type: String,
+      default: '',
+    },
     resumeStatus: {
       type: String,
       enum: ['uploaded', 'missing', 'reviewed'],

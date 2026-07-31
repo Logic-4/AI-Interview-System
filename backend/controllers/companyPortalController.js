@@ -7,6 +7,7 @@ const Company = require('../models/Company');
 const User = require('../models/User');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
+const { buildInterviewPayload } = require('../services/promptPayloadService');
 
 const normalizePagination = (value, fallback, max) => Math.min(Math.max(parseInt(value, 10) || fallback, 1), max);
 
@@ -35,7 +36,7 @@ const getDashboard = async (req, res, next) => {
       Interview.countDocuments({ company: companyId, status: 'scheduled' }),
 
       Application.find({ company: companyId })
-        .populate('job', 'title department')
+        .populate('job', 'title')
         .populate('candidate', 'name email avatar')
         .sort({ createdAt: -1 })
         .limit(5)
@@ -62,7 +63,7 @@ const getDashboard = async (req, res, next) => {
         id: j._id,
         type: 'job',
         title: `Job posting "${j.title}" (${j.status})`,
-        subtitle: `Department: ${j.department}`,
+        subtitle: `Location: ${j.location}`,
         timestamp: j.createdAt,
       })),
     ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 5);
@@ -91,11 +92,10 @@ const getJobs = async (req, res, next) => {
   try {
     const page = normalizePagination(req.query.page, 1, 1000);
     const limit = normalizePagination(req.query.limit, 10, 100);
-    const { search = '', status = '', department = '' } = req.query;
+    const { search = '', status = '' } = req.query;
 
     const filter = { company: req.companyId };
     if (status) filter.status = status;
-    if (department) filter.department = department;
     if (search.trim()) {
       filter.title = new RegExp(search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
     }
@@ -188,7 +188,7 @@ const getApplications = async (req, res, next) => {
 
     const [applications, total] = await Promise.all([
       Application.find(filter)
-        .populate('job', 'title department experienceLevel')
+        .populate('job', 'title experienceLevel')
         .populate('candidate', 'name email avatar skills experienceLevel')
         .populate('interview', 'overallScore status type language duration scheduledAt')
         .sort({ createdAt: -1 })
@@ -256,7 +256,7 @@ const getCandidates = async (req, res, next) => {
     }
 
     const applications = await Application.find(filter)
-      .populate('job', 'title department')
+      .populate('job', 'title')
       .populate('candidate', 'name email avatar experienceLevel skills')
       .populate('interview', 'overallScore status')
       .sort({ createdAt: -1 })
@@ -365,14 +365,18 @@ const getInterviews = async (req, res, next) => {
 
 const scheduleInterview = async (req, res, next) => {
   try {
-    const { applicationId, candidateId, jobRole, type = 'mixed', difficulty = 'mid', domain = 'technology', language = 'english', duration = 30, scheduledAt } = req.body;
+    const { applicationId, candidateId, jobRole, type, difficulty, domain = 'technology', language, duration, scheduledAt } = req.body;
 
     let candidate = null;
     let application = null;
+    let job = null;
 
     if (applicationId) {
       application = await Application.findOne({ _id: applicationId, company: req.companyId });
-      if (application) candidateId = application.candidate;
+      if (application) {
+        candidateId = application.candidate;
+        job = await Job.findById(application.job);
+      }
     }
 
     if (!candidateId) return next(ApiError.badRequest('Candidate is required for scheduling an interview'));
@@ -380,16 +384,26 @@ const scheduleInterview = async (req, res, next) => {
     candidate = await User.findById(candidateId);
     if (!candidate) return next(ApiError.notFound('Candidate user not found'));
 
+    // Pull the interview configuration and parsed resume from the Job +
+    // Application when scheduling from an application; req.body can still
+    // override individual fields (e.g. manual, non-application scheduling).
+    const jobPayload = job ? buildInterviewPayload(job, application) : null;
+
+    const resolvedJobRole = jobRole || jobPayload?.jobRole || 'Candidate';
+
     const interview = await Interview.create({
       user: candidate._id,
       company: req.companyId,
-      title: `${jobRole || 'Company'} Interview - ${candidate.name}`,
-      type,
-      difficulty,
+      title: `${resolvedJobRole} Interview - ${candidate.name}`,
+      type: type || jobPayload?.type || 'mixed',
+      difficulty: difficulty || jobPayload?.difficulty || 'mid',
       domain,
-      language: language.toLowerCase(),
-      jobRole: jobRole || 'Candidate',
-      duration,
+      language: (language || jobPayload?.language || 'english').toLowerCase(),
+      jobRole: resolvedJobRole,
+      jobDescription: jobPayload?.jobDescription || '',
+      resumeText: jobPayload?.resumeText || '',
+      focusSkills: jobPayload?.focusSkills || [],
+      duration: duration || jobPayload?.duration || 30,
       scheduledAt: scheduledAt ? new Date(scheduledAt) : new Date(),
       status: 'scheduled',
     });
@@ -465,7 +479,7 @@ const getAssessments = async (req, res, next) => {
     const [assessments, total] = await Promise.all([
       Assessment.find(filter)
         .populate('candidate', 'name email avatar')
-        .populate('job', 'title department')
+        .populate('job', 'title')
         .sort({ completionDate: -1 })
         .skip((page - 1) * limit)
         .limit(limit)

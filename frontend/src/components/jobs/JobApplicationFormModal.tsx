@@ -35,12 +35,7 @@ export const JobApplicationFormModal = ({ job, isOpen, onClose }: JobApplication
   const [photoPreview, setPhotoPreview] = useState<string>('');
   const [resumeFile, setResumeFile] = useState<File | null>(null);
 
-  // Optional fields
-  const [coverLetter, setCoverLetter] = useState('');
 
-  // Booking fields
-  const [selectedDate, setSelectedDate] = useState<string>('');
-  const [selectedTime, setSelectedTime] = useState<string>('');
 
   // Status state
   const [submitting, setSubmitting] = useState(false);
@@ -83,27 +78,21 @@ export const JobApplicationFormModal = ({ job, isOpen, onClose }: JobApplication
       return;
     }
 
-    if (job.coverLetterRequired && !coverLetter.trim()) {
-      toast.error('Cover Letter is required for this job application');
-      return;
-    }
-
-    if (job.allowCandidateSelectTime && (!selectedDate || !selectedTime)) {
-      toast.error('Please select an interview date and time slot');
-      return;
-    }
-
     setSubmitting(true);
     try {
       let uploadedPhotoUrl = photoPreview;
       let uploadedResumeUrl = '';
+      let uploadedResumeText = '';
 
       if (photoFile) {
-        uploadedPhotoUrl = await publicCompanyService.uploadBlobFile(photoFile, 'photos');
+        const photoResult = await publicCompanyService.uploadBlobFile(photoFile, 'photos');
+        uploadedPhotoUrl = photoResult.url;
       }
 
       if (job.resumeRequired && resumeFile) {
-        uploadedResumeUrl = await publicCompanyService.uploadBlobFile(resumeFile, 'resumes');
+        const resumeResult = await publicCompanyService.uploadBlobFile(resumeFile, 'resumes');
+        uploadedResumeUrl = resumeResult.url;
+        uploadedResumeText = resumeResult.resumeText || '';
       }
 
       await publicCompanyService.submitJobApplication(job._id, {
@@ -112,9 +101,7 @@ export const JobApplicationFormModal = ({ job, isOpen, onClose }: JobApplication
         phone: phone.trim(),
         profilePhotoUrl: uploadedPhotoUrl,
         resumeUrl: job.resumeRequired ? uploadedResumeUrl : undefined,
-        coverLetter: job.coverLetterRequired ? coverLetter.trim() : undefined,
-        selectedInterviewDate: job.allowCandidateSelectTime ? selectedDate : undefined,
-        selectedInterviewTime: job.allowCandidateSelectTime ? selectedTime : undefined,
+        resumeText: job.resumeRequired ? uploadedResumeText : undefined,
       });
 
       setSubmitted(true);
@@ -139,17 +126,12 @@ export const JobApplicationFormModal = ({ job, isOpen, onClose }: JobApplication
     setPhotoFile(null);
     setPhotoPreview('');
     setResumeFile(null);
-    setCoverLetter('');
-    setSelectedDate('');
-    setSelectedTime('');
     setSubmitted(false);
     setAlreadyApplied(false);
     onClose();
   };
 
-  const minDate = new Date();
-  minDate.setDate(minDate.getDate() + 1);
-  const minDateStr = minDate.toISOString().split('T')[0];
+
 
   const companyName = typeof job.company === 'object' && job.company !== null ? (job.company as any).name : '';
 
@@ -181,20 +163,6 @@ export const JobApplicationFormModal = ({ job, isOpen, onClose }: JobApplication
             <p className="text-sm text-white-dark max-w-md mx-auto">
               Thank you for applying for <span className="font-semibold text-black dark:text-white">{job.title}</span>. Your application has been logged and sent to the employer.
             </p>
-
-            {job.allowCandidateSelectTime && selectedDate && selectedTime && (
-              <div className="panel max-w-md mx-auto bg-primary/5 border-primary/20 text-left text-xs space-y-2 p-4 rounded-xl">
-                <div className="flex items-center gap-2 font-bold text-primary text-sm">
-                  <CalendarIcon className="h-4 w-4" /> AI Interview Booked
-                </div>
-                <p className="text-black dark:text-white">
-                  <span className="text-white-dark">Date:</span> {new Date(selectedDate).toLocaleDateString(undefined, { dateStyle: 'full' })}
-                </p>
-                <p className="text-black dark:text-white">
-                  <span className="text-white-dark">Time Slot:</span> {selectedTime}
-                </p>
-              </div>
-            )}
 
             <div className="pt-4">
               <button type="button" onClick={resetForm} className="btn btn-primary px-8">
@@ -317,98 +285,36 @@ export const JobApplicationFormModal = ({ job, isOpen, onClose }: JobApplication
               </div>
             </div>
 
-            {/* Section 2: Optional Dynamic Fields (Resume & Cover Letter) */}
-            {(job.resumeRequired || job.coverLetterRequired) && (
+            {/* Section 2: Resume Upload */}
+            {job.resumeRequired && (
               <div className="space-y-4 border-t border-white-light dark:border-white-light/10 pt-4">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
                   <FileText className="h-4 w-4" /> Application Documents
                 </h3>
 
                 {/* Resume / CV Field */}
-                {job.resumeRequired && (
-                  <div className="space-y-2">
-                    <label className="form-label text-xs flex items-center justify-between">
-                      <span>Resume / CV (PDF, DOCX) *</span>
-                      <span className="badge badge-outline-primary text-[10px]">Mandatory</span>
+                <div className="space-y-2">
+                  <label className="form-label text-xs flex items-center justify-between">
+                    <span>Resume / CV (PDF, DOCX) *</span>
+                    <span className="badge badge-outline-primary text-[10px]">Mandatory</span>
+                  </label>
+
+                  <div className="flex items-center gap-3">
+                    <label className="btn btn-outline-primary btn-sm flex items-center gap-2 cursor-pointer">
+                      <Upload className="h-4 w-4" />
+                      <span>{resumeFile ? 'Change Resume File' : 'Choose Resume File'}</span>
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        className="hidden"
+                        onChange={handleResumeChange}
+                      />
                     </label>
-
-                    <div className="flex items-center gap-3">
-                      <label className="btn btn-outline-primary btn-sm flex items-center gap-2 cursor-pointer">
-                        <Upload className="h-4 w-4" />
-                        <span>{resumeFile ? 'Change Resume File' : 'Choose Resume File'}</span>
-                        <input
-                          type="file"
-                          accept=".pdf,.doc,.docx"
-                          className="hidden"
-                          onChange={handleResumeChange}
-                        />
-                      </label>
-                      {resumeFile && (
-                        <span className="text-xs font-medium text-success flex items-center gap-1">
-                          <FileText className="h-4 w-4" /> {resumeFile.name}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Cover Letter Field */}
-                {job.coverLetterRequired && (
-                  <div className="space-y-2">
-                    <label className="form-label text-xs flex items-center justify-between">
-                      <span>Cover Letter *</span>
-                      <span className="badge badge-outline-primary text-[10px]">Mandatory</span>
-                    </label>
-                    <textarea
-                      rows={4}
-                      required
-                      placeholder="Describe why you are the ideal candidate for this role..."
-                      className="form-textarea text-sm"
-                      value={coverLetter}
-                      onChange={(e) => setCoverLetter(e.target.value)}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Section 3: Interview Booking */}
-            {job.allowCandidateSelectTime && (
-              <div className="space-y-4 border-t border-white-light dark:border-white-light/10 pt-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
-                    <CalendarIcon className="h-4 w-4" /> Select Interview Schedule
-                  </h3>
-                  <span className="badge badge-outline-info text-[10px]">AI Session Slot</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="form-label text-xs">Preferred Date *</label>
-                    <input
-                      type="date"
-                      min={minDateStr}
-                      className="form-input text-sm"
-                      value={selectedDate}
-                      onChange={(e) => setSelectedDate(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="form-label text-xs">Preferred Time Slot *</label>
-                    <select
-                      required
-                      className="form-select text-sm"
-                      value={selectedTime}
-                      onChange={(e) => setSelectedTime(e.target.value)}
-                    >
-                      <option value="">Select a time slot</option>
-                      {TIME_SLOTS.map((slot) => (
-                        <option key={slot} value={slot}>
-                          {slot}
-                        </option>
-                      ))}
-                    </select>
+                    {resumeFile && (
+                      <span className="text-xs font-medium text-success flex items-center gap-1">
+                        <FileText className="h-4 w-4" /> {resumeFile.name}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

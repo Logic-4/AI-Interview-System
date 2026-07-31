@@ -1,7 +1,7 @@
-import { useState, ChangeEvent, FormEvent, useEffect } from 'react';
+import { useState, ChangeEvent, FormEvent, useEffect, useRef, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CheckCircle2, ChevronRight } from 'lucide-react';
+import { CheckCircle2, ChevronRight, Bold, Italic, List } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { setPageTitle } from '@/store/themeConfigSlice';
 import companyService from '@/services/companyService';
@@ -10,7 +10,6 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 const defaultForm: JobPayload = {
   title: '',
-  department: '',
   employmentType: 'full-time',
   workplaceType: 'on-site',
   location: '',
@@ -20,27 +19,18 @@ const defaultForm: JobPayload = {
   status: 'published',
 
   description: '',
-  responsibilities: '',
   requiredSkills: [],
-  preferredSkills: [],
   experienceLevel: 'mid',
   education: '',
   requiredEducation: '',
-  salaryRange: '',
-  benefitsNotes: '',
 
   interviewLanguage: 'English',
   interviewType: 'mixed',
-  difficulty: 'mid',
   targetJobRole: '',
   durationMinutes: 30,
   focusSkills: [],
   numberOfQuestions: 5,
   resumeRequired: true,
-  coverLetterRequired: false,
-  allowCandidateSelectTime: true,
-  completionDeadline: '',
-  interviewExpiryDate: '',
   passingScoreThreshold: 70,
 };
 
@@ -54,9 +44,9 @@ const PostJobPage = () => {
   const [saving, setSaving] = useState(false);
   const [loadingJob, setLoadingJob] = useState(false);
   const [form, setForm] = useState<JobPayload>(defaultForm);
+  const descRef = useRef<HTMLTextAreaElement>(null);
 
   const [reqSkillsInput, setReqSkillsInput] = useState('');
-  const [prefSkillsInput, setPrefSkillsInput] = useState('');
   const [focusSkillsInput, setFocusSkillsInput] = useState('');
 
   useEffect(() => {
@@ -72,7 +62,6 @@ const PostJobPage = () => {
         if (j) {
           setForm({
             title: j.title || '',
-            department: j.department || '',
             employmentType: j.employmentType || 'full-time',
             workplaceType: j.workplaceType || 'on-site',
             location: j.location || '',
@@ -81,30 +70,17 @@ const PostJobPage = () => {
             applicationDeadline: j.applicationDeadline ? j.applicationDeadline.slice(0, 10) : '',
             status: j.status || 'published',
             description: j.description || '',
-            responsibilities: j.responsibilities || '',
             requiredSkills: j.requiredSkills || [],
-            preferredSkills: j.preferredSkills || [],
             experienceLevel: j.experienceLevel || 'mid',
             education: j.education || '',
             requiredEducation: j.requiredEducation || j.education || '',
-            salaryRange: j.salaryRange || '',
-            benefitsNotes: j.benefitsNotes || '',
             interviewLanguage: j.interviewLanguage || 'English',
             interviewType: j.interviewType || 'mixed',
-            difficulty: j.difficulty || 'mid',
             targetJobRole: j.targetJobRole || '',
             durationMinutes: j.durationMinutes || 30,
             focusSkills: j.focusSkills || [],
             numberOfQuestions: j.numberOfQuestions || 5,
             resumeRequired: j.resumeRequired !== false,
-            coverLetterRequired: Boolean(j.coverLetterRequired),
-            allowCandidateSelectTime: j.allowCandidateSelectTime !== false,
-            completionDeadline: j.completionDeadline ? j.completionDeadline.slice(0, 10) : '',
-            interviewExpiryDate: j.interviewExpiryDate
-              ? j.interviewExpiryDate.slice(0, 10)
-              : j.completionDeadline
-              ? j.completionDeadline.slice(0, 10)
-              : '',
             passingScoreThreshold: j.passingScoreThreshold ?? 70,
           });
         }
@@ -133,15 +109,7 @@ const PostJobPage = () => {
     setForm((prev) => ({ ...prev, requiredSkills: prev.requiredSkills.filter((_, i) => i !== idx) }));
   };
 
-  const addPreferredSkill = () => {
-    if (!prefSkillsInput.trim()) return;
-    setForm((prev) => ({ ...prev, preferredSkills: [...prev.preferredSkills, prefSkillsInput.trim()] }));
-    setPrefSkillsInput('');
-  };
 
-  const removePreferredSkill = (idx: number) => {
-    setForm((prev) => ({ ...prev, preferredSkills: prev.preferredSkills.filter((_, i) => i !== idx) }));
-  };
 
   const addFocusSkill = () => {
     if (!focusSkillsInput.trim()) return;
@@ -149,13 +117,82 @@ const PostJobPage = () => {
     setFocusSkillsInput('');
   };
 
+  const insertMarkdown = useCallback((type: 'bold' | 'italic' | 'list') => {
+    const textarea = descRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    const selected = text.substring(start, end);
+
+    let before = '';
+    let after = '';
+    let placeholder = '';
+    if (type === 'bold') {
+      before = '**'; after = '**'; placeholder = 'bold text';
+    } else if (type === 'italic') {
+      before = '*'; after = '*'; placeholder = 'italic text';
+    } else if (type === 'list') {
+      // Insert at start of line
+      const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+      const linePrefix = text.substring(lineStart, start);
+      before = linePrefix.startsWith('- ') ? '' : '\n- ';
+      after = '';
+      placeholder = selected || 'list item';
+    }
+
+    const insertText = type === 'list'
+      ? `${before}${selected || placeholder}`
+      : `${before}${selected || placeholder}${after}`;
+
+    const newValue = text.substring(0, start) + insertText + text.substring(end);
+    setForm((prev) => ({ ...prev, description: newValue }));
+
+    requestAnimationFrame(() => {
+      textarea.focus();
+      if (selected) {
+        textarea.setSelectionRange(start + before.length, start + before.length + selected.length);
+      } else {
+        const contentStart = start + before.length;
+        const contentEnd = contentStart + placeholder.length;
+        textarea.setSelectionRange(contentStart, contentEnd);
+      }
+    });
+  }, []);
+
+  const handleDescKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.ctrlKey || e.metaKey) {
+      if (e.key === 'b') { e.preventDefault(); insertMarkdown('bold'); }
+      else if (e.key === 'i') { e.preventDefault(); insertMarkdown('italic'); }
+      else if (e.key === 'l') { e.preventDefault(); insertMarkdown('list'); }
+    }
+    // Auto-continue bullet list on Enter
+    if (e.key === 'Enter') {
+      const textarea = descRef.current;
+      if (!textarea) return;
+      const pos = textarea.selectionStart;
+      const text = textarea.value;
+      const lineStart = text.lastIndexOf('\n', pos - 1) + 1;
+      const currentLine = text.substring(lineStart, pos);
+      if (currentLine.startsWith('- ') && currentLine.length > 2) {
+        e.preventDefault();
+        const newValue = text.substring(0, pos) + '\n- ' + text.substring(textarea.selectionEnd);
+        setForm((prev) => ({ ...prev, description: newValue }));
+        requestAnimationFrame(() => {
+          textarea.setSelectionRange(pos + 3, pos + 3);
+        });
+      }
+    }
+  }, [insertMarkdown]);
+
   const removeFocusSkill = (idx: number) => {
     setForm((prev) => ({ ...prev, focusSkills: (prev.focusSkills || []).filter((_, i) => i !== idx) }));
   };
 
   const handleSubmit = async (publishStatus: 'draft' | 'published') => {
-    if (!form.title || !form.department || !form.location || !form.description) {
-      toast.error('Please fill in all required fields (Title, Department, Location, Description)');
+    if (!form.title || !form.location || !form.description) {
+      toast.error('Please fill in all required fields (Title, Location, Description)');
       return;
     }
 
@@ -269,18 +306,6 @@ const PostJobPage = () => {
                   />
                 </div>
 
-                <div className="sm:col-span-2">
-                  <label htmlFor="department">Department / Team *</label>
-                  <input
-                    id="department"
-                    name="department"
-                    className="form-input"
-                    placeholder="e.g. Engineering, Product, Marketing"
-                    value={form.department}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
 
                 <div>
                   <label htmlFor="employmentType">Employment type *</label>
@@ -327,15 +352,56 @@ const PostJobPage = () => {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label htmlFor="description">Job description *</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="mb-0">Job description *</label>
+                    <div className="flex items-center gap-1 text-xs text-white-dark">
+                      <kbd className="px-1 py-0.5 rounded border border-white-light dark:border-white-light/20 bg-slate-100 dark:bg-slate-800 font-mono text-[10px]">Ctrl+B</kbd>
+                      <span>bold</span>
+                      <kbd className="px-1 py-0.5 rounded border border-white-light dark:border-white-light/20 bg-slate-100 dark:bg-slate-800 font-mono text-[10px]">Ctrl+I</kbd>
+                      <span>italic</span>
+                      <kbd className="px-1 py-0.5 rounded border border-white-light dark:border-white-light/20 bg-slate-100 dark:bg-slate-800 font-mono text-[10px]">Ctrl+L</kbd>
+                      <span>list</span>
+                    </div>
+                  </div>
+
+                  {/* Formatting Toolbar */}
+                  <div className="flex items-center gap-1 px-2 py-1 border border-b-0 border-white-light dark:border-white-light/10 bg-slate-50 dark:bg-slate-800/60 rounded-t-lg">
+                    <button
+                      type="button"
+                      className="p-1.5 rounded hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+                      onClick={() => insertMarkdown('bold')}
+                      title="Bold (Ctrl+B)"
+                    >
+                      <Bold className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      className="p-1.5 rounded hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+                      onClick={() => insertMarkdown('italic')}
+                      title="Italic (Ctrl+I)"
+                    >
+                      <Italic className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      className="p-1.5 rounded hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+                      onClick={() => insertMarkdown('list')}
+                      title="Bullet List (Ctrl+L)"
+                    >
+                      <List className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
                   <textarea
+                    ref={descRef}
                     id="description"
                     name="description"
-                    rows={5}
-                    className="form-textarea"
-                    placeholder="Describe the role, responsibilities, and overall expectations..."
+                    rows={8}
+                    className="form-textarea rounded-t-none border-t-0 font-mono text-sm"
+                    placeholder={`Write the job description here...\n\nTip: Use **text** for bold, *text* for italic, start a line with - for bullets.`}
                     value={form.description}
                     onChange={handleChange}
+                    onKeyDown={handleDescKeyDown}
                     required
                   />
                 </div>
@@ -348,18 +414,6 @@ const PostJobPage = () => {
                 <p className="text-xs text-white-dark mb-4">Describe the role, key responsibilities, required skills, and qualifications.</p>
               </div>
 
-              <div>
-                <label htmlFor="responsibilities">Main Responsibilities</label>
-                <textarea
-                  id="responsibilities"
-                  name="responsibilities"
-                  rows={3}
-                  className="form-textarea"
-                  placeholder="List key daily responsibilities..."
-                  value={form.responsibilities}
-                  onChange={handleChange}
-                />
-              </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
@@ -396,81 +450,28 @@ const PostJobPage = () => {
               </div>
 
               {/* Skills Tags */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label>Required Skills</label>
-                  <div className="flex gap-2">
-                    <input
-                      className="form-input flex-1"
-                      placeholder="Add a required skill"
-                      value={reqSkillsInput}
-                      onChange={(e) => setReqSkillsInput(e.target.value)}
-                    />
-                    <button type="button" className="btn btn-outline-primary" onClick={addRequiredSkill}>
-                      Add
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {form.requiredSkills.map((sk, i) => (
-                      <span key={i} className="badge badge-outline-primary flex items-center gap-1">
-                        {sk}
-                        <button type="button" onClick={() => removeRequiredSkill(i)}>
-                          &times;
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label>Preferred Skills</label>
-                  <div className="flex gap-2">
-                    <input
-                      className="form-input flex-1"
-                      placeholder="Add a preferred skill"
-                      value={prefSkillsInput}
-                      onChange={(e) => setPrefSkillsInput(e.target.value)}
-                    />
-                    <button type="button" className="btn btn-outline-primary" onClick={addPreferredSkill}>
-                      Add
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {form.preferredSkills.map((sk, i) => (
-                      <span key={i} className="badge badge-outline-primary flex items-center gap-1">
-                        {sk}
-                        <button type="button" onClick={() => removePreferredSkill(i)}>
-                          &times;
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="salaryRange">Salary Range (Optional)</label>
+              <div>
+                <label>Required Skills</label>
+                <div className="flex gap-2">
                   <input
-                    id="salaryRange"
-                    name="salaryRange"
-                    className="form-input"
-                    placeholder="e.g. $2,000 - $3,500 / month"
-                    value={form.salaryRange}
-                    onChange={handleChange}
+                    className="form-input flex-1"
+                    placeholder="Add a required skill"
+                    value={reqSkillsInput}
+                    onChange={(e) => setReqSkillsInput(e.target.value)}
                   />
+                  <button type="button" className="btn btn-outline-primary" onClick={addRequiredSkill}>
+                    Add
+                  </button>
                 </div>
-
-                <div>
-                  <label htmlFor="benefitsNotes">Benefits / Compensation Notes (Optional)</label>
-                  <input
-                    id="benefitsNotes"
-                    name="benefitsNotes"
-                    className="form-input"
-                    placeholder="Health insurance, remote stipend, performance bonus"
-                    value={form.benefitsNotes}
-                    onChange={handleChange}
-                  />
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {form.requiredSkills.map((sk, i) => (
+                    <span key={i} className="badge badge-outline-primary flex items-center gap-1">
+                      {sk}
+                      <button type="button" onClick={() => removeRequiredSkill(i)}>
+                        &times;
+                      </button>
+                    </span>
+                  ))}
                 </div>
               </div>
             </div>
@@ -573,23 +574,6 @@ const PostJobPage = () => {
                   </select>
                 </div>
 
-                {/* 3. Interview Difficulty * */}
-                <div>
-                  <label htmlFor="difficulty">Interview Difficulty *</label>
-                  <select
-                    id="difficulty"
-                    name="difficulty"
-                    className="form-select"
-                    value={form.difficulty}
-                    onChange={handleChange}
-                  >
-                    <option value="junior">Junior</option>
-                    <option value="mid">Mid-level</option>
-                    <option value="senior">Senior</option>
-                    <option value="lead">Lead</option>
-                  </select>
-                </div>
-
                 {/* 6. Interview Duration (minutes) */}
                 <div>
                   <label htmlFor="durationMinutes">Interview Duration (minutes)</label>
@@ -634,34 +618,12 @@ const PostJobPage = () => {
                     onChange={handleChange}
                   />
                 </div>
-
-                {/* 9. Interview Expiry / Completion Deadline */}
-                <div>
-                  <label htmlFor="interviewExpiryDate">Interview Expiry / Completion Deadline</label>
-                  <input
-                    id="interviewExpiryDate"
-                    name="interviewExpiryDate"
-                    type="date"
-                    className="form-input"
-                    value={
-                      form.interviewExpiryDate
-                        ? form.interviewExpiryDate.slice(0, 10)
-                        : form.completionDeadline
-                        ? form.completionDeadline.slice(0, 10)
-                        : ''
-                    }
-                    onChange={(e) => {
-                      handleChange(e);
-                      setForm((prev) => ({ ...prev, completionDeadline: e.target.value }));
-                    }}
-                  />
-                </div>
               </div>
 
               {/* 10. Candidate Requirements */}
               <div className="pt-4 border-t border-white-light dark:border-white-light/10 space-y-3">
                 <h3 className="text-sm font-bold text-black dark:text-white">Candidate Requirements</h3>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input
                       type="checkbox"
@@ -671,28 +633,6 @@ const PostJobPage = () => {
                       onChange={handleChange}
                     />
                     <span className="text-sm font-semibold">Require Resume Upload</span>
-                  </label>
-
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      name="coverLetterRequired"
-                      className="form-checkbox"
-                      checked={form.coverLetterRequired}
-                      onChange={handleChange}
-                    />
-                    <span className="text-sm font-semibold">Require Cover Letter</span>
-                  </label>
-
-                  <label className="flex items-center gap-3 cursor-pointer sm:col-span-2">
-                    <input
-                      type="checkbox"
-                      name="allowCandidateSelectTime"
-                      className="form-checkbox"
-                      checked={form.allowCandidateSelectTime}
-                      onChange={handleChange}
-                    />
-                    <span className="text-sm font-semibold">Allow Candidate to Select Interview Time</span>
                   </label>
                 </div>
               </div>

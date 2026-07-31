@@ -21,9 +21,15 @@ export interface JobApplicationPayload {
   phone: string;
   profilePhotoUrl?: string;
   resumeUrl?: string;
+  resumeText?: string;
   coverLetter?: string;
   selectedInterviewDate?: string;
   selectedInterviewTime?: string;
+}
+
+export interface BlobUploadResult {
+  url: string;
+  resumeText?: string;
 }
 
 const publicCompanyService = {
@@ -42,18 +48,18 @@ const publicCompanyService = {
     return response.data.data.job;
   },
 
-  async uploadBlobFile(file: File, folder: string = 'candidates'): Promise<string> {
+  async uploadBlobFile(file: File, folder: string = 'candidates'): Promise<BlobUploadResult> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('folder', folder);
 
-    const response = await api.post<ApiResponse<{ url: string }>>('/public/companies/upload-blob', formData, {
+    const response = await api.post<ApiResponse<BlobUploadResult>>('/public/companies/upload-blob', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
 
-    return response.data.data.url;
+    return response.data.data;
   },
 
   async submitJobApplication(jobId: string, payload: JobApplicationPayload): Promise<any> {

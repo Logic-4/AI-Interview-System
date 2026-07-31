@@ -25,6 +25,7 @@ import { Job } from '@/types/companyPortal';
 import { useAuthStore } from '@/stores/authStore';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { JobApplicationFormModal } from '@/components/jobs/JobApplicationFormModal';
+import ReactMarkdown from 'react-markdown';
 
 const formatDate = (dateStr?: string) => {
   if (!dateStr) return 'Recently';
@@ -102,38 +103,10 @@ const PublicJobDetailsPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-black/40 pb-12">
-      {/* Public Top Navigation Header */}
-      <header className="sticky top-0 z-40 border-b border-white-light dark:border-white-light/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6">
-          <Link to="/" className="flex items-center gap-2 font-bold text-xl text-black dark:text-white">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white shadow-sm">
-              <Sparkles className="h-5 w-5" />
-            </span>
-            <span>Recruit<span className="text-primary">AI</span></span>
-          </Link>
-
-          <div className="flex items-center gap-3">
-            {isAuthenticated && user?.role !== 'company' && !(user as any)?.company ? (
-              <Link to="/dashboard" className="btn btn-outline-primary btn-sm">
-                Dashboard
-              </Link>
-            ) : !isAuthenticated ? (
-              <>
-                <Link to={`/login?redirect=/jobs/${jobId}`} className="btn btn-outline-primary btn-sm">
-                  Log in
-                </Link>
-                <Link to="/register" className="btn btn-primary btn-sm">
-                  Sign up
-                </Link>
-              </>
-            ) : null}
-          </div>
-        </div>
-      </header>
 
       <main className="mx-auto max-w-5xl space-y-6 px-4 pt-6 sm:px-6">
         {/* ─── Hero Header Banner ─── */}
-        <div className="panel overflow-hidden border-0 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 sm:p-8">
+        <div className="panel overflow-hidden p-6 sm:p-8">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             {/* Company Logo Avatar */}
@@ -151,9 +124,6 @@ const PublicJobDetailsPage = () => {
 
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="badge badge-outline-primary text-xs font-semibold uppercase">
-                  {job.department || 'General'}
-                </span>
                 <span className="badge badge-outline-info text-xs capitalize">{job.employmentType}</span>
                 <span className="badge badge-outline-secondary text-xs capitalize">{job.workplaceType}</span>
               </div>
@@ -205,162 +175,57 @@ const PublicJobDetailsPage = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Main Content (2 Columns) */}
-        <div className="space-y-6 lg:col-span-2">
-          {/* Job Description */}
+      <div className="space-y-6">
+        <div className="panel space-y-4">
+          <h2 className="text-lg font-bold text-black dark:text-white border-b border-white-light dark:border-white-light/10 pb-3">
+            Job Description
+          </h2>
+          <div className="prose dark:prose-invert max-w-none text-sm text-white-dark prose-headings:text-black dark:prose-headings:text-white prose-strong:text-black dark:prose-strong:text-white prose-p:text-white-dark prose-li:text-white-dark">
+            <ReactMarkdown>{job.description}</ReactMarkdown>
+          </div>
+        </div>
+
+
+        {/* Education & Experience Requirements */}
+        {(job.requiredEducation || job.experienceLevel) && (
           <div className="panel space-y-4">
-            <h2 className="text-lg font-bold text-black dark:text-white border-b border-white-light dark:border-white-light/10 pb-3">
-              Job Description
+            <h2 className="text-lg font-bold text-black dark:text-white border-b border-white-light dark:border-white-light/10 pb-3 flex items-center gap-2">
+              <GraduationCap className="h-5 w-5 text-primary" />
+              Requirements & Qualifications
             </h2>
-            <p className="text-sm leading-relaxed text-white-dark whitespace-pre-line">{job.description}</p>
-          </div>
 
-          {/* Responsibilities */}
-          {job.responsibilities && (
-            <div className="panel space-y-4">
-              <h2 className="text-lg font-bold text-black dark:text-white border-b border-white-light dark:border-white-light/10 pb-3">
-                Key Responsibilities
-              </h2>
-              <p className="text-sm leading-relaxed text-white-dark whitespace-pre-line">{job.responsibilities}</p>
-            </div>
-          )}
-
-          {/* Education & Experience Requirements */}
-          {(job.requiredEducation || job.experienceLevel) && (
-            <div className="panel space-y-4">
-              <h2 className="text-lg font-bold text-black dark:text-white border-b border-white-light dark:border-white-light/10 pb-3 flex items-center gap-2">
-                <GraduationCap className="h-5 w-5 text-primary" />
-                Requirements & Qualifications
-              </h2>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-xs text-white-dark block">Experience Level</span>
-                  <span className="font-semibold text-black dark:text-white capitalize">{job.experienceLevel} Level</span>
-                </div>
-                {job.requiredEducation && (
-                  <div className="sm:col-span-2">
-                    <span className="text-xs text-white-dark block mb-1">Education Requirements</span>
-                    <p className="text-sm text-black dark:text-white">{job.requiredEducation}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Required & Preferred Skills */}
-          {((job.requiredSkills && job.requiredSkills.length > 0) ||
-            (job.preferredSkills && job.preferredSkills.length > 0)) && (
-            <div className="panel space-y-5">
-              <h2 className="text-lg font-bold text-black dark:text-white border-b border-white-light dark:border-white-light/10 pb-3 flex items-center gap-2">
-                <Award className="h-5 w-5 text-primary" />
-                Skills & Tech Stack
-              </h2>
-
-              {job.requiredSkills && job.requiredSkills.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-white-dark mb-2">Required Skills</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {job.requiredSkills.map((skill, idx) => (
-                      <span key={idx} className="badge badge-outline-primary text-xs">
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {job.preferredSkills && job.preferredSkills.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-white-dark mb-2">Preferred / Nice to Have</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {job.preferredSkills.map((skill, idx) => (
-                      <span key={idx} className="badge badge-outline-secondary text-xs">
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Benefits Notes */}
-          {job.benefitsNotes && (
-            <div className="panel space-y-3">
-              <h2 className="text-lg font-bold text-black dark:text-white flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-success" /> Benefits & Compensation
-              </h2>
-              <p className="text-sm text-white-dark whitespace-pre-line">{job.benefitsNotes}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Sidebar Summary & AI Interview Specs */}
-        <div className="space-y-6">
-          {/* AI Interview Breakdown Card */}
-          <div className="panel space-y-4 bg-gradient-to-b from-primary/10 via-primary/5 to-transparent border-primary/20">
-            <div className="flex items-center gap-2 border-b border-primary/20 pb-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white">
-                <Sparkles className="h-4 w-4" />
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div>
-                <h3 className="font-bold text-black dark:text-white text-sm">Automated AI Interview</h3>
-                <p className="text-xs text-white-dark">Required evaluation stage</p>
+                <span className="text-xs text-white-dark block">Experience Level</span>
+                <span className="font-semibold text-black dark:text-white capitalize">{job.experienceLevel} Level</span>
               </div>
+              {job.requiredEducation && (
+                <div className="sm:col-span-2">
+                  <span className="text-xs text-white-dark block mb-1">Education Requirements</span>
+                  <p className="text-sm text-black dark:text-white">{job.requiredEducation}</p>
+                </div>
+              )}
             </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="flex items-center justify-between py-1 border-b border-white-light dark:border-white-light/10">
-                <span className="text-white-dark flex items-center gap-1.5">
-                  <Globe className="h-3.5 w-3.5 text-primary" /> Language
-                </span>
-                <span className="font-semibold text-black dark:text-white">{job.interviewLanguage || 'English'}</span>
-              </div>
-
-              <div className="flex items-center justify-between py-1 border-b border-white-light dark:border-white-light/10">
-                <span className="text-white-dark flex items-center gap-1.5">
-                  <Briefcase className="h-3.5 w-3.5 text-primary" /> Interview Type
-                </span>
-                <span className="font-semibold text-black dark:text-white capitalize">{job.interviewType || 'mixed'}</span>
-              </div>
-
-              <div className="flex items-center justify-between py-1 border-b border-white-light dark:border-white-light/10">
-                <span className="text-white-dark flex items-center gap-1.5">
-                  <Award className="h-3.5 w-3.5 text-primary" /> Difficulty Level
-                </span>
-                <span className="font-semibold text-black dark:text-white capitalize">{job.difficulty || 'mid'}</span>
-              </div>
-
-              <div className="flex items-center justify-between py-1 border-b border-white-light dark:border-white-light/10">
-                <span className="text-white-dark flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5 text-primary" /> Duration
-                </span>
-                <span className="font-semibold text-black dark:text-white">{job.durationMinutes || 30} minutes</span>
-              </div>
-
-              <div className="flex items-center justify-between py-1 border-b border-white-light dark:border-white-light/10">
-                <span className="text-white-dark flex items-center gap-1.5">
-                  <HelpCircle className="h-3.5 w-3.5 text-primary" /> Questions
-                </span>
-                <span className="font-semibold text-black dark:text-white">{job.numberOfQuestions || 5} questions</span>
-              </div>
-
-              <div className="flex items-center justify-between py-1">
-                <span className="text-white-dark flex items-center gap-1.5">
-                  <ShieldCheck className="h-3.5 w-3.5 text-primary" /> Passing Threshold
-                </span>
-                <span className="font-semibold text-success">{job.passingScoreThreshold || 70}%</span>
-              </div>
-            </div>
-
-            <button type="button" className="btn btn-primary w-full mt-3 flex items-center justify-center gap-2" onClick={handleApply}>
-              <span>Apply & Start Interview</span>
-              <ArrowRight className="h-4 w-4" />
-            </button>
           </div>
-        </div>
+        )}
+
+        {/* Required Skills */}
+        {job.requiredSkills && job.requiredSkills.length > 0 && (
+          <div className="panel space-y-5">
+            <h2 className="text-lg font-bold text-black dark:text-white border-b border-white-light dark:border-white-light/10 pb-3 flex items-center gap-2">
+              <Award className="h-5 w-5 text-primary" />
+              Required Skills
+            </h2>
+
+            <div className="flex flex-wrap gap-2">
+              {job.requiredSkills.map((skill, idx) => (
+                <span key={idx} className="badge badge-outline-primary text-xs">
+                  {skill}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       </main>
 
