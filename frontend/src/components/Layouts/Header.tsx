@@ -14,6 +14,17 @@ const Header = () => {
     const navigate = useNavigate();
     const { user, logout } = useAuthStore();
 
+    const getAvatarFallback = (name?: string) => {
+        if (!name) return '👤';
+        const initials = name
+            .split(' ')
+            .map((n) => n[0])
+            .join('')
+            .toUpperCase()
+            .slice(0, 2);
+        return initials;
+    };
+
     useEffect(() => {
         const selector = document.querySelector('ul.horizontal-menu a[href="' + window.location.pathname + '"]');
         if (selector) {
@@ -133,39 +144,65 @@ const Header = () => {
                                         <span className="hidden sm:block font-bold text-sm text-[#1E2433] dark:text-white-dark group-hover:text-primary transition-colors">
                                             {user ? user.name : 'Guest User'}
                                         </span>
-                                        <img className="w-9 h-9 rounded-full object-cover ring-2 ring-primary/20" src={user?.avatar || "/assets/images/user-profile.jpeg"} alt="userProfile" />
+                                        {user?.avatar ? (
+                                            <img
+                                                className="w-9 h-9 rounded-full object-cover ring-2 ring-primary/20"
+                                                src={user.avatar}
+                                                alt="userProfile"
+                                                onError={(e) => {
+                                                    (e.target as HTMLImageElement).style.display = 'none';
+                                                    (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                                                }}
+                                            />
+                                        ) : null}
+                                        <div className={`w-9 h-9 rounded-full ring-2 ring-primary/20 flex items-center justify-center text-sm font-semibold bg-gradient-to-br from-primary/20 to-primary/10 text-primary dark:from-primary/30 dark:to-primary/20 ${user?.avatar ? 'hidden' : ''}`}>
+                                            {getAvatarFallback(user?.name)}
+                                        </div>
                                     </div>
                                 }
                             >
-                                <ul className="text-dark dark:text-white-dark !py-0 w-[230px] font-semibold dark:text-white-light/90 border border-[#E8ECF2] dark:border-[#1b2e4b] shadow-dropdown rounded-xl overflow-hidden bg-white dark:bg-black">
+                                <ul className="text-dark dark:text-white-dark !py-0 w-[280px] font-semibold dark:text-white-light/90 border border-[#E8ECF2] dark:border-[#1b2e4b] shadow-lg rounded-xl overflow-hidden bg-white dark:bg-[#0e1726]">
                                     <li>
-                                        <div className="flex items-center px-4 py-4">
-                                            <img className="rounded-md w-10 h-10 object-cover ring-2 ring-primary/10" src={user?.avatar || "/assets/images/user-profile.jpeg"} alt="userProfile" />
-                                            <div className="ltr:pl-4 rtl:pr-4 truncate">
-                                                <h4 className="text-base">
+                                        <div className="flex items-center gap-3 px-4 py-4 border-b border-white-light dark:border-white-light/10">
+                                            {user?.avatar ? (
+                                                <img
+                                                    className="rounded-lg w-12 h-12 object-cover ring-2 ring-primary/20"
+                                                    src={user.avatar}
+                                                    alt="userProfile"
+                                                    onError={(e) => {
+                                                        (e.target as HTMLImageElement).style.display = 'none';
+                                                        (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                                                    }}
+                                                />
+                                            ) : null}
+                                            <div className={`w-12 h-12 rounded-lg ring-2 ring-primary/20 flex items-center justify-center text-sm font-semibold bg-gradient-to-br from-primary/20 to-primary/10 text-primary dark:from-primary/30 dark:to-primary/20 ${user?.avatar ? 'hidden' : ''}`}>
+                                                {getAvatarFallback(user?.name)}
+                                            </div>
+                                            <div className="ltr:pl-1 rtl:pr-1 flex-1 min-w-0">
+                                                <h4 className="text-sm font-semibold text-[#1E2433] dark:text-white truncate">
                                                     {user ? user.name : 'Guest User'}
                                                 </h4>
-                                                <button type="button" className="text-black/60 hover:text-primary dark:text-dark-light/60 dark:hover:text-white truncate">
+                                                <p className="text-xs text-black/50 dark:text-white-light/60 truncate">
                                                     {user?.email || 'guest@example.com'}
-                                                </button>
+                                                </p>
                                             </div>
                                         </div>
                                     </li>
                                     {user?.role !== 'superadmin' && <li>
-                                        <Link to="/profile" className="dark:hover:text-white">
-                                            <User className="w-4.5 h-4.5 ltr:mr-2 rtl:ml-2 shrink-0" />
+                                        <Link to="/profile" className="flex items-center gap-3 px-4 py-3 hover:bg-white-light/50 dark:hover:bg-white-light/10 text-[#1E2433] dark:text-white-light transition-colors">
+                                            <User className="w-4 h-4 shrink-0" />
                                             {t('Profile')}
                                         </Link>
                                     </li>}
                                     {user?.role === 'superadmin' && <li>
-                                        <Link to="/superadmin/settings" className="dark:hover:text-white">
-                                            <Settings className="w-4.5 h-4.5 ltr:mr-2 rtl:ml-2 shrink-0" />
+                                        <Link to="/superadmin/settings" className="flex items-center gap-3 px-4 py-3 hover:bg-white-light/50 dark:hover:bg-white-light/10 text-[#1E2433] dark:text-white-light transition-colors">
+                                            <Settings className="w-4 h-4 shrink-0" />
                                             Profile & Security
                                         </Link>
                                     </li>}
                                     <li className="border-t border-white-light dark:border-white-light/10">
-                                        <button type="button" className="text-danger !py-3 w-full flex items-center hover:bg-white-light/90 dark:hover:bg-dark/60 px-4" onClick={handleLogout}>
-                                            <LogOut className="w-4.5 h-4.5 ltr:mr-2 rtl:ml-2 rotate-90 shrink-0" />
+                                        <button type="button" className="w-full flex items-center gap-3 px-4 py-3 text-danger hover:bg-red-50/50 dark:hover:bg-red-500/10 transition-colors" onClick={handleLogout}>
+                                            <LogOut className="w-4 h-4 rotate-90 shrink-0" />
                                             {t('Sign Out')}
                                         </button>
                                     </li>
