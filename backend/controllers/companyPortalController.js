@@ -5,11 +5,47 @@ const Interview = require('../models/Interview');
 const Assessment = require('../models/Assessment');
 const Company = require('../models/Company');
 const User = require('../models/User');
+const VerificationEvent = require('../models/VerificationEvent');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { buildInterviewPayload } = require('../services/promptPayloadService');
+const {
+  sendApplicationApprovedEmail,
+  sendApplicationRejectedEmail,
+  sendInterviewScheduledEmail,
+  sendInterviewRescheduledEmail,
+  sendInterviewCancelledEmail,
+} = require('../services/emailService');
+const logger = require('../utils/logger');
 
 const normalizePagination = (value, fallback, max) => Math.min(Math.max(parseInt(value, 10) || fallback, 1), max);
+
+// Notification emails must never break the underlying action (approval,
+// rejection, scheduling) if the mail provider is unreachable or unconfigured.
+function notifyEmail(sendFn, ...args) {
+  Promise.resolve()
+    .then(() => sendFn(...args))
+    .catch((error) => logger.warn(`Notification email failed: ${error.message}`));
+}
+
+async function approveApplicationRecord(application, reviewerId) {
+  application.approvalStatus = 'approved';
+  application.approvedAt = new Date();
+  application.approvedBy = reviewerId;
+  application.rejectionReason = '';
+  if (application.status === 'applied') application.status = 'under_review';
+  await application.save();
+}
+
+async function rejectApplicationRecord(application, reviewerId, reason = '') {
+  application.approvalStatus = 'rejected';
+  application.status = 'rejected';
+  application.isShortlisted = false;
+  application.rejectionReason = String(reason || '').slice(0, 1000);
+  application.rejectedAt = new Date();
+  application.rejectedBy = reviewerId;
+  await application.save();
+}
 
 // ─── DASHBOARD ──────────────────────────────────────────
 const getDashboard = async (req, res, next) => {
@@ -26,6 +62,8 @@ const getDashboard = async (req, res, next) => {
       pendingInterviews,
       recentApplications,
       upcomingInterviews,
+      unreviewedSecurityEvents,
+      recentSecurityEvents,
     ] = await Promise.all([
       Job.countDocuments({ company: companyId }),
       Job.countDocuments({ company: companyId, status: 'published' }),
@@ -45,6 +83,14 @@ const getDashboard = async (req, res, next) => {
       Interview.find({ company: companyId, status: 'scheduled' })
         .populate('user', 'name email avatar')
         .sort({ scheduledAt: 1 })
+        .limit(5)
+        .lean(),
+
+      VerificationEvent.countDocuments({ company: companyId, outcome: { $ne: 'passed' }, reviewed: false }),
+
+      VerificationEvent.find({ company: companyId, outcome: { $ne: 'passed' } })
+        .populate('interview', 'title jobRole')
+        .sort({ createdAt: -1 })
         .limit(5)
         .lean(),
     ]);
@@ -77,9 +123,11 @@ const getDashboard = async (req, res, next) => {
         candidatesInterviewed,
         candidatesShortlisted,
         pendingInterviews,
+        unreviewedSecurityEvents,
       },
       recentApplications,
       upcomingInterviews,
+      recentSecurityEvents,
       latestActivity: activities,
     });
   } catch (error) {
@@ -227,15 +275,55 @@ const getApplicationById = async (req, res, next) => {
 
 const updateApplicationStatus = async (req, res, next) => {
   try {
-    const { status, isShortlisted } = req.body;
+    const { status, isShortlisted, reason } = req.body;
     const application = await Application.findOne({ _id: req.params.id, company: req.companyId });
     if (!application) return next(ApiError.notFound('Application not found'));
+
+    // Rejections always go through the shared helper so the audit fields and
+    // the candidate notification email stay consistent regardless of which
+    // screen triggered the status change.
+    if (status === 'rejected' && application.status !== 'rejected') {
+      await rejectApplicationRecord(application, req.user._id, reason);
+      const job = await Job.findById(application.job).select('title').lean();
+      notifyEmail(
+        sendApplicationRejectedEmail,
+        { name: application.candidateName, email: application.candidateEmail },
+        job,
+        req.company,
+        application.rejectionReason
+      );
+      return ApiResponse.success(res, { application }, 'Application status updated');
+    }
 
     if (status !== undefined) application.status = status;
     if (isShortlisted !== undefined) application.isShortlisted = isShortlisted;
 
     await application.save();
     ApiResponse.success(res, { application }, 'Application status updated');
+  } catch (error) {
+    next(error);
+  }
+};
+
+const approveApplication = async (req, res, next) => {
+  try {
+    const application = await Application.findOne({ _id: req.params.id, company: req.companyId });
+    if (!application) return next(ApiError.notFound('Application not found'));
+    if (application.status === 'rejected') {
+      return next(ApiError.badRequest('Cannot approve an application that has already been rejected'));
+    }
+
+    await approveApplicationRecord(application, req.user._id);
+
+    const job = await Job.findById(application.job).select('title').lean();
+    notifyEmail(
+      sendApplicationApprovedEmail,
+      { name: application.candidateName, email: application.candidateEmail },
+      job,
+      req.company
+    );
+
+    ApiResponse.success(res, { application }, 'Application approved');
   } catch (error) {
     next(error);
   }
@@ -270,10 +358,13 @@ const getCandidates = async (req, res, next) => {
       email: app.candidateEmail,
       appliedPosition: app.job?.title || 'N/A',
       jobId: app.job?._id,
+      interviewId: app.interview?._id ?? app.interview ?? null,
       experienceLevel: app.candidate?.experienceLevel || 'Mid',
       interviewScore: app.overallScore ?? app.interview?.overallScore ?? null,
       status: app.status,
       isShortlisted: app.isShortlisted,
+      approvalStatus: app.approvalStatus || 'pending',
+      rejectionReason: app.rejectionReason || '',
       appliedDate: app.appliedDate,
       avatar: app.candidate?.avatar || '',
       skills: app.candidate?.skills || [],
@@ -318,12 +409,20 @@ const toggleShortlist = async (req, res, next) => {
 
 const rejectCandidate = async (req, res, next) => {
   try {
+    const { reason } = req.body;
     const application = await Application.findOne({ _id: req.params.id, company: req.companyId });
     if (!application) return next(ApiError.notFound('Application not found'));
 
-    application.status = 'rejected';
-    application.isShortlisted = false;
-    await application.save();
+    await rejectApplicationRecord(application, req.user._id, reason);
+
+    const job = await Job.findById(application.job).select('title').lean();
+    notifyEmail(
+      sendApplicationRejectedEmail,
+      { name: application.candidateName, email: application.candidateEmail },
+      job,
+      req.company,
+      application.rejectionReason
+    );
 
     ApiResponse.success(res, { application }, 'Candidate marked as rejected');
   } catch (error) {
@@ -365,7 +464,8 @@ const getInterviews = async (req, res, next) => {
 
 const scheduleInterview = async (req, res, next) => {
   try {
-    const { applicationId, candidateId, jobRole, type, difficulty, domain = 'technology', language, duration, scheduledAt } = req.body;
+    const { applicationId, jobRole, type, difficulty, domain, language, duration, scheduledAt } = req.body;
+    let candidateId = req.body.candidateId;
 
     let candidate = null;
     let application = null;
@@ -374,6 +474,9 @@ const scheduleInterview = async (req, res, next) => {
     if (applicationId) {
       application = await Application.findOne({ _id: applicationId, company: req.companyId });
       if (application) {
+        if (application.approvalStatus !== 'approved') {
+          return next(ApiError.badRequest('Candidate must be approved before scheduling an interview'));
+        }
         candidateId = application.candidate;
         job = await Job.findById(application.job);
       }
@@ -397,13 +500,14 @@ const scheduleInterview = async (req, res, next) => {
       title: `${resolvedJobRole} Interview - ${candidate.name}`,
       type: type || jobPayload?.type || 'mixed',
       difficulty: difficulty || jobPayload?.difficulty || 'mid',
-      domain,
+      domain: domain || jobPayload?.domain || 'technology',
       language: (language || jobPayload?.language || 'english').toLowerCase(),
       jobRole: resolvedJobRole,
       jobDescription: jobPayload?.jobDescription || '',
       resumeText: jobPayload?.resumeText || '',
       focusSkills: jobPayload?.focusSkills || [],
       duration: duration || jobPayload?.duration || 30,
+      expectedQuestionCount: jobPayload?.numberOfQuestions || undefined,
       scheduledAt: scheduledAt ? new Date(scheduledAt) : new Date(),
       status: 'scheduled',
     });
@@ -415,6 +519,14 @@ const scheduleInterview = async (req, res, next) => {
       await application.save();
     }
 
+    notifyEmail(
+      sendInterviewScheduledEmail,
+      { name: candidate.name, email: candidate.email },
+      interview,
+      job,
+      req.company
+    );
+
     ApiResponse.created(res, { interview }, 'Interview scheduled successfully');
   } catch (error) {
     next(error);
@@ -424,12 +536,23 @@ const scheduleInterview = async (req, res, next) => {
 const rescheduleInterview = async (req, res, next) => {
   try {
     const { scheduledAt } = req.body;
-    const interview = await Interview.findOne({ _id: req.params.id, company: req.companyId });
+    const interview = await Interview.findOne({ _id: req.params.id, company: req.companyId }).populate(
+      'user',
+      'name email'
+    );
     if (!interview) return next(ApiError.notFound('Interview not found'));
 
     interview.scheduledAt = new Date(scheduledAt);
     interview.status = 'scheduled';
     await interview.save();
+
+    notifyEmail(
+      sendInterviewRescheduledEmail,
+      { name: interview.user?.name, email: interview.user?.email },
+      interview,
+      null,
+      req.company
+    );
 
     ApiResponse.success(res, { interview }, 'Interview rescheduled successfully');
   } catch (error) {
@@ -439,11 +562,22 @@ const rescheduleInterview = async (req, res, next) => {
 
 const cancelInterview = async (req, res, next) => {
   try {
-    const interview = await Interview.findOne({ _id: req.params.id, company: req.companyId });
+    const interview = await Interview.findOne({ _id: req.params.id, company: req.companyId }).populate(
+      'user',
+      'name email'
+    );
     if (!interview) return next(ApiError.notFound('Interview not found'));
 
     interview.status = 'cancelled';
     await interview.save();
+
+    notifyEmail(
+      sendInterviewCancelledEmail,
+      { name: interview.user?.name, email: interview.user?.email },
+      interview,
+      null,
+      req.company
+    );
 
     ApiResponse.success(res, { interview }, 'Interview cancelled successfully');
   } catch (error) {
@@ -495,27 +629,47 @@ const getAssessments = async (req, res, next) => {
         .sort({ completedAt: -1 })
         .lean();
 
+      // Batch-fetch linked applications to resolve per-job passing thresholds
+      const interviewIds = completedInterviews.map((inv) => inv._id);
+      const linkedApps = await Application.find(
+        { interview: { $in: interviewIds }, company: req.companyId }
+      ).populate('job', 'passingScoreThreshold title').lean();
+      const thresholdMap = Object.fromEntries(
+        linkedApps.map((app) => [String(app.interview), app.job?.passingScoreThreshold ?? 70])
+      );
+      const jobTitleMap = Object.fromEntries(
+        linkedApps.map((app) => [String(app.interview), app.job?.title])
+      );
+
       const synthesizedAssessments = completedInterviews.map((inv) => {
         const score = inv.overallScore ?? inv.feedback?.overallScore ?? 0;
+        const passingScore = thresholdMap[String(inv._id)] ?? 70;
         return {
           _id: inv._id,
           candidate: inv.user,
           candidateName: inv.user?.name || 'Candidate',
-          job: { title: inv.jobRole || inv.title || 'Technical Assessment' },
+          job: { title: jobTitleMap[String(inv._id)] || inv.jobRole || inv.title || 'Technical Assessment' },
           assessmentType: `${inv.type.toUpperCase()} AI Evaluation`,
           score,
-          passingScore: 70,
-          passFailStatus: score >= 70 ? 'passed' : 'failed',
+          passingScore,
+          passFailStatus: score >= passingScore ? 'passed' : 'failed',
           completionDate: inv.completedAt || inv.updatedAt,
           summaryNotes: inv.feedback?.summary || 'Completed automated AI Mock Interview evaluation.',
           strengths: inv.feedback?.strengths || [],
           improvements: inv.feedback?.improvements || [],
+          integrityScore: inv.proctoring?.integrityScore ?? 100,
+          flaggedForReview: inv.proctoring?.flaggedForReview ?? false,
+          proctoringStrikes: inv.proctoring?.strikes ?? 0,
         };
       });
 
+      const filtered = passFailStatus
+        ? synthesizedAssessments.filter((a) => a.passFailStatus === passFailStatus)
+        : synthesizedAssessments;
+
       return ApiResponse.success(res, {
-        assessments: synthesizedAssessments.slice((page - 1) * limit, page * limit),
-        pagination: { page, limit, total: synthesizedAssessments.length, totalPages: Math.ceil(synthesizedAssessments.length / limit) },
+        assessments: filtered.slice((page - 1) * limit, page * limit),
+        pagination: { page, limit, total: filtered.length, totalPages: Math.ceil(filtered.length / limit) || 1 },
       });
     }
 
@@ -533,36 +687,60 @@ const getAssessmentById = async (req, res, next) => {
     const assessment = await Assessment.findOne({ _id: req.params.id, company: req.companyId })
       .populate('candidate', 'name email avatar skills bio')
       .populate('job')
-      .populate('interview')
+      .populate({ path: 'interview', populate: ['questions', 'feedback'] })
       .lean();
 
     if (assessment) {
       return ApiResponse.success(res, { assessment });
     }
 
-    // Fallback search in completed interviews
-    const interview = await Interview.findOne({ _id: req.params.id, company: req.companyId })
-      .populate('user', 'name email avatar skills bio')
-      .populate('feedback')
-      .lean();
+    // Fallback: synthesize from completed interview, fetching linked job for threshold
+    const [interview, linkedApp] = await Promise.all([
+      Interview.findOne({ _id: req.params.id, company: req.companyId })
+        .populate('user', 'name email avatar skills bio')
+        .populate('feedback')
+        .populate('questions')
+        .lean(),
+      Application.findOne({ interview: req.params.id, company: req.companyId })
+        .populate('job', 'passingScoreThreshold title')
+        .lean(),
+    ]);
 
     if (!interview) return next(ApiError.notFound('Assessment report not found'));
 
     const score = interview.overallScore ?? interview.feedback?.overallScore ?? 0;
+    const passingScore = linkedApp?.job?.passingScoreThreshold ?? 70;
+
     const synthesized = {
       _id: interview._id,
       candidate: interview.user,
       candidateName: interview.user?.name || 'Candidate',
-      job: { title: interview.jobRole || interview.title },
+      job: linkedApp?.job || { title: interview.jobRole || interview.title },
       assessmentType: `${interview.type.toUpperCase()} AI Evaluation`,
       score,
-      passingScore: 70,
-      passFailStatus: score >= 70 ? 'passed' : 'failed',
+      passingScore,
+      passFailStatus: score >= passingScore ? 'passed' : 'failed',
       completionDate: interview.completedAt || interview.updatedAt,
       summaryNotes: interview.feedback?.summary || 'Automated AI Interview Report',
+      detailedFeedback: interview.feedback?.detailedFeedback || '',
       strengths: interview.feedback?.strengths || [],
       improvements: interview.feedback?.improvements || [],
-      detailedCategoryScores: interview.feedback?.categoryScores || {},
+      categoryScores: interview.feedback?.categories || null,
+      integrityScore: interview.proctoring?.integrityScore ?? 100,
+      flaggedForReview: interview.proctoring?.flaggedForReview ?? false,
+      proctoringStrikes: interview.proctoring?.strikes ?? 0,
+      identityVerification: interview.identityVerification || null,
+      proctoringViolations: interview.proctoring?.violations || [],
+      questionEvaluations: (interview.questions || [])
+        .sort((a, b) => a.order - b.order)
+        .map((q) => ({
+          order: q.order,
+          text: q.text,
+          category: q.category,
+          score: q.score,
+          aiFeedback: q.aiFeedback || '',
+          userAnswer: q.userAnswer || '',
+        })),
     };
 
     ApiResponse.success(res, { assessment: synthesized });
@@ -624,6 +802,51 @@ const updateAccountSettings = async (req, res, next) => {
   }
 };
 
+// ─── SECURITY EVENTS (Identity Verification) ────────────
+const getSecurityEvents = async (req, res, next) => {
+  try {
+    const page = normalizePagination(req.query.page, 1, 1000);
+    const limit = normalizePagination(req.query.limit, 20, 100);
+    const { outcome = '', reviewed = '' } = req.query;
+
+    const filter = { company: req.companyId };
+    if (outcome) filter.outcome = outcome;
+    if (reviewed === 'true') filter.reviewed = true;
+    if (reviewed === 'false') filter.reviewed = false;
+
+    const [events, total] = await Promise.all([
+      VerificationEvent.find(filter)
+        .populate('interview', 'title jobRole scheduledAt')
+        .populate('reviewedBy', 'name email')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      VerificationEvent.countDocuments(filter),
+    ]);
+
+    ApiResponse.paginated(res, { events }, { page, limit, total, totalPages: Math.ceil(total / limit) || 1 });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const reviewSecurityEvent = async (req, res, next) => {
+  try {
+    const event = await VerificationEvent.findOne({ _id: req.params.id, company: req.companyId });
+    if (!event) return next(ApiError.notFound('Security event not found'));
+
+    event.reviewed = true;
+    event.reviewedAt = new Date();
+    event.reviewedBy = req.user._id;
+    await event.save();
+
+    ApiResponse.success(res, { event }, 'Security event marked as reviewed');
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getDashboard,
   getJobs,
@@ -634,6 +857,7 @@ module.exports = {
   getApplications,
   getApplicationById,
   updateApplicationStatus,
+  approveApplication,
   getCandidates,
   toggleShortlist,
   rejectCandidate,
@@ -647,4 +871,6 @@ module.exports = {
   getCompanySettings,
   updateCompanyProfile,
   updateAccountSettings,
+  getSecurityEvents,
+  reviewSecurityEvent,
 };

@@ -106,6 +106,135 @@ const sendPasswordResetEmail = async (user, resetToken) => {
   });
 };
 
+function formatInterviewDateTime(date, timezone) {
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      dateStyle: 'full',
+      timeStyle: 'short',
+      timeZone: timezone || 'UTC',
+    }).format(new Date(date));
+  } catch {
+    return new Date(date).toUTCString();
+  }
+}
+
+const sendApplicationApprovedEmail = async ({ name, email }, job, company) => {
+  const jobTitle = job?.title || 'the role you applied for';
+  const companyName = company?.name || 'the hiring team';
+  return sendEmail({
+    to: email,
+    subject: `${companyName} - Your application has been approved`,
+    html: renderEmailLayout({
+      title: 'Application approved',
+      preheader: `Your application for ${jobTitle} has moved forward.`,
+      greeting: `Hi ${escapeHtml(name)},`,
+      body: `<p style="margin:0 0 14px;font-size:16px;line-height:1.6;">Good news — <strong>${escapeHtml(companyName)}</strong> has approved your application for <strong>${escapeHtml(jobTitle)}</strong> to move forward in the hiring process.</p><p style="margin:0;font-size:16px;line-height:1.6;">The hiring team will follow up shortly with a scheduled AI interview time and further details. No action is needed from you right now.</p>`,
+      footerNote: 'You will receive a separate email once your interview is scheduled, including the date, time, and interview format.',
+    }),
+    text: `Hi ${name},\n\n${companyName} has approved your application for ${jobTitle}. They will follow up shortly with your interview details.`,
+  });
+};
+
+const sendApplicationRejectedEmail = async ({ name, email }, job, company, reason = '') => {
+  const jobTitle = job?.title || 'the role you applied for';
+  const companyName = company?.name || 'the hiring team';
+  const reasonBlock = reason
+    ? `<p style="margin:18px 0 0;font-size:14px;line-height:1.6;color:#697386;"><strong>Feedback from the hiring team:</strong><br>${escapeHtml(reason)}</p>`
+    : '';
+  return sendEmail({
+    to: email,
+    subject: `${companyName} - Update on your application`,
+    html: renderEmailLayout({
+      title: 'Application update',
+      preheader: `An update on your application for ${jobTitle}.`,
+      greeting: `Hi ${escapeHtml(name)},`,
+      body: `<p style="margin:0;font-size:16px;line-height:1.6;">Thank you for your interest in <strong>${escapeHtml(jobTitle)}</strong> at <strong>${escapeHtml(companyName)}</strong>. After careful review, the team has decided not to move forward with your application at this time.</p>${reasonBlock}`,
+      footerNote: 'We appreciate the time you invested and encourage you to apply to future openings that match your experience.',
+    }),
+    text: `Hi ${name},\n\nThank you for applying to ${jobTitle} at ${companyName}. The team has decided not to move forward with your application at this time.${reason ? `\n\nFeedback: ${reason}` : ''}`,
+  });
+};
+
+const sendInterviewScheduledEmail = async ({ name, email }, interview, job, company) => {
+  const jobTitle = job?.title || interview.jobRole || 'your role';
+  const companyName = company?.name || 'the hiring team';
+  const when = formatInterviewDateTime(interview.scheduledAt, company?.timezone);
+  const clientUrl = getClientUrl();
+  const detailsUrl = `${clientUrl}/interviews/${interview._id}`;
+
+  const detailRows = [
+    ['Interview type', interview.type],
+    ['Duration', `${interview.duration || 30} minutes`],
+    ['Language', interview.language === 'somali' ? 'Somali' : 'English'],
+  ]
+    .filter(([, value]) => Boolean(value))
+    .map(
+      ([label, value]) =>
+        `<tr><td style="padding:6px 0;color:#697386;font-size:13px;">${escapeHtml(label)}</td><td style="padding:6px 0;font-weight:bold;font-size:13px;text-align:right;text-transform:capitalize;">${escapeHtml(String(value))}</td></tr>`
+    )
+    .join('');
+
+  return sendEmail({
+    to: email,
+    subject: `Interview scheduled - ${jobTitle} at ${companyName}`,
+    html: renderEmailLayout({
+      title: 'Your interview is scheduled',
+      preheader: `Your AI interview for ${jobTitle} is set for ${when}.`,
+      greeting: `Hi ${escapeHtml(name)},`,
+      body: `<p style="margin:0 0 18px;font-size:16px;line-height:1.6;"><strong>${escapeHtml(companyName)}</strong> has scheduled your AI interview for <strong>${escapeHtml(jobTitle)}</strong>.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f7f8fc;border-radius:12px;padding:16px;margin:0 0 18px;">
+<tr><td style="padding:6px 0;color:#697386;font-size:13px;">Date &amp; time</td><td style="padding:6px 0;font-weight:bold;font-size:13px;text-align:right;">${escapeHtml(when)}</td></tr>
+${detailRows}
+</table>
+<p style="margin:0;font-size:14px;line-height:1.6;color:#697386;">On the day, sign in a few minutes early. You will complete a brief webcam identity check before the interview opens.</p>`,
+      ctaLabel: 'View interview details',
+      ctaUrl: detailsUrl,
+      footerNote: 'Need to reschedule? Contact the hiring team directly — they manage all interview timing changes.',
+    }),
+    text: `Hi ${name},\n\n${companyName} has scheduled your AI interview for ${jobTitle}.\n\nDate & time: ${when}\nInterview type: ${interview.type}\nDuration: ${interview.duration || 30} minutes\n\nView details: ${detailsUrl}`,
+  });
+};
+
+const sendInterviewRescheduledEmail = async ({ name, email }, interview, job, company) => {
+  const jobTitle = job?.title || interview.jobRole || 'your role';
+  const companyName = company?.name || 'the hiring team';
+  const when = formatInterviewDateTime(interview.scheduledAt, company?.timezone);
+  const detailsUrl = `${getClientUrl()}/interviews/${interview._id}`;
+
+  return sendEmail({
+    to: email,
+    subject: `Interview rescheduled - ${jobTitle} at ${companyName}`,
+    html: renderEmailLayout({
+      title: 'Your interview was rescheduled',
+      preheader: `Your interview for ${jobTitle} moved to ${when}.`,
+      greeting: `Hi ${escapeHtml(name)},`,
+      body: `<p style="margin:0;font-size:16px;line-height:1.6;"><strong>${escapeHtml(companyName)}</strong> has rescheduled your interview for <strong>${escapeHtml(jobTitle)}</strong>.</p><p style="margin:18px 0 0;font-size:20px;font-weight:bold;color:${BRAND_PRIMARY};">${escapeHtml(when)}</p>`,
+      ctaLabel: 'View interview details',
+      ctaUrl: detailsUrl,
+      footerNote: 'Please make a note of the new date and time.',
+    }),
+    text: `Hi ${name},\n\n${companyName} has rescheduled your interview for ${jobTitle} to ${when}.\n\nView details: ${detailsUrl}`,
+  });
+};
+
+const sendInterviewCancelledEmail = async ({ name, email }, interview, job, company) => {
+  const jobTitle = job?.title || interview.jobRole || 'your role';
+  const companyName = company?.name || 'the hiring team';
+
+  return sendEmail({
+    to: email,
+    subject: `Interview cancelled - ${jobTitle} at ${companyName}`,
+    html: renderEmailLayout({
+      title: 'Your interview was cancelled',
+      preheader: `Your interview for ${jobTitle} has been cancelled.`,
+      greeting: `Hi ${escapeHtml(name)},`,
+      body: `<p style="margin:0;font-size:16px;line-height:1.6;"><strong>${escapeHtml(companyName)}</strong> has cancelled your scheduled interview for <strong>${escapeHtml(jobTitle)}</strong>.</p><p style="margin:18px 0 0;font-size:14px;line-height:1.6;color:#697386;">If you have questions, please reach out to the hiring team directly.</p>`,
+      footerNote: 'The hiring team may follow up with a new time, or with an update on your application status.',
+    }),
+    text: `Hi ${name},\n\n${companyName} has cancelled your scheduled interview for ${jobTitle}.`,
+  });
+};
+
 const sendGoogleSignInHelpEmail = async (user) => {
   const googleUrl = `${getClientUrl()}/login`;
   return sendEmail({
@@ -122,4 +251,17 @@ const sendGoogleSignInHelpEmail = async (user) => {
   });
 };
 
-module.exports = { sendEmail, sendVerificationEmail, sendInterviewCompletionEmail, sendPasswordResetEmail, sendGoogleSignInHelpEmail, escapeHtml, renderEmailLayout };
+module.exports = {
+  sendEmail,
+  sendVerificationEmail,
+  sendInterviewCompletionEmail,
+  sendPasswordResetEmail,
+  sendGoogleSignInHelpEmail,
+  sendApplicationApprovedEmail,
+  sendApplicationRejectedEmail,
+  sendInterviewScheduledEmail,
+  sendInterviewRescheduledEmail,
+  sendInterviewCancelledEmail,
+  escapeHtml,
+  renderEmailLayout,
+};

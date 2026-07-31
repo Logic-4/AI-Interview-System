@@ -115,6 +115,23 @@ const interviewSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    // Full-session webcam recording (video + audio), captured only for
+    // company-scheduled interviews after the candidate consents. Chunks are
+    // small immutable pieces uploaded during the live session; they are
+    // byte-concatenated into recordingUrl once the interview completes, then
+    // discarded.
+    recordingChunks: [
+      {
+        index: { type: Number, required: true },
+        url: { type: String, required: true },
+        _id: false,
+      },
+    ],
+    recordingStatus: {
+      type: String,
+      enum: ['none', 'recording', 'processing', 'ready', 'failed'],
+      default: 'none',
+    },
     transcription: {
       type: String,
       default: '',
@@ -171,6 +188,40 @@ const interviewSchema = new mongoose.Schema(
     isDeleted: {
       type: Boolean,
       default: false,
+    },
+    // Pre-interview identity checkpoint (lobby face match). Legacy training
+    // interviews without a company keep the default 'not_required'.
+    identityVerification: {
+      status: {
+        type: String,
+        enum: ['not_required', 'pending', 'passed', 'failed', 'blocked'],
+        default: 'not_required',
+      },
+      similarity: { type: Number, default: null },
+      threshold: { type: Number, default: null },
+      provider: { type: String, default: '' },
+      attempts: { type: Number, default: 0 },
+      verifiedAt: { type: Date, default: null },
+      lastAttemptAt: { type: Date, default: null },
+      lastReason: { type: String, default: '', maxlength: 500 },
+    },
+    proctoring: {
+      enabled: { type: Boolean, default: false },
+      strikes: { type: Number, default: 0, min: 0, max: 3 },
+      integrityScore: { type: Number, default: 100, min: 0, max: 100 },
+      violations: [
+        {
+          type: {
+            type: String,
+            enum: ['tab_switch', 'window_blur', 'gaze_away', 'face_not_detected'],
+          },
+          timestamp: { type: Date, default: Date.now },
+          details: { type: String, default: '', maxlength: 500 },
+          strike: { type: Number, default: null },
+          _id: false,
+        },
+      ],
+      flaggedForReview: { type: Boolean, default: false },
     },
   },
   {

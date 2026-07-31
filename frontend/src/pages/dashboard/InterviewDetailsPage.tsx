@@ -26,9 +26,14 @@ import { cn } from "../../lib/utils";
 import { computeQuestionsReady, isSomaliLanguage } from "../../lib/interviewHelpers";
 import interviewService from "../../services/interviewService";
 import feedbackService from "../../services/feedbackService";
+import InterviewLobby from "../../components/interview/InterviewLobby";
+import InterviewWaitingRoom from "../../components/interview/InterviewWaitingRoom";
+import { ProctoringOverlay, ProctoringStatusBadge } from "../../components/interview/ProctoringOverlay";
 import { useInterviewStore } from "../../stores/interviewStore";
 import { useAuthStore } from "../../stores/authStore";
 import { useConversationEngine } from "../../hooks/useConversationEngine";
+import { useInterviewSessionRecorder } from "../../hooks/useInterviewSessionRecorder";
+import { useProctoring } from "../../hooks/useProctoring";
 
 import type { Question } from "../../types/question";
 import type { PopulatedInterview } from "../../types/interview";
@@ -42,6 +47,9 @@ function formatTime(seconds: number): string {
 
 /* ─── Page phases ───────────────────────────────────────────── */
 type PagePhase = "loading" | "ready" | "active" | "error";
+
+// Must match backend EARLY_JOIN_WINDOW_MS in interviewController.js.
+const EARLY_JOIN_WINDOW_MS = 15 * 60 * 1000;
 
 export default function InterviewDetailsPage() {
   const params = useParams();
@@ -67,6 +75,23 @@ export default function InterviewDetailsPage() {
   const [isEnding, setIsEnding] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [questionsReady, setQuestionsReady] = useState(false);
+  const [identityCleared, setIdentityCleared] = useState(false);
+  const [timeWindowForcedOpen, setTimeWindowForcedOpen] = useState(false);
+  const [recordingConsent, setRecordingConsent] = useState(false);
+
+  const recordingRequired = Boolean(interview?.company);
+  const recorder = useInterviewSessionRecorder(interviewId);
+
+  // Hidden video element for gaze tracking — fed from the recording stream
+  const gazeVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [gazeVideoReady, setGazeVideoReady] = useState(false);
+
+  const proctoring = useProctoring({
+    enabled: pagePhase === "active" && recordingRequired,
+    interviewId,
+    videoElement: gazeVideoReady ? gazeVideoRef.current : null,
+    gazeEnabled: true,
+  });
 
   const hasCompletedRef = useRef(false);
   const pollDelayRef = useRef(2000);
@@ -116,6 +141,9 @@ export default function InterviewDetailsPage() {
     loadedInterviewIdRef.current = interviewId;
     hasCompletedRef.current = false;
     pollDelayRef.current = 2000;
+    setIdentityCleared(false);
+    setTimeWindowForcedOpen(false);
+    setRecordingConsent(false);
     resetSession();
 
     const navInterview =
@@ -223,8 +251,11 @@ export default function InterviewDetailsPage() {
   const onComplete = useCallback(async () => {
     if (hasCompletedRef.current) return;
     hasCompletedRef.current = true;
+    // Flush the last recording chunk and wait for all uploads to settle
+    // before marking complete, so the backend has every chunk to finalize.
+    await recorder.stop();
     await interviewService.completeInterview(interviewId);
-  }, [interviewId]);
+  }, [interviewId, recorder]);
 
   const onGenerateFeedback = useCallback(async () => {
     try {
@@ -257,6 +288,15 @@ export default function InterviewDetailsPage() {
       applyInterview(started);
       setSessionActive(true);
       setPagePhase("active");
+      recorder.start();
+
+      // Feed the recording stream into the hidden gaze-tracking video element
+      const stream = recorder.getStream();
+      if (stream && gazeVideoRef.current) {
+        gazeVideoRef.current.srcObject = stream;
+        gazeVideoRef.current.play().catch(() => {});
+        setGazeVideoReady(true);
+      }
 
       setTimeout(() => engine.start({ language: started.language }), 300);
     } catch {
@@ -315,6 +355,7 @@ export default function InterviewDetailsPage() {
     try {
       if (!hasCompletedRef.current) {
         hasCompletedRef.current = true;
+        await recorder.stop();
         await interviewService.completeInterview(interviewId);
       }
     } catch {}
@@ -349,6 +390,40 @@ export default function InterviewDetailsPage() {
           </div>
         </Card>
       </div>
+    );
+  }
+
+  /* ─── Scheduling Window — company interviews only open near their time ── */
+  const isBeforeScheduleWindow =
+    pagePhase === "ready" &&
+    Boolean(interview?.company) &&
+    Boolean(interview?.scheduledAt) &&
+    !timeWindowForcedOpen &&
+    Date.now() < new Date(interview!.scheduledAt as string).getTime() - EARLY_JOIN_WINDOW_MS;
+
+  if (pagePhase === "ready" && interview && isBeforeScheduleWindow) {
+    return (
+      <InterviewWaitingRoom
+        scheduledAt={interview.scheduledAt as string}
+        earlyJoinWindowMs={EARLY_JOIN_WINDOW_MS}
+        interviewTitle={interview.title}
+        onWindowOpen={() => setTimeWindowForcedOpen(true)}
+      />
+    );
+  }
+
+  /* ─── Identity Checkpoint — must clear before entering the lobby ── */
+  if (pagePhase === "ready" && interview && !identityCleared) {
+    return (
+      <InterviewLobby
+        interviewId={interviewId}
+        candidateName={user?.name}
+        keepStreamForRecording={recordingRequired}
+        onVerified={(stream) => {
+          if (stream) recorder.attachStream(stream);
+          setIdentityCleared(true);
+        }}
+      />
     );
   }
 
@@ -405,6 +480,21 @@ export default function InterviewDetailsPage() {
               </div>
             </div>
 
+            {recordingRequired && questionsReady && (
+              <label className="flex items-start gap-3 p-4 rounded-md bg-warning/5 border border-warning/20 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={recordingConsent}
+                  onChange={(e) => setRecordingConsent(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-white-light dark:border-[#1b2e4b] text-primary focus:ring-primary flex-shrink-0"
+                />
+                <span className="text-xs font-semibold text-text-muted leading-relaxed">
+                  I consent to this interview being <strong className="text-text-primary dark:text-white">recorded (video &amp; audio)</strong> for
+                  the full session and shared with the hiring team for evaluation purposes.
+                </span>
+              </label>
+            )}
+
             <div className="flex justify-center pt-4">
               {!questionsReady ? (
                 <div className="text-center space-y-4">
@@ -434,7 +524,7 @@ export default function InterviewDetailsPage() {
                   size="xl"
                   className="h-14 px-12 rounded-md text-sm font-semibold uppercase tracking-wider shadow-xl shadow-primary/20 group text-white"
                   onClick={handleStart}
-                  disabled={isStarting}
+                  disabled={isStarting || (recordingRequired && !recordingConsent)}
                 >
                   {isStarting ? (
                     <>
@@ -456,6 +546,17 @@ export default function InterviewDetailsPage() {
       </div>
     );
   }
+
+  /* ─── Hidden gaze-tracking video element (rendered outside portal) ─── */
+  const gazeVideoElement = recordingRequired ? (
+    <video
+      ref={gazeVideoRef}
+      muted
+      playsInline
+      aria-hidden="true"
+      className="fixed -top-[9999px] -left-[9999px] w-1 h-1 pointer-events-none"
+    />
+  ) : null;
 
   /* ─── Active / Conversation Session ───────────────────────── */
   const progressPercent =
@@ -520,9 +621,20 @@ export default function InterviewDetailsPage() {
     }
 
     /* Active session theater mode — clean single-question UI */
-    return createPortal(
-      <div className="fixed top-0 left-0 w-screen h-screen z-[9999] bg-background text-text-primary dark:text-white flex flex-col">
+    return (
+      <>
+        {gazeVideoElement}
+        {createPortal(
+          <div className="fixed top-0 left-0 w-screen h-screen z-[9999] bg-background text-text-primary dark:text-white flex flex-col">
 
+        {/* ── Proctoring alert overlay ─────────────────────── */}
+        {recordingRequired && (
+          <ProctoringOverlay
+            alert={proctoring.currentAlert}
+            strikes={proctoring.strikes}
+            onDismiss={proctoring.dismissAlert}
+          />
+        )}
 
         {/* ── Top bar ──────────────────────────────────────── */}
         <div className="flex items-center justify-between px-6 py-3 flex-shrink-0 border-b border-white-light dark:border-[#1b2e4b]">
@@ -537,6 +649,23 @@ export default function InterviewDetailsPage() {
                 transition={{ duration: 0.5 }}
               />
             </div>
+            {recordingRequired && recorder.status === "recording" && (
+              <div
+                title="This session is being recorded (video & audio)"
+                className="flex items-center gap-1.5 px-2 py-0.5 bg-danger/10 border border-danger/30 rounded-md"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse" />
+                <span className="text-[10px] font-bold text-danger uppercase tracking-widest">Session Recording</span>
+              </div>
+            )}
+            {recordingRequired && (
+              <ProctoringStatusBadge
+                strikes={proctoring.strikes}
+                integrityScore={proctoring.integrityScore}
+                flaggedForReview={proctoring.flaggedForReview}
+                gazeActive={proctoring.gazeTracking.isTracking}
+              />
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -846,7 +975,9 @@ export default function InterviewDetailsPage() {
         {/* Spacer for fixed bottom bar */}
         <div className="h-16 flex-shrink-0" />
       </div>,
-      document.body
+          document.body
+        )}
+      </>
     );
   }
 

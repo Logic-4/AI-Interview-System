@@ -404,7 +404,7 @@ function resolveQuestionCategory(type, absoluteIndex, totalCount) {
   if (lowerType === 'hr') {
     categoryCycle = ['motivation', 'strengths/weaknesses', 'culture fit', 'experience'];
   } else if (lowerType === 'technical') {
-    categoryCycle = ['core skills', 'scenario tasks', 'debugging', 'fundamentals'];
+    categoryCycle = ['core skills', 'applied knowledge', 'debugging', 'fundamentals'];
   } else if (lowerType === 'behavioral') {
     categoryCycle = ['STAR-based situation', 'past experience', 'problem solving'];
   } else {

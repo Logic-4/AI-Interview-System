@@ -91,6 +91,14 @@ const jobSchema = new mongoose.Schema(
       default: '',
     },
     // Section 3: Interview Configuration
+    domain: {
+      type: String,
+      enum: {
+        values: ['technology', 'healthcare', 'finance', 'engineering', 'education', 'legal'],
+        message: 'Domain must be technology, healthcare, finance, engineering, education, or legal',
+      },
+      default: 'technology',
+    },
     interviewLanguage: {
       type: String,
       enum: ['English', 'Somali'],

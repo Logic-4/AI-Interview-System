@@ -5,6 +5,7 @@ export type JobStatus = 'draft' | 'published' | 'paused' | 'closed';
 export type InterviewLanguage = 'English' | 'Somali';
 export type InterviewType = 'technical' | 'behavioral' | 'hr' | 'system-design' | 'mixed';
 export type ApplicationStatus = 'applied' | 'under_review' | 'interview_scheduled' | 'interviewed' | 'shortlisted' | 'rejected' | 'hired';
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 export type ResumeStatus = 'uploaded' | 'missing' | 'reviewed';
 export type CompanyInterviewStatus = 'scheduled' | 'in-progress' | 'completed' | 'cancelled';
 export type PassFailStatus = 'passed' | 'failed' | 'pending';
@@ -65,6 +66,10 @@ export interface Application {
   appliedDate: string;
   status: ApplicationStatus;
   isShortlisted: boolean;
+  approvalStatus: ApprovalStatus;
+  rejectionReason?: string;
+  approvedAt?: string | null;
+  rejectedAt?: string | null;
   interviewStatus: string;
   interview?: any;
   overallScore?: number | null;
@@ -78,10 +83,13 @@ export interface CandidateSummary {
   email: string;
   appliedPosition: string;
   jobId?: string;
+  interviewId?: string | null;
   experienceLevel: string;
   interviewScore?: number | null;
   status: ApplicationStatus;
   isShortlisted: boolean;
+  approvalStatus: ApprovalStatus;
+  rejectionReason?: string;
   appliedDate: string;
   avatar?: string;
   skills?: string[];
@@ -105,13 +113,46 @@ export interface CompanyInterview {
   scheduledAt?: string;
   status: CompanyInterviewStatus;
   overallScore?: number | null;
+  recordingUrl?: string;
+  recordingStatus?: 'none' | 'recording' | 'processing' | 'ready' | 'failed';
   feedback?: {
     overallScore?: number;
     summary?: string;
     strengths?: string[];
     improvements?: string[];
   };
+  proctoring?: {
+    enabled: boolean;
+    strikes: number;
+    integrityScore: number;
+    flaggedForReview: boolean;
+    violations?: ProctoringViolation[];
+  };
   createdAt: string;
+}
+
+export type IdentityVerificationStatus = 'not_required' | 'pending' | 'passed' | 'failed' | 'blocked';
+export type ProctoringViolationType = 'tab_switch' | 'window_blur' | 'gaze_away' | 'face_not_detected';
+
+export interface QuestionEvaluation {
+  order: number;
+  text: string;
+  category: string;
+  score: number | null;
+  aiFeedback: string;
+  userAnswer: string;
+}
+
+export interface CategoryScoreEntry {
+  score: number;
+  feedback: string;
+}
+
+export interface ProctoringViolation {
+  type: ProctoringViolationType;
+  timestamp: string;
+  details: string;
+  strike: number | null;
 }
 
 export interface CompanyAssessment {
@@ -135,9 +176,28 @@ export interface CompanyAssessment {
   passFailStatus: PassFailStatus;
   completionDate: string;
   summaryNotes?: string;
+  detailedFeedback?: string;
   strengths?: string[];
   improvements?: string[];
   detailedCategoryScores?: Record<string, any>;
+  categoryScores?: {
+    communication?: CategoryScoreEntry;
+    technicalAccuracy?: CategoryScoreEntry;
+    problemSolving?: CategoryScoreEntry;
+    codeQuality?: CategoryScoreEntry;
+    confidence?: CategoryScoreEntry;
+  } | null;
+  integrityScore?: number;
+  flaggedForReview?: boolean;
+  proctoringStrikes?: number;
+  identityVerification?: {
+    status: IdentityVerificationStatus;
+    similarity?: number | null;
+    threshold?: number | null;
+    attempts?: number;
+  } | null;
+  proctoringViolations?: ProctoringViolation[];
+  questionEvaluations?: QuestionEvaluation[];
 }
 
 export interface CompanyProfile {
@@ -167,4 +227,35 @@ export interface CompanyDashboardMetrics {
   candidatesInterviewed: number;
   candidatesShortlisted: number;
   pendingInterviews: number;
+  unreviewedSecurityEvents: number;
+}
+
+export type VerificationOutcome =
+  | 'passed'
+  | 'failed'
+  | 'no_face'
+  | 'multiple_faces'
+  | 'no_reference'
+  | 'provider_error'
+  | 'attempts_exhausted';
+
+export interface SecurityEvent {
+  _id: string;
+  company: string;
+  interview: { _id: string; title: string; jobRole?: string; scheduledAt?: string } | string;
+  candidateName: string;
+  outcome: VerificationOutcome;
+  similarity: number | null;
+  threshold: number | null;
+  provider: string;
+  attempt: number;
+  facesDetected: number;
+  reason: string;
+  liveFrameUrl: string;
+  referenceImageUrl: string;
+  severity: 'info' | 'warning' | 'critical';
+  reviewed: boolean;
+  reviewedAt: string | null;
+  reviewedBy?: { _id: string; name: string; email: string } | null;
+  createdAt: string;
 }

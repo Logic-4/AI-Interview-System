@@ -18,7 +18,8 @@ import {
     Users,
     Star,
     Video,
-    Award
+    Award,
+    ShieldAlert
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -54,6 +55,7 @@ const Sidebar = () => {
         { path: '/company/shortlist', label: 'Shortlist', icon: Star, end: false },
         { path: '/company/interviews', label: 'Interviews', icon: Video, end: false },
         { path: '/company/assessments', label: 'Assessments', icon: Award, end: false },
+        { path: '/company/security-events', label: 'Security Events', icon: ShieldAlert, end: false },
         { path: '/company/settings', label: 'Settings', icon: Settings, end: false },
     ];
 

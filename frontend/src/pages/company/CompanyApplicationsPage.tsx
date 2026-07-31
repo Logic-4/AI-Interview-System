@@ -21,8 +21,11 @@ import {
 import toast from 'react-hot-toast';
 import { setPageTitle } from '@/store/themeConfigSlice';
 import companyService from '@/services/companyService';
-import { Application, ApplicationStatus } from '@/types/companyPortal';
+import { Application, ApplicationStatus, ApprovalStatus } from '@/types/companyPortal';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+
+const approvalBadge = (status: ApprovalStatus) =>
+  ({ approved: 'success', rejected: 'danger', pending: 'warning' })[status] || 'secondary';
 
 const dateTime = (value?: string) =>
   value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : 'N/A';
@@ -123,6 +126,9 @@ const CompanyApplicationsPage = () => {
   const [loading, setLoading] = useState(true);
   const [detailApp, setDetailApp] = useState<Application | null>(null);
   const [previewPhoto, setPreviewPhoto] = useState<{ url: string; name: string } | null>(null);
+  const [approving, setApproving] = useState(false);
+  const [rejectReasonOpen, setRejectReasonOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -158,6 +164,33 @@ const CompanyApplicationsPage = () => {
       }
     } catch (err: any) {
       toast.error('Failed to update application status');
+    }
+  };
+
+  const handleApprove = async (appId: string) => {
+    setApproving(true);
+    try {
+      const updated = await companyService.approveApplication(appId);
+      toast.success('Application approved — candidate notified by email');
+      await load();
+      if (detailApp?._id === appId) setDetailApp(updated);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to approve application');
+    } finally {
+      setApproving(false);
+    }
+  };
+
+  const handleRejectSubmit = async (appId: string) => {
+    try {
+      const updated = await companyService.rejectCandidate(appId, rejectReason.trim() || undefined);
+      toast.success('Application rejected — candidate notified by email');
+      setRejectReasonOpen(false);
+      setRejectReason('');
+      await load();
+      if (detailApp?._id === appId) setDetailApp(updated);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to reject application');
     }
   };
 
@@ -223,6 +256,7 @@ const CompanyApplicationsPage = () => {
                     <th>Phone Number</th>
                     <th>Applied Date</th>
                     <th>Status</th>
+                    <th>Approval</th>
                     <th className="text-right">Actions</th>
                   </tr>
                 </thead>
@@ -254,7 +288,21 @@ const CompanyApplicationsPage = () => {
                           </span>
                         </td>
                         <td>
+                          <span className={`badge badge-outline-${approvalBadge(app.approvalStatus)} capitalize`}>
+                            {app.approvalStatus}
+                          </span>
+                        </td>
+                        <td>
                           <div className="flex justify-end gap-2">
+                            {app.approvalStatus !== 'approved' && (
+                              <button
+                                title="Approve Application"
+                                className="btn btn-sm btn-outline-success p-2"
+                                onClick={() => void handleApprove(app._id)}
+                              >
+                                <CheckCircle2 className="h-4 w-4" />
+                              </button>
+                            )}
                             <button
                               title="View Candidate Details"
                               className="btn btn-sm btn-outline-primary flex items-center gap-1.5 px-3"
@@ -270,7 +318,7 @@ const CompanyApplicationsPage = () => {
                   })}
                   {applications.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center text-white-dark">
+                      <td colSpan={7} className="py-12 text-center text-white-dark">
                         No candidate applications found.
                       </td>
                     </tr>
@@ -326,6 +374,9 @@ const CompanyApplicationsPage = () => {
                     </h2>
                     <span className={`badge badge-outline-${statusBadge(detailApp.status)} capitalize text-xs font-bold`}>
                       {detailApp.status.replace('_', ' ')}
+                    </span>
+                    <span className={`badge badge-outline-${approvalBadge(detailApp.approvalStatus)} capitalize text-xs font-bold`}>
+                      {detailApp.approvalStatus}
                     </span>
                   </div>
                   <p className="text-xs font-medium text-primary flex items-center gap-1 mt-1">
@@ -537,6 +588,17 @@ const CompanyApplicationsPage = () => {
             {/* Modal Actions Footer */}
             <div className="p-4 bg-slate-50 dark:bg-slate-800/60 border-t border-white-light dark:border-white-light/10 flex items-center justify-between">
               <div className="flex items-center gap-2">
+                {detailApp.approvalStatus !== 'approved' && (
+                  <button
+                    type="button"
+                    className="btn btn-success btn-sm flex items-center gap-1.5"
+                    disabled={approving}
+                    onClick={() => void handleApprove(detailApp._id)}
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Approve Application</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   className="btn btn-outline-success btn-sm flex items-center gap-1.5"
@@ -545,14 +607,16 @@ const CompanyApplicationsPage = () => {
                   <Star className="h-4 w-4" />
                   <span>Move to Shortlist</span>
                 </button>
-                <button
-                  type="button"
-                  className="btn btn-outline-danger btn-sm flex items-center gap-1.5"
-                  onClick={() => void updateStatus(detailApp._id, 'rejected', false)}
-                >
-                  <XCircle className="h-4 w-4" />
-                  <span>Reject Candidate</span>
-                </button>
+                {detailApp.approvalStatus !== 'rejected' && (
+                  <button
+                    type="button"
+                    className="btn btn-outline-danger btn-sm flex items-center gap-1.5"
+                    onClick={() => setRejectReasonOpen(true)}
+                  >
+                    <XCircle className="h-4 w-4" />
+                    <span>Reject Candidate</span>
+                  </button>
+                )}
               </div>
 
               <button type="button" className="btn btn-primary px-6 btn-sm" onClick={() => setDetailApp(null)}>
@@ -592,6 +656,40 @@ const CompanyApplicationsPage = () => {
                 alt={previewPhoto.name}
                 className="max-h-[70vh] max-w-full object-contain rounded-xl shadow-2xl border border-white/10"
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Reject with Reason Modal ─── */}
+      {rejectReasonOpen && detailApp && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="panel w-full max-w-md space-y-4">
+            <h3 className="text-lg font-bold text-black dark:text-white">Reject {detailApp.candidateName}</h3>
+            <div>
+              <label htmlFor="appRejectReason">Reason (optional, included in the candidate&apos;s email)</label>
+              <textarea
+                id="appRejectReason"
+                className="form-textarea"
+                rows={3}
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={() => {
+                  setRejectReasonOpen(false);
+                  setRejectReason('');
+                }}
+              >
+                Cancel
+              </button>
+              <button type="button" className="btn btn-danger" onClick={() => void handleRejectSubmit(detailApp._id)}>
+                Reject &amp; Notify
+              </button>
             </div>
           </div>
         </div>

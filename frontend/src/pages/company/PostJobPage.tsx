@@ -1,7 +1,7 @@
-import { useState, ChangeEvent, FormEvent, useEffect, useRef, useCallback } from 'react';
+import { useState, ChangeEvent, useEffect, useRef, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CheckCircle2, ChevronRight, Bold, Italic, List } from 'lucide-react';
+import { CheckCircle2, ChevronRight, Bold, Italic, List, Link as LinkIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { setPageTitle } from '@/store/themeConfigSlice';
 import companyService from '@/services/companyService';
@@ -43,6 +43,7 @@ const PostJobPage = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [loadingJob, setLoadingJob] = useState(false);
+  const [publishedJobId, setPublishedJobId] = useState<string | null>(null);
   const [form, setForm] = useState<JobPayload>(defaultForm);
   const descRef = useRef<HTMLTextAreaElement>(null);
 
@@ -201,11 +202,16 @@ const PostJobPage = () => {
       if (editId) {
         await companyService.updateJob(editId, { ...form, status: publishStatus });
         toast.success(publishStatus === 'published' ? 'Job updated successfully!' : 'Job draft saved!');
+        navigate('/company/jobs');
       } else {
-        await companyService.createJob({ ...form, status: publishStatus });
-        toast.success(publishStatus === 'published' ? 'Job published successfully!' : 'Job draft saved!');
+        const job = await companyService.createJob({ ...form, status: publishStatus });
+        if (publishStatus === 'published') {
+          setPublishedJobId(job._id);
+        } else {
+          toast.success('Job draft saved!');
+          navigate('/company/jobs');
+        }
       }
-      navigate('/company/jobs');
     } catch (err: any) {
       toast.error(err.response?.data?.message || (editId ? 'Failed to update job' : 'Failed to create job'));
     } finally {
@@ -223,6 +229,62 @@ const PostJobPage = () => {
     return (
       <div className="flex h-96 items-center justify-center">
         <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  if (publishedJobId) {
+    const publicUrl = `${window.location.origin}/jobs/${publishedJobId}`;
+    return (
+      <div className="flex flex-col items-center justify-center py-20 space-y-6 max-w-xl mx-auto text-center">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-success/10 text-success">
+          <CheckCircle2 className="h-10 w-10" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-black dark:text-white">Job Published!</h2>
+          <p className="mt-2 text-sm text-white-dark">
+            Share this link with candidates so they can view the job and apply.
+          </p>
+        </div>
+        <div className="w-full rounded-lg border border-white-light dark:border-white-light/10 p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <LinkIcon className="h-4 w-4 text-primary shrink-0" />
+            <p className="text-xs font-bold text-white-dark uppercase">Application Link</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              readOnly
+              value={publicUrl}
+              className="form-input flex-1 text-sm font-mono bg-gray-50 dark:bg-dark"
+            />
+            <button
+              type="button"
+              className="btn btn-primary shrink-0"
+              onClick={() => {
+                void navigator.clipboard.writeText(publicUrl);
+                toast.success('Link copied!');
+              }}
+            >
+              Copy
+            </button>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <button type="button" className="btn btn-outline-secondary" onClick={() => navigate('/company/jobs')}>
+            View All Jobs
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => {
+              setPublishedJobId(null);
+              setForm(defaultForm);
+              setCurrentStep(1);
+            }}
+          >
+            Post Another Job
+          </button>
+        </div>
       </div>
     );
   }

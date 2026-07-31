@@ -1,11 +1,216 @@
 import { useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { Search, Eye, Star, Calendar, XCircle, UserCheck } from 'lucide-react';
+import {
+  Search, Eye, Star, Calendar, XCircle, CheckCircle2, UserCheck,
+  Mail, Phone, Briefcase, Award, X, AlertTriangle,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { setPageTitle } from '@/store/themeConfigSlice';
 import companyService from '@/services/companyService';
-import { CandidateSummary } from '@/types/companyPortal';
+import { CandidateSummary, ApplicationStatus } from '@/types/companyPortal';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+
+const approvalBadge = (status: CandidateSummary['approvalStatus']) =>
+  ({ approved: 'success', rejected: 'danger', pending: 'warning' })[status] || 'secondary';
+
+const statusBadge = (status: ApplicationStatus) =>
+  ({ hired: 'success', shortlisted: 'success', rejected: 'danger', interviewed: 'primary', interview_scheduled: 'primary', under_review: 'warning' })[status] || 'secondary';
+
+const dateShort = (v?: string) =>
+  v ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(v)) : 'N/A';
+
+function Avatar({ src, name, size = 'md' }: { src?: string; name: string; size?: 'sm' | 'md' | 'lg' }) {
+  const [err, setErr] = useState(false);
+  const sz = { sm: 'h-8 w-8 text-xs', md: 'h-10 w-10 text-sm', lg: 'h-16 w-16 text-xl' }[size];
+  const valid = src && (src.startsWith('http') || src.startsWith('data:image/'));
+  if (valid && !err) {
+    return <img src={src} alt={name} onError={() => setErr(true)} className={`${sz} rounded-full object-cover shrink-0`} />;
+  }
+  const initials = name?.split(' ').filter(Boolean).slice(0, 2).map(n => n[0]).join('').toUpperCase() || 'C';
+  return (
+    <div className={`${sz} flex items-center justify-center rounded-full bg-gradient-to-tr from-primary via-indigo-600 to-purple-600 font-bold text-white shrink-0`}>
+      {initials}
+    </div>
+  );
+}
+
+function ProfileModal({
+  cand,
+  onClose,
+  onApprove,
+  onSchedule,
+  onShortlist,
+  onReject,
+  onHire,
+  approvingId,
+}: {
+  cand: CandidateSummary;
+  onClose: () => void;
+  onApprove: (c: CandidateSummary) => void;
+  onSchedule: (c: CandidateSummary) => void;
+  onShortlist: (c: CandidateSummary) => void;
+  onReject: (c: CandidateSummary) => void;
+  onHire: (c: CandidateSummary) => void;
+  approvingId: string | null;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="w-full max-w-xl rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-white-light dark:border-white-light/10 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center gap-4 px-6 py-5 border-b border-white-light dark:border-white-light/10 bg-slate-50/50 dark:bg-slate-800/40">
+          <Avatar src={cand.avatar} name={cand.name} size="lg" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-lg font-bold text-black dark:text-white">{cand.name}</h3>
+              <span className={`badge badge-outline-${statusBadge(cand.status)} capitalize text-xs`}>
+                {cand.status.replace(/_/g, ' ')}
+              </span>
+              <span className={`badge badge-outline-${approvalBadge(cand.approvalStatus)} capitalize text-xs`}>
+                {cand.approvalStatus}
+              </span>
+            </div>
+            <p className="text-sm text-primary mt-0.5 flex items-center gap-1">
+              <Briefcase className="h-3.5 w-3.5 shrink-0" />
+              {cand.appliedPosition}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="h-8 w-8 rounded-full bg-slate-200/60 dark:bg-slate-700 flex items-center justify-center text-white-dark hover:text-black dark:hover:text-white transition shrink-0"
+            onClick={onClose}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 space-y-5 max-h-[55vh] overflow-y-auto">
+          {/* Contact */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <div className="flex items-center gap-2 rounded-lg border border-white-light dark:border-white-light/10 px-3 py-2">
+              <Mail className="h-4 w-4 text-primary shrink-0" />
+              <a href={`mailto:${cand.email}`} className="text-primary hover:underline truncate text-xs">{cand.email}</a>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border border-white-light dark:border-white-light/10 px-3 py-2">
+              <Briefcase className="h-4 w-4 text-white-dark shrink-0" />
+              <span className="capitalize text-xs text-black dark:text-white">{cand.experienceLevel} level</span>
+            </div>
+          </div>
+
+          {/* Skills */}
+          {cand.skills && cand.skills.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-white-dark uppercase mb-2">Skills</p>
+              <div className="flex flex-wrap gap-1.5">
+                {cand.skills.map((sk, i) => (
+                  <span key={i} className="badge badge-outline-primary text-xs">{sk}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Interview Score */}
+          {cand.interviewScore != null && (
+            <div className="rounded-lg border border-white-light dark:border-white-light/10 p-4">
+              <div className="flex items-center gap-3">
+                <Award className="h-5 w-5 text-primary shrink-0" />
+                <div className="flex-1">
+                  <p className="text-xs text-white-dark mb-1">AI Interview Score</p>
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl font-extrabold text-primary">{cand.interviewScore}%</span>
+                    <div className="flex-1 h-2 rounded-full bg-gray-200 dark:bg-dark">
+                      <div
+                        className={`h-2 rounded-full ${cand.interviewScore >= 70 ? 'bg-success' : cand.interviewScore >= 50 ? 'bg-warning' : 'bg-danger'}`}
+                        style={{ width: `${Math.min(100, cand.interviewScore)}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {cand.interviewId && (
+                <button
+                  type="button"
+                  className="mt-3 text-xs text-primary hover:underline font-semibold flex items-center gap-1"
+                  onClick={async () => {
+                    onClose();
+                    // navigate to assessments — open the detail
+                    window.location.href = '/company/assessments';
+                  }}
+                >
+                  <Eye className="h-3.5 w-3.5" /> View full assessment report
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Rejection Reason */}
+          {cand.rejectionReason && (
+            <div className="rounded-lg border border-danger/30 bg-danger/5 px-4 py-3">
+              <p className="text-xs font-bold text-danger mb-1 flex items-center gap-1">
+                <AlertTriangle className="h-3.5 w-3.5" /> Rejection Reason
+              </p>
+              <p className="text-xs text-black dark:text-white">{cand.rejectionReason}</p>
+            </div>
+          )}
+
+          {/* Applied date */}
+          <p className="text-xs text-white-dark">Applied: {dateShort(cand.appliedDate)}</p>
+        </div>
+
+        {/* Footer actions */}
+        <div className="flex flex-wrap items-center gap-2 px-6 py-4 bg-slate-50 dark:bg-slate-800/60 border-t border-white-light dark:border-white-light/10">
+          {cand.approvalStatus !== 'approved' && cand.approvalStatus !== 'rejected' && (
+            <button
+              type="button"
+              className="btn btn-success btn-sm flex items-center gap-1.5"
+              disabled={approvingId === cand._id}
+              onClick={() => onApprove(cand)}
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              {approvingId === cand._id ? 'Approving…' : 'Approve'}
+            </button>
+          )}
+          {cand.approvalStatus === 'approved' && cand.status !== 'hired' && cand.status !== 'rejected' && (
+            <button
+              type="button"
+              className="btn btn-outline-info btn-sm flex items-center gap-1.5"
+              onClick={() => onSchedule(cand)}
+            >
+              <Calendar className="h-4 w-4" /> Schedule Interview
+            </button>
+          )}
+          {!cand.isShortlisted && cand.status !== 'hired' && cand.status !== 'rejected' && (
+            <button
+              type="button"
+              className="btn btn-outline-warning btn-sm flex items-center gap-1.5"
+              onClick={() => onShortlist(cand)}
+            >
+              <Star className="h-4 w-4" /> Shortlist
+            </button>
+          )}
+          {cand.isShortlisted && cand.approvalStatus === 'approved' && cand.status !== 'hired' && (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm flex items-center gap-1.5"
+              onClick={() => onHire(cand)}
+            >
+              <UserCheck className="h-4 w-4" /> Mark as Hired
+            </button>
+          )}
+          {cand.approvalStatus !== 'rejected' && cand.status !== 'hired' && (
+            <button
+              type="button"
+              className="btn btn-outline-danger btn-sm flex items-center gap-1.5 ml-auto"
+              onClick={() => onReject(cand)}
+            >
+              <XCircle className="h-4 w-4" /> Reject
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const CompanyCandidatesPage = () => {
   const dispatch = useDispatch();
@@ -18,6 +223,9 @@ const CompanyCandidatesPage = () => {
   const [profileModal, setProfileModal] = useState<CandidateSummary | null>(null);
   const [scheduleModal, setScheduleModal] = useState<CandidateSummary | null>(null);
   const [scheduledAtDate, setScheduledAtDate] = useState('');
+  const [rejectModal, setRejectModal] = useState<CandidateSummary | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [approvingId, setApprovingId] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -25,7 +233,7 @@ const CompanyCandidatesPage = () => {
       const res = await companyService.getCandidates({ page, limit: 10, search });
       setCandidates(res.candidates);
       setTotal(res.pagination.total);
-    } catch (err: any) {
+    } catch {
       toast.error('Failed to load candidates');
     } finally {
       setLoading(false);
@@ -37,29 +245,58 @@ const CompanyCandidatesPage = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      void load();
-    }, 250);
-    return () => clearTimeout(timer);
+    const t = setTimeout(() => void load(), 250);
+    return () => clearTimeout(t);
   }, [page, search]);
+
+  const handleApprove = async (cand: CandidateSummary) => {
+    setApprovingId(cand._id);
+    try {
+      await companyService.approveApplication(cand._id);
+      toast.success(`${cand.name} approved`);
+      await load();
+      if (profileModal?._id === cand._id) setProfileModal(prev => prev ? { ...prev, approvalStatus: 'approved' } : null);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to approve candidate');
+    } finally {
+      setApprovingId(null);
+    }
+  };
 
   const handleShortlist = async (cand: CandidateSummary) => {
     try {
       await companyService.toggleShortlist(cand._id);
       toast.success(cand.isShortlisted ? 'Removed from shortlist' : 'Added to shortlist');
+      setProfileModal(null);
       await load();
-    } catch (err: any) {
+    } catch {
       toast.error('Failed to update shortlist');
     }
   };
 
-  const handleReject = async (cand: CandidateSummary) => {
+  const handleHire = async (cand: CandidateSummary) => {
     try {
-      await companyService.rejectCandidate(cand._id);
-      toast.success('Candidate rejected');
+      await companyService.updateApplicationStatus(cand._id, { status: 'hired' });
+      toast.success(`${cand.name} marked as hired!`);
+      setProfileModal(null);
+      await load();
+    } catch {
+      toast.error('Failed to mark as hired');
+    }
+  };
+
+  const handleRejectSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rejectModal) return;
+    try {
+      await companyService.rejectCandidate(rejectModal._id, rejectReason.trim() || undefined);
+      toast.success('Candidate rejected and notified by email');
+      setRejectModal(null);
+      setRejectReason('');
+      setProfileModal(null);
       await load();
     } catch (err: any) {
-      toast.error('Failed to reject candidate');
+      toast.error(err.response?.data?.message || 'Failed to reject candidate');
     }
   };
 
@@ -75,8 +312,10 @@ const CompanyCandidatesPage = () => {
       });
       toast.success('Interview scheduled!');
       setScheduleModal(null);
+      setScheduledAtDate('');
+      setProfileModal(null);
       await load();
-    } catch (err: any) {
+    } catch {
       toast.error('Failed to schedule interview');
     }
   };
@@ -87,202 +326,187 @@ const CompanyCandidatesPage = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-black dark:text-white">Candidates</h1>
-        <p className="mt-1 text-sm text-white-dark">View profiles, shortlist talent, and manage interview schedules.</p>
+        <p className="mt-1 text-sm text-white-dark">View profiles, shortlist talent, schedule interviews, and hire top candidates.</p>
       </div>
 
       <div className="panel">
-        <div className="mb-5 flex flex-col gap-3 md:flex-row">
+        <div className="mb-5 flex gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white-dark" />
             <input
               className="form-input pl-9"
-              placeholder="Search by candidate name or email..."
+              placeholder="Search by name or email..."
               value={search}
-              onChange={(e) => {
-                setPage(1);
-                setSearch(e.target.value);
-              }}
+              onChange={(e) => { setPage(1); setSearch(e.target.value); }}
             />
           </div>
         </div>
 
         {loading ? (
-          <div className="flex h-64 items-center justify-center">
-            <LoadingSpinner size="lg" />
-          </div>
+          <div className="flex h-64 items-center justify-center"><LoadingSpinner size="lg" /></div>
         ) : (
           <>
             <div className="table-responsive">
               <table>
                 <thead>
                   <tr>
-                    <th>Candidate Name</th>
-                    <th>Email</th>
+                    <th>Candidate</th>
                     <th>Applied Position</th>
                     <th>Experience</th>
                     <th>Interview Score</th>
                     <th>Status</th>
+                    <th>Approval</th>
                     <th className="text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {candidates.map((cand) => (
                     <tr key={cand._id}>
-                      <td className="font-semibold text-black dark:text-white">{cand.name}</td>
-                      <td>{cand.email}</td>
+                      <td>
+                        <div className="flex items-center gap-3">
+                          <Avatar src={cand.avatar} name={cand.name} size="sm" />
+                          <div>
+                            <div className="font-semibold text-black dark:text-white">{cand.name}</div>
+                            <div className="text-xs text-white-dark">{cand.email}</div>
+                          </div>
+                        </div>
+                      </td>
                       <td>{cand.appliedPosition}</td>
                       <td className="capitalize">{cand.experienceLevel}</td>
                       <td>
-                        {cand.interviewScore !== null && cand.interviewScore !== undefined ? (
-                          <span className="font-bold text-primary">{cand.interviewScore}%</span>
+                        {cand.interviewScore != null ? (
+                          <span className={`font-bold ${cand.interviewScore >= 70 ? 'text-success' : cand.interviewScore >= 50 ? 'text-warning' : 'text-danger'}`}>
+                            {cand.interviewScore}%
+                          </span>
                         ) : (
-                          <span className="text-xs text-white-dark">N/A</span>
+                          <span className="text-xs text-white-dark">—</span>
                         )}
                       </td>
                       <td>
-                        <span className={`badge badge-outline-${cand.isShortlisted ? 'success' : 'secondary'} capitalize`}>
-                          {cand.status.replace('_', ' ')}
+                        <span className={`badge badge-outline-${statusBadge(cand.status)} capitalize`}>
+                          {cand.status.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`badge badge-outline-${approvalBadge(cand.approvalStatus)} capitalize`}>
+                          {cand.approvalStatus}
                         </span>
                       </td>
                       <td>
                         <div className="flex justify-end gap-1">
-                          <button
-                            title="View Profile"
-                            className="btn btn-sm btn-outline-primary p-2"
-                            onClick={() => setProfileModal(cand)}
-                          >
+                          <button className="btn btn-sm btn-outline-primary p-2" title="View Profile" onClick={() => setProfileModal(cand)}>
                             <Eye className="h-4 w-4" />
                           </button>
+                          {cand.approvalStatus !== 'approved' && cand.approvalStatus !== 'rejected' && (
+                            <button
+                              className="btn btn-sm btn-outline-success p-2"
+                              title="Approve"
+                              disabled={approvingId === cand._id}
+                              onClick={() => void handleApprove(cand)}
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                            </button>
+                          )}
                           <button
-                            title="Schedule Interview"
-                            className="btn btn-sm btn-outline-info p-2"
+                            className="btn btn-sm btn-outline-info p-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={cand.approvalStatus === 'approved' ? 'Schedule Interview' : 'Approve first'}
+                            disabled={cand.approvalStatus !== 'approved'}
                             onClick={() => setScheduleModal(cand)}
                           >
                             <Calendar className="h-4 w-4" />
                           </button>
                           <button
-                            title={cand.isShortlisted ? 'Remove Shortlist' : 'Move To Shortlist'}
-                            className={`btn btn-sm ${cand.isShortlisted ? 'btn-success' : 'btn-outline-success'} p-2`}
+                            className={`btn btn-sm p-2 ${cand.isShortlisted ? 'btn-warning' : 'btn-outline-warning'}`}
+                            title={cand.isShortlisted ? 'Remove from Shortlist' : 'Shortlist'}
                             onClick={() => void handleShortlist(cand)}
                           >
                             <Star className="h-4 w-4" />
                           </button>
-                          <button
-                            title="Reject Candidate"
-                            className="btn btn-sm btn-outline-danger p-2"
-                            onClick={() => void handleReject(cand)}
-                          >
-                            <XCircle className="h-4 w-4" />
-                          </button>
+                          {cand.isShortlisted && cand.approvalStatus === 'approved' && cand.status !== 'hired' && (
+                            <button
+                              className="btn btn-sm btn-primary p-2"
+                              title="Mark as Hired"
+                              onClick={() => void handleHire(cand)}
+                            >
+                              <UserCheck className="h-4 w-4" />
+                            </button>
+                          )}
+                          {cand.approvalStatus !== 'rejected' && cand.status !== 'hired' && (
+                            <button
+                              className="btn btn-sm btn-outline-danger p-2"
+                              title="Reject"
+                              onClick={() => setRejectModal(cand)}
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
                   ))}
                   {candidates.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="py-12 text-center text-white-dark">
-                        No candidates found.
-                      </td>
-                    </tr>
+                    <tr><td colSpan={7} className="py-12 text-center text-white-dark">No candidates found.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
 
-            {/* Pagination */}
             <div className="mt-5 flex items-center justify-between text-sm">
               <span className="text-white-dark">{total} candidates</span>
               <div className="flex items-center gap-2">
-                <button
-                  className="btn btn-outline-primary btn-sm"
-                  disabled={page === 1}
-                  onClick={() => setPage(page - 1)}
-                >
-                  Previous
-                </button>
-                <span>
-                  Page {page} of {totalPages}
-                </span>
-                <button
-                  className="btn btn-outline-primary btn-sm"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage(page + 1)}
-                >
-                  Next
-                </button>
+                <button className="btn btn-outline-primary btn-sm" disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</button>
+                <span>Page {page} of {totalPages}</span>
+                <button className="btn btn-outline-primary btn-sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</button>
               </div>
             </div>
           </>
         )}
       </div>
 
-      {/* Profile Modal */}
       {profileModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="panel w-full max-w-lg space-y-4">
-            <h3 className="text-lg font-bold text-black dark:text-white">Candidate Profile</h3>
-            <div className="space-y-2 text-sm">
-              <p>
-                <span className="text-white-dark">Name: </span>
-                <span className="font-semibold text-black dark:text-white">{profileModal.name}</span>
-              </p>
-              <p>
-                <span className="text-white-dark">Email: </span>
-                <span className="font-semibold">{profileModal.email}</span>
-              </p>
-              <p>
-                <span className="text-white-dark">Applied Position: </span>
-                <span className="font-semibold">{profileModal.appliedPosition}</span>
-              </p>
-              <p>
-                <span className="text-white-dark">Experience Level: </span>
-                <span className="font-semibold capitalize">{profileModal.experienceLevel}</span>
-              </p>
-              <p>
-                <span className="text-white-dark">Interview Score: </span>
-                <span className="font-bold text-primary">
-                  {profileModal.interviewScore !== null && profileModal.interviewScore !== undefined
-                    ? `${profileModal.interviewScore}%`
-                    : 'N/A'}
-                </span>
-              </p>
-            </div>
-            <div className="flex justify-end pt-3">
-              <button className="btn btn-primary" onClick={() => setProfileModal(null)}>
-                Close
-              </button>
-            </div>
+        <ProfileModal
+          cand={profileModal}
+          onClose={() => setProfileModal(null)}
+          onApprove={(c) => void handleApprove(c)}
+          onSchedule={(c) => { setScheduleModal(c); setProfileModal(null); }}
+          onShortlist={(c) => void handleShortlist(c)}
+          onReject={(c) => { setRejectModal(c); setProfileModal(null); }}
+          onHire={(c) => void handleHire(c)}
+          approvingId={approvingId}
+        />
+      )}
+
+      {scheduleModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="panel w-full max-w-md space-y-4">
+            <h3 className="text-lg font-bold text-black dark:text-white">Schedule Interview</h3>
+            <p className="text-sm text-white-dark">Candidate: <span className="font-bold text-black dark:text-white">{scheduleModal.name}</span></p>
+            <form onSubmit={(e) => void handleScheduleSubmit(e)} className="space-y-4">
+              <div>
+                <label htmlFor="scheduledAt">Date &amp; Time</label>
+                <input id="scheduledAt" type="datetime-local" className="form-input" value={scheduledAtDate} onChange={(e) => setScheduledAtDate(e.target.value)} required />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" className="btn btn-outline-secondary" onClick={() => setScheduleModal(null)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Schedule</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
-      {/* Schedule Modal */}
-      {scheduleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      {rejectModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
           <div className="panel w-full max-w-md space-y-4">
-            <h3 className="text-lg font-bold text-black dark:text-white">Schedule Interview</h3>
-            <p className="text-sm text-white-dark">
-              Candidate: <span className="font-bold text-black dark:text-white">{scheduleModal.name}</span>
-            </p>
-            <form onSubmit={handleScheduleSubmit} className="space-y-4">
+            <h3 className="text-lg font-bold text-black dark:text-white">Reject {rejectModal.name}</h3>
+            <form onSubmit={(e) => void handleRejectSubmit(e)} className="space-y-4">
               <div>
-                <label htmlFor="scheduledAt">Date & Time</label>
-                <input
-                  id="scheduledAt"
-                  type="datetime-local"
-                  className="form-input"
-                  value={scheduledAtDate}
-                  onChange={(e) => setScheduledAtDate(e.target.value)}
-                  required
-                />
+                <label htmlFor="rejectReason">Reason (optional, sent in notification email)</label>
+                <textarea id="rejectReason" className="form-textarea" rows={3} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
               </div>
-              <div className="flex justify-end gap-3 pt-3">
-                <button type="button" className="btn btn-outline-secondary" onClick={() => setScheduleModal(null)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Schedule
-                </button>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" className="btn btn-outline-secondary" onClick={() => { setRejectModal(null); setRejectReason(''); }}>Cancel</button>
+                <button type="submit" className="btn btn-danger">Reject &amp; Notify</button>
               </div>
             </form>
           </div>

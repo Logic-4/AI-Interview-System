@@ -9,13 +9,16 @@ const {
   getInterviewProgress,
   retryQuestionGeneration,
   startInterview,
+  uploadRecordingChunk,
   submitAnswer,
   completeInterview,
   deleteInterview,
   retryEvaluate,
   reevaluateAnswer,
   resetInterview,
+  reportProctoringEvent,
 } = require('../controllers/interviewController');
+const { getIdentityStatus, verifyIdentity } = require('../controllers/verificationController');
 const { createInterviewValidator, submitAnswerValidator, listInterviewsValidator } = require('../validators/interviewValidator');
 const validate = require('../middleware/validate');
 const { protect } = require('../middleware/auth');
@@ -35,10 +38,16 @@ router.post('/:id/retry-generation', aiLimiter, retryQuestionGeneration);
 router.get('/:id', getInterview);
 router.delete('/:id', deleteInterview);
 
+// Pre-interview identity checkpoint (Lobby face match)
+router.get('/:id/identity', getIdentityStatus);
+router.post('/:id/identity/verify', aiLimiter, upload.single('frame'), verifyIdentity);
+
 // Interview lifecycle
 router.put('/:id/start', startInterview);
+router.post('/:id/recording/chunk', upload.single('chunk'), uploadRecordingChunk);
 router.put('/:interviewId/questions/:questionId/answer', aiLimiter, upload.single('audio'), submitAnswerValidator, validate, submitAnswer);
 router.put('/:id/complete', completeInterview);
+router.post('/:id/proctoring/event', reportProctoringEvent);
 router.put('/:id/reset', resetInterview);
 
 // Practice loop — retry a question after feedback (Step 7)

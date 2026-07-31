@@ -161,33 +161,140 @@ def clamp_score(value) -> int:
     return max(0, min(100, score))
 
 
+def language_instruction(language: str, mode: str = "question") -> str:
+    """
+    Returns the language directive injected at the top of every prompt.
+
+    mode="question"  — for /generate-question: the *question* field must be in the target language.
+    mode="turn"      — for /interview-turn: nextInterviewerResponse must be in the target language;
+                       evaluation fields (score, feedback, …) stay in English.
+
+    Design rule: always ask for *direct* generation in the target language.
+    Never say "translate from English" — that frames a two-step internal process
+    (English draft → translate) which degrades naturalness.
+    """
+    lang = (language or "english").lower()
+
+    if lang != "somali":
+        if mode == "turn":
+            return "Respond in English. Be direct, conversational, and professional."
+        return "Generate the question in English. Be clear and natural."
+
+    # Somali — direct generation
+    common = (
+        "For technical terms that have no established Somali equivalent "
+        "(e.g. 'API', 'React', 'database', 'debugging'), keep the English term as-is."
+    )
+    if mode == "turn":
+        return (
+            "Write your nextInterviewerResponse DIRECTLY in Somali — "
+            "think and write in Somali from the start, do not draft in English first. "
+            "Use natural, professional Somali. " + common
+        )
+    return (
+        "Generate the question DIRECTLY in Somali — "
+        "think and write in Somali from the start, do not draft in English first. "
+        "Use natural, professional Somali. " + common
+    )
+
+
 def difficulty_hint(difficulty: str) -> str:
     mapping = {
-        "junior": "Entry-level (junior). Expect fundamentals and learning ability.",
-        "mid": "Mid-level. Expect practical experience and independent problem solving.",
-        "senior": "Senior-level. Expect depth, trade-offs, and leadership examples.",
-        "lead": "Lead/expert-level. Expect architecture, mentoring, and strategic thinking.",
-        "easy": "Entry-level. Expect fundamentals.",
-        "medium": "Mid-level. Expect practical depth.",
-        "hard": "Senior-level. Expect advanced depth.",
+        "junior": "junior", "easy": "junior",
+        "mid": "mid-level", "medium": "mid-level",
+        "senior": "senior", "hard": "senior",
+        "lead": "lead/staff",
     }
-    return mapping.get((difficulty or "mid").lower(), mapping["mid"])
+    return mapping.get((difficulty or "mid").lower(), "mid-level")
 
 
 def category_rubric(category: str, type_str: str) -> str:
     cat = (category or "").lower()
-    if "star" in cat or "behavioral" in cat or type_str == "behavioral":
+    t = (type_str or "mixed").lower()
+    if "star" in cat or "behavioral" in cat or t == "behavioral":
         return (
             "Evaluate using STAR (Situation, Task, Action, Result). "
             "Reward specific examples with measurable outcomes."
         )
-    if type_str == "hr" or cat in ("motivation", "culture fit", "experience"):
+    if t == "hr" or cat in ("motivation", "culture fit", "experience", "strengths/weaknesses"):
         return "Evaluate motivation, culture alignment, and role fit."
-    if type_str == "technical" or cat in ("core skills", "debugging", "fundamentals", "technical"):
+    if t == "technical" or cat in ("core skills", "applied knowledge", "debugging", "fundamentals", "technical"):
         return "Evaluate technical accuracy, clarity, and practical understanding."
-    if type_str == "system-design" or "scenario" in cat:
+    if t == "system-design" or cat in ("architecture overview", "scalability", "trade-offs", "component design"):
         return "Evaluate structured thinking, trade-offs, and scalability awareness."
+    if t == "mixed":
+        if cat in ("motivation", "culture fit", "past experience"):
+            return "Evaluate motivation, culture alignment, and role fit."
+        return "Evaluate technical accuracy, relevance, and depth of experience."
     return "Evaluate clarity, relevance, and completeness."
+
+
+def type_question_style(type_str: str, category: str) -> str:
+    """Returns type-specific question generation instructions for the AI prompt."""
+    t = (type_str or "mixed").lower()
+    cat = (category or "").lower()
+
+    if t == "technical":
+        return (
+            "QUESTION STYLE - TECHNICAL: Ask a direct, specific technical question ONLY.\n"
+            "Choose ONE starter that fits the target skill:\n"
+            "  - Knowledge: 'What is X?', 'What does X do?', 'What is the purpose of X?'\n"
+            "  - Understanding: 'How does X work?', 'How does X differ from Y?', 'Why does X behave like Z?'\n"
+            "  - Practical: 'How would you implement X?', 'How would you use X to solve Y?'\n"
+            "  - Trade-off: 'What are the trade-offs of using X?', 'When would you choose X over Y?'\n"
+            "  - Debugging: 'What would cause X to fail?', 'How would you diagnose Y in X?'\n"
+            "NEVER start with 'Tell me about a time', 'Describe a situation', 'Give me an example of', "
+            "or 'Imagine a scenario'. Ask a direct factual or practical question."
+        )
+    if t == "behavioral":
+        return (
+            "QUESTION STYLE - BEHAVIORAL: Ask a behavioral question ONLY using STAR framing.\n"
+            "Choose ONE starter:\n"
+            "  - 'Tell me about a time when you...'\n"
+            "  - 'Describe a situation where you...'\n"
+            "  - 'Walk me through how you handled...'\n"
+            "  - 'Give me an example of when you...'\n"
+            "Focus on real past experiences: teamwork, conflict, problem-solving, or failure/growth. "
+            "Do NOT ask technical or HR questions."
+        )
+    if t == "hr":
+        return (
+            "QUESTION STYLE - HR / CULTURE FIT: Ask an HR or culture-fit question ONLY.\n"
+            "Choose ONE starter that fits the category:\n"
+            "  - Motivation: 'Why are you interested in this role?', 'What drew you to this field?'\n"
+            "  - Strengths/Weaknesses: 'What is your greatest strength?', 'What is an area you are actively improving?'\n"
+            "  - Culture fit: 'How do you prefer to work in a team?', 'What kind of work environment brings out your best?'\n"
+            "  - Career: 'Where do you see yourself in 3-5 years?', 'What does success look like to you?'\n"
+            "  - Pressure: 'How do you handle disagreement with a colleague?', 'How do you manage competing priorities?'\n"
+            "Do NOT ask technical or coding questions."
+        )
+    if t == "system-design":
+        return (
+            "QUESTION STYLE - SYSTEM DESIGN: Ask a system design question ONLY.\n"
+            "Choose ONE starter:\n"
+            "  - Design: 'How would you design X?', 'Walk me through the architecture of X.'\n"
+            "  - Scale: 'How would you scale X to handle Y requests per second?'\n"
+            "  - Trade-off: 'What trade-offs would you consider when designing X?'\n"
+            "  - Component: 'How would you structure the database for X?', 'What caching strategy would you use for X?'\n"
+            "  - Reliability: 'How would you handle failures in X?', 'How would you ensure consistency in X?'\n"
+            "Do NOT ask HR questions. Do NOT start with 'Tell me about a time'. "
+            "Ask about architecture decisions and engineering trade-offs."
+        )
+    # mixed — infer from category
+    if cat in ("motivation", "culture fit", "strengths/weaknesses", "past experience"):
+        return (
+            "QUESTION STYLE - HR / CULTURE FIT (mixed interview): Ask an HR or culture-fit question for this slot.\n"
+            "Choose ONE starter: 'Why are you interested in this role?', 'What motivates you?', "
+            "'How do you prefer to work?', 'What is your greatest strength?', 'Tell me about a time when you...'. "
+            "Do NOT ask technical questions for this slot."
+        )
+    return (
+        "QUESTION STYLE - TECHNICAL (mixed interview): Ask a direct technical question for this slot.\n"
+        "Choose ONE starter: 'What is X?', 'How does X work?', 'How would you implement X?', "
+        "'What are the trade-offs of X?', 'How would you debug X?'. "
+        "Do NOT ask HR or motivational questions for this slot. "
+        "NEVER start with 'Tell me about a time'."
+    )
 
 
 def build_role_context(role_profile: Optional[dict]) -> str:
@@ -324,30 +431,51 @@ def handle_interview_turn(data: dict) -> dict:
     category = current_question.get("category", "general")
     question_difficulty = current_question.get("difficulty") or difficulty
 
-    lang_hint = (
-        "Respond in English. You are a real human hiring manager. "
-        "Be direct, conversational, and professional. "
-        if language.lower() == "english"
-        else
-        "IMPORTANT: Your ENTIRE nextInterviewerResponse MUST be in Somali. DO NOT use English! "
-        "Ku hadal af-Soomaali dabiici ah oo aad u xirfad iyo naxwe sarreeya. "
-        "Fadlan u turjum ama u sharax ereyada farsamada Ingiriisiga ah af-Soomaali dabiici ah "
-        "si mashiinka ku dhawaaqista codka (TTS) uu ugu dhawaaqi karo si sax oo dabiici ah."
-    )
+    lang_hint = language_instruction(language, mode="turn")
 
     somali_note = ""
     if language.lower() == "somali":
         somali_note = (
             "SCORING: The candidate answered in Somali. Evaluate content and meaning only — "
-            "never penalize the language. Somali and English answers with the same meaning get the same score.\n\n"
+            "never penalize the language choice.\n\n"
         )
 
     role_context = build_role_context(role_profile)
     rubric = category_rubric(category, type_str)
 
+    type_eval_hint = {
+        "technical": (
+            "This is a TECHNICAL interview. Evaluate technical accuracy, depth, and problem-solving clarity. "
+            "Reward correct explanations, trade-off awareness, and concrete examples. "
+            "Follow up if the candidate gives a vague or incomplete technical answer."
+        ),
+        "behavioral": (
+            "This is a BEHAVIORAL interview. Evaluate answers using STAR (Situation, Task, Action, Result). "
+            "Reward specific, structured examples with measurable outcomes. "
+            "Follow up if the candidate gives a generic or non-specific answer."
+        ),
+        "hr": (
+            "This is an HR / culture-fit interview. Evaluate motivation, cultural alignment, and role fit. "
+            "Reward authenticity, self-awareness, and alignment with role expectations. "
+            "Follow up if the answer is vague about motivation or fit."
+        ),
+        "system-design": (
+            "This is a SYSTEM DESIGN interview. Evaluate structured thinking, trade-offs, and scalability awareness. "
+            "Reward candidates who consider distributed systems, failure modes, and real-world constraints. "
+            "Follow up if the candidate skips trade-offs or gives an overly simple design."
+        ),
+        "mixed": (
+            "This is a MIXED interview combining technical and HR questions. "
+            "For technical questions, evaluate accuracy and depth. "
+            "For HR/behavioral questions, evaluate motivation, fit, and use of STAR format. "
+            "Match your follow-up style to the category of the current question."
+        ),
+    }.get((type_str or "mixed").lower(), "Evaluate clarity, relevance, and depth of the candidate's answer.")
+
     system_prompt = (
         f"You are an expert {domain} interviewer for: {role}.\n"
         f"Interview type: {type_str}. Difficulty: {difficulty_hint(question_difficulty)}.\n"
+        f"{type_eval_hint}\n"
         f"{lang_hint}\n\n"
         f"{somali_note}"
         f"CURRENT QUESTION: {question_text}\n"
@@ -403,6 +531,52 @@ def handle_interview_turn(data: dict) -> dict:
     return normalize_turn_response(parsed, raw)
 
 
+def _category_opening_instruction(
+    category: str,
+    candidate_name: str,
+    role: str,
+    target_skill: str,
+    candidate_experience: list,
+    candidate_projects: list,
+) -> str:
+    """Returns a category-specific instruction line for intro and outro slots."""
+    cat = (category or "").lower()
+
+    if cat == "intro":
+        # Build context hints the AI can use to vary the opening.
+        hints = []
+        if candidate_experience:
+            hints.append(f"candidate background: {candidate_experience[0]}")
+        if candidate_projects:
+            hints.append(f"recent project: {candidate_projects[0]}")
+        if target_skill:
+            hints.append(f"key skill: {target_skill}")
+        context_hint = ("; ".join(hints) + ". ") if hints else ""
+        return (
+            f"- This is the OPENING question. {context_hint}"
+            "Do NOT use 'Tell me about yourself', 'Introduce yourself', or ask them to summarize their resume. "
+            "Instead, open with ONE of these approaches tailored to the candidate:\n"
+            f"    * Ask what drew them to this specific {role} role or this domain.\n"
+            "    * Reference something concrete from their background and ask how it connects to this role.\n"
+            "    * Ask what aspect of the work they are most excited to do.\n"
+            "    * Ask about the most relevant experience or project they are bringing to this position.\n"
+            "Pick the approach that best fits the available context. Be natural — not robotic.\n"
+        )
+
+    if cat == "outro":
+        return (
+            "- This is the CLOSING question. Do NOT use 'Do you have any questions for me?' verbatim. "
+            "Instead, close with ONE of these:\n"
+            "    * Invite them to highlight something important that wasn't covered.\n"
+            "    * Ask what excites them most about this specific opportunity.\n"
+            "    * Ask about their expectations or goals for the first few months.\n"
+            "    * Ask what questions they have about the team, the role, or the work itself.\n"
+            "Make it feel like a natural conversation ending, not a checklist item.\n"
+        )
+
+    return ""
+
+
 def handle_generate_question(data: dict) -> dict:
     language = data.get("language", "english")
     domain = data.get("domain", "general")
@@ -411,7 +585,10 @@ def handle_generate_question(data: dict) -> dict:
     type_str = data.get("type", "technical")
     candidate_name = data.get("candidateName", "Candidate")
     difficulty = data.get("difficulty", "mid")
-    skills = data.get("skills", [])
+    target_skill = data.get("targetSkill", "")
+    supporting_skills = data.get("supportingSkills", [])
+    question_index = data.get("questionIndex", 0)
+    total_questions = data.get("totalQuestions", 1)
     responsibilities = data.get("responsibilities", [])
     experience = data.get("experience", "")
     candidate_experience = data.get("candidateExperience", [])
@@ -424,69 +601,77 @@ def handle_generate_question(data: dict) -> dict:
     job_description = data.get("jobDescription", "")
     resume_text = data.get("resumeText", "")
 
-    lang_hint = (
-        "Generate the question in English."
-        if language.lower() == "english"
-        else
-        "IMPORTANT: Generate the question ENTIRELY in Somali. DO NOT use English! "
-        "Ku hadal af-Soomaali dabiici ah oo aad u xirfad iyo naxwe sarreeya. "
-        "Fadlan u turjum ama u sharax ereyada farsamada (keywords/jargon) af-Soomaali dabiici ah "
-        "si mashiinka ku dhawaaqista codka (TTS) uu ugu dhawaaqi karo si sax oo dabiici ah."
-    )
+    lang_hint = language_instruction(language, mode="question")
 
-    if category == "outro":
-        if language.lower() == "somali":
-            question = "Waad ku mahadsantahay wakhtigaaga maanta. Ma qabtaa wax su'aalo ah oo aad iwaydiiso ka hor intaanan soo afjarin?"
-        else:
-            question = "Thank you for your time today. Do you have any questions for me before we wrap up?"
-        return {
-            "question": question,
-            "expectedAnswer": "Candidate asks questions about the role, company culture, or next steps.",
-        }
-
+    # --- Build context block (ordered: specific → general) ---
     context_block = ""
-    if skills:
-        context_block += f"The job requires these skills: {', '.join(skills)}.\n"
-        context_block += "Your question MUST test one of these specific skills.\n"
-    if responsibilities:
-        context_block += f"Key responsibilities for this role include: {', '.join(responsibilities[:5])}.\n"
+
+    # 1. Primary skill target — pin the question to one concrete skill/technology.
+    if target_skill:
+        context_block += f"TARGET SKILL FOR THIS QUESTION: {target_skill}\n"
+        context_block += f"Your question MUST directly test the candidate's knowledge of {target_skill}.\n"
+        if supporting_skills:
+            context_block += f"Related skills for context only (do not make the question about these): {', '.join(supporting_skills)}.\n"
+    elif supporting_skills:
+        context_block += f"Job required skills: {', '.join(supporting_skills)}.\n"
+        context_block += "Ask a question that tests one of these specific skills.\n"
+
+    # 2. Role context.
     if experience:
         context_block += f"Required experience level: {experience}.\n"
+    if responsibilities:
+        context_block += f"Key responsibilities: {', '.join(responsibilities[:4])}.\n"
+
+    # 3. Candidate-specific context — tailor to their actual background.
     if candidate_experience:
-        context_block += f"Candidate experience highlights: {', '.join(candidate_experience[:5])}.\n"
-    if candidate_education:
-        context_block += f"Candidate education: {', '.join(candidate_education[:3])}.\n"
+        context_block += f"Candidate background: {', '.join(candidate_experience[:4])}.\n"
     if candidate_projects:
-        context_block += f"Candidate projects: {', '.join(candidate_projects[:5])}.\n"
+        context_block += f"Candidate projects: {', '.join(candidate_projects[:3])}.\n"
     if candidate_certifications:
-        context_block += f"Candidate certifications: {', '.join(candidate_certifications[:5])}.\n"
+        context_block += f"Candidate certifications: {', '.join(candidate_certifications[:3])}.\n"
+    if candidate_education:
+        context_block += f"Candidate education: {', '.join(candidate_education[:2])}.\n"
+
+    # 4. Interview metadata.
     if interview_title:
-        context_block += f"Interview title and intended focus: {interview_title[:200]}.\n"
-    if duration_minutes:
-        context_block += f"Planned interview duration: {duration_minutes} minutes; keep each question proportionate to that time budget.\n"
-    if scheduled_at:
-        context_block += f"Interview schedule metadata: {str(scheduled_at)[:80]}.\n"
+        context_block += f"Interview focus: {interview_title[:120]}.\n"
+
+    # 5. Raw JD / resume (lower weight, trimmed hard).
     if job_description:
-        context_block += f"Job description details:\n{job_description[:6000]}\n"
-        context_block += "Ensure the question aligns with the context and requirements provided above.\n"
+        context_block += f"Job description (excerpt):\n{job_description[:3000]}\n"
     if resume_text:
-        context_block += f"Candidate resume details:\n{resume_text[:6000]}\n"
-        context_block += "Tailor questions to actual candidate claims, projects, and experience without revealing private contact details.\n"
+        context_block += f"Candidate resume (excerpt):\n{resume_text[:3000]}\n"
+        context_block += "Tailor the question to actual candidate claims; do not reveal private contact details.\n"
+
+    # Variety signal — tell the model which question slot this is so it avoids repeating earlier patterns.
+    variety_hint = ""
+    if total_questions > 1 and question_index > 0:
+        variety_hint = (
+            f"This is question {question_index + 1} of {total_questions}. "
+            "Use a DIFFERENT question starter and angle than previous questions. "
+            "Vary the format: alternate between knowledge checks, practical implementation, trade-offs, and debugging.\n"
+        )
+
+    question_style = type_question_style(type_str, category)
+
+    target_directive = (
+        f"about {target_skill}" if target_skill else f"for a {role} role"
+    )
 
     prompt_content = (
         f"You are an expert {domain} interviewer hiring for a {role} position.\n"
-        f"Interview style: {type_str}. Difficulty: {difficulty_hint(difficulty)}.\n"
+        f"Interview type: {type_str}. Difficulty: {difficulty_hint(difficulty)}.\n"
         f"{lang_hint}\n\n"
         f"{context_block}\n"
-        "RULES FOR QUESTION GENERATION:\n"
-        "- Match difficulty to the level above.\n"
-        f"- Category focus: {category}.\n"
-        f"- If category is 'intro', greet the candidate by name ({candidate_name}) and ask a custom opening question to introduce yourself and request them to summarize their background/experience for this role.\n"
-        "- Natural and conversational; ONE clear question only.\n"
-        "- Technical: ask 'What is...', 'How does...', 'Explain...'.\n"
-        "- Behavioral: ask 'Tell me about a time...'.\n"
-        "- Max 25 words.\n\n"
-        f"Generate a {category} question for a {role} role.\n\n"
+        f"{question_style}\n\n"
+        f"{variety_hint}"
+        "RULES:\n"
+        "- ONE clear, natural question only. No preamble or explanation.\n"
+        "- Match difficulty to the level stated above.\n"
+        f"- Category: {category}.\n"
+        f"{_category_opening_instruction(category, candidate_name, role, target_skill, candidate_experience, candidate_projects)}"
+        "- Max 25 words. Direct and specific — no filler phrases.\n\n"
+        f"Generate a {category} question {target_directive}.\n\n"
         'Return ONLY valid JSON: {"question": "...", "expectedAnswer": "..."}'
     )
 

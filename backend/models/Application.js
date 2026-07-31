@@ -81,6 +81,38 @@ const applicationSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
+    // Company approval gate — a candidate cannot be scheduled for an
+    // interview until a company reviewer explicitly approves the application.
+    approvalStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending',
+      index: true,
+    },
+    rejectionReason: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: 1000,
+    },
+    approvedAt: {
+      type: Date,
+      default: null,
+    },
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    rejectedAt: {
+      type: Date,
+      default: null,
+    },
+    rejectedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
     interviewStatus: {
       type: String,
       enum: ['not_scheduled', 'scheduled', 'completed', 'cancelled'],

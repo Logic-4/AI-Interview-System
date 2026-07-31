@@ -13,6 +13,7 @@ import {
   ArrowRight,
   TrendingUp,
   Award,
+  ShieldAlert,
 } from 'lucide-react';
 import { setPageTitle } from '@/store/themeConfigSlice';
 import companyService from '@/services/companyService';
@@ -59,6 +60,7 @@ const CompanyDashboardPage = () => {
     candidatesInterviewed: 0,
     candidatesShortlisted: 0,
     pendingInterviews: 0,
+    unreviewedSecurityEvents: 0,
   };
 
   const statCards = [
@@ -83,6 +85,27 @@ const CompanyDashboardPage = () => {
           <Plus className="mr-2 h-4 w-4" /> Post a Job
         </NavLink>
       </div>
+
+      {/* Security Alert Banner */}
+      {metrics.unreviewedSecurityEvents > 0 && (
+        <NavLink
+          to="/company/security-events"
+          className="panel flex items-center justify-between border border-danger/30 bg-danger/5 p-4 transition hover:bg-danger/10"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-danger/10 text-danger">
+              <ShieldAlert className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-bold text-black dark:text-white">
+                {metrics.unreviewedSecurityEvents} identity verification {metrics.unreviewedSecurityEvents === 1 ? 'alert needs' : 'alerts need'} review
+              </p>
+              <p className="text-xs text-white-dark">Face-match failures and blocked candidates flagged in the interview lobby.</p>
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 text-danger" />
+        </NavLink>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

@@ -61,6 +61,7 @@ const CompanyShortlistPage = lazyWithRetry(() => import('../pages/company/Compan
 const CompanyInterviewsPage = lazyWithRetry(() => import('../pages/company/CompanyInterviewsPage'));
 const CompanyAssessmentsPage = lazyWithRetry(() => import('../pages/company/CompanyAssessmentsPage'));
 const CompanySettingsPage = lazyWithRetry(() => import('../pages/company/CompanySettingsPage'));
+const CompanySecurityEventsPage = lazyWithRetry(() => import('../pages/company/CompanySecurityEventsPage'));
 
 const routes = [
     // Blank Layout routes (Auth, Landing, Mock interview flow)
@@ -231,6 +232,11 @@ const routes = [
     {
         path: '/company/settings',
         element: <CompanySettingsPage />,
+        layout: 'default',
+    },
+    {
+        path: '/company/security-events',
+        element: <CompanySecurityEventsPage />,
         layout: 'default',
     },
 ];

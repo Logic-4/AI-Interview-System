@@ -10,6 +10,7 @@ import {
   CompanyProfile,
   CompanyDashboardMetrics,
   ApplicationStatus,
+  SecurityEvent,
 } from '@/types/companyPortal';
 
 interface PaginatedResponse<T> {
@@ -26,6 +27,7 @@ interface CompanyDashboardData {
   metrics: CompanyDashboardMetrics;
   recentApplications: Application[];
   upcomingInterviews: CompanyInterview[];
+  recentSecurityEvents: SecurityEvent[];
   latestActivity: Array<{
     id: string;
     type: string;
@@ -83,8 +85,13 @@ const companyService = {
     return response.data.data.application;
   },
 
-  async updateApplicationStatus(id: string, payload: { status?: ApplicationStatus; isShortlisted?: boolean }): Promise<Application> {
+  async updateApplicationStatus(id: string, payload: { status?: ApplicationStatus; isShortlisted?: boolean; reason?: string }): Promise<Application> {
     const response = await api.patch<ApiResponse<{ application: Application }>>(`/company/applications/${id}/status`, payload);
+    return response.data.data.application;
+  },
+
+  async approveApplication(id: string): Promise<Application> {
+    const response = await api.patch<ApiResponse<{ application: Application }>>(`/company/applications/${id}/approve`);
     return response.data.data.application;
   },
 
@@ -99,8 +106,8 @@ const companyService = {
     return response.data.data.application;
   },
 
-  async rejectCandidate(id: string): Promise<Application> {
-    const response = await api.patch<ApiResponse<{ application: Application }>>(`/company/candidates/${id}/reject`);
+  async rejectCandidate(id: string, reason?: string): Promise<Application> {
+    const response = await api.patch<ApiResponse<{ application: Application }>>(`/company/candidates/${id}/reject`, { reason });
     return response.data.data.application;
   },
 
@@ -163,6 +170,20 @@ const companyService = {
 
   async updateAccountSettings(currentPassword?: string, newPassword?: string): Promise<void> {
     await api.put('/company/settings/account', { currentPassword, newPassword });
+  },
+
+  // Security Events (Identity Verification)
+  async getSecurityEvents(params: { page?: number; limit?: number; outcome?: string; reviewed?: boolean } = {}) {
+    const response = await api.get<ApiResponse<{ events: SecurityEvent[] }> & PaginatedResponse<SecurityEvent>>(
+      '/company/security-events',
+      { params }
+    );
+    return { events: response.data.data.events, pagination: response.data.pagination };
+  },
+
+  async reviewSecurityEvent(id: string): Promise<SecurityEvent> {
+    const response = await api.patch<ApiResponse<{ event: SecurityEvent }>>(`/company/security-events/${id}/review`);
+    return response.data.data.event;
   },
 };
 

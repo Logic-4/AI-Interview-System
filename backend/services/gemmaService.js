@@ -145,6 +145,11 @@ function recordCircuitSuccess() {
 
 const PLACEHOLDER_ANSWER_RE = /^\[(No |Transcription)/i;
 
+const DIFFICULTY_LABELS = { junior: 'Junior', mid: 'Mid', senior: 'Senior', lead: 'Lead' };
+function toDifficultyLabel(difficulty) {
+  return DIFFICULTY_LABELS[(difficulty || '').toLowerCase()] || 'Mid';
+}
+
 function clampScore(value) {
   const n = Number(value);
   if (Number.isNaN(n)) return null;
@@ -437,11 +442,14 @@ function resolveQuestionCategory(type, absoluteIndex, totalCount) {
   if (lowerType === 'hr') {
     categoryCycle = ['motivation', 'strengths/weaknesses', 'culture fit', 'experience'];
   } else if (lowerType === 'technical') {
-    categoryCycle = ['core skills', 'scenario tasks', 'debugging', 'fundamentals'];
+    categoryCycle = ['core skills', 'applied knowledge', 'debugging', 'fundamentals'];
   } else if (lowerType === 'behavioral') {
     categoryCycle = ['STAR-based situation', 'past experience', 'problem solving'];
+  } else if (lowerType === 'system-design') {
+    categoryCycle = ['architecture overview', 'scalability', 'trade-offs', 'component design'];
   } else {
-    categoryCycle = ['conceptual', 'situational', 'behavioral', 'technical'];
+    // mixed: interleave technical and HR categories
+    categoryCycle = ['core skills', 'motivation', 'applied knowledge', 'culture fit', 'debugging', 'past experience'];
   }
 
   return categoryCycle[(absoluteIndex - 1) % categoryCycle.length];
@@ -459,6 +467,7 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
     title,
     duration,
     scheduledAt,
+    difficultyLabel,
     _forcedCategory,
     _forcedIndex,
     _forcedCount,
@@ -496,6 +505,14 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
     const absoluteIndex = _forcedIndex !== undefined ? _forcedIndex : _startIndex + i;
     const category = _forcedCategory || resolveQuestionCategory(type, absoluteIndex, totalCount);
 
+    // Pin this question slot to one specific skill so the model doesn't fall back to generic phrasing.
+    // Rotate through the skill list by index so each question targets a different skill.
+    const targetSkill = uniqueSkills.length
+      ? uniqueSkills[absoluteIndex % uniqueSkills.length]
+      : '';
+    // Pass up to 4 remaining skills as supporting context (not the primary target).
+    const supportingSkills = uniqueSkills.filter(s => s !== targetSkill).slice(0, 4);
+
     const payload = {
       language: language || 'english',
       domain: domain || 'general',
@@ -504,7 +521,11 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
       category,
       type: type || 'technical',
       difficulty: difficulty || 'mid',
-      skills: uniqueSkills,
+      difficultyLabel: difficultyLabel || toDifficultyLabel(difficulty),
+      targetSkill,
+      supportingSkills,
+      questionIndex: absoluteIndex,
+      totalQuestions: totalCount,
       responsibilities: roleProfile?.responsibilities || [],
       experience: roleProfile?.experienceLevel || '',
       candidateExperience: roleProfile?.candidateExperience || [],
@@ -606,10 +627,10 @@ const processInterviewTurn = async (
     conversationHistory: trimConversationHistory(conversationHistory),
     domain,
     role: jobRole || domain,
-    jobRole,
     language,
     type,
     difficulty,
+    difficultyLabel: toDifficultyLabel(difficulty),
     currentQuestion: currentQuestion
       ? {
           text: currentQuestion.text || '',

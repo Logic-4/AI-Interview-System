@@ -24,6 +24,7 @@ router.delete('/jobs/:id', controller.deleteJob);
 router.get('/applications', controller.getApplications);
 router.get('/applications/:id', controller.getApplicationById);
 router.patch('/applications/:id/status', controller.updateApplicationStatus);
+router.patch('/applications/:id/approve', controller.approveApplication);
 
 // ─── Candidates & Shortlist ───
 router.get('/candidates', controller.getCandidates);
@@ -40,6 +41,10 @@ router.get('/interviews/:id/results', controller.getInterviewResults);
 // ─── Assessments ───
 router.get('/assessments', controller.getAssessments);
 router.get('/assessments/:id', controller.getAssessmentById);
+
+// ─── Security Events (Identity Verification) ───
+router.get('/security-events', controller.getSecurityEvents);
+router.patch('/security-events/:id/review', controller.reviewSecurityEvent);
 
 // ─── Settings ───
 router.get('/settings', controller.getCompanySettings);

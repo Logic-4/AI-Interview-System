@@ -1,5 +1,5 @@
 import api from './api';
-import { Interview, PopulatedInterview, CreateInterviewPayload, SubmitAnswerPayload, SubmitAnswerResponse, AnswerEvaluation, InterviewListParams, InterviewWarmupStatus } from '@/types/interview';
+import { Interview, PopulatedInterview, CreateInterviewPayload, SubmitAnswerPayload, SubmitAnswerResponse, AnswerEvaluation, InterviewListParams, InterviewWarmupStatus, IdentityVerificationStatus, IdentityVerificationResult, ReportProctoringEventPayload, ReportProctoringEventResponse } from '@/types/interview';
 import { ApiResponse, PaginatedResponse } from '@/types/api';
 
 const interviewService = {
@@ -52,6 +52,39 @@ const interviewService = {
     return res.data.data.interview;
   },
 
+  async getIdentityStatus(id: string): Promise<IdentityVerificationStatus> {
+    const res = await api.get<ApiResponse<{ verification: IdentityVerificationStatus }>>(`/interviews/${id}/identity`);
+    return res.data.data.verification;
+  },
+
+  async verifyIdentity(id: string, frame: Blob): Promise<IdentityVerificationResult> {
+    const formData = new FormData();
+    formData.append('frame', frame, 'frame.jpg');
+    try {
+      const res = await api.post<ApiResponse<IdentityVerificationResult>>(
+        `/interviews/${id}/identity/verify`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+      return res.data.data;
+    } catch (err: any) {
+      // 403 "attempts_exhausted" still carries a structured payload we need to render.
+      if (err?.response?.data?.data) {
+        return err.response.data.data as IdentityVerificationResult;
+      }
+      throw err;
+    }
+  },
+
+  async uploadRecordingChunk(interviewId: string, index: number, chunk: Blob): Promise<void> {
+    const formData = new FormData();
+    formData.append('chunk', chunk, `chunk_${index}.webm`);
+    formData.append('index', String(index));
+    await api.post(`/interviews/${interviewId}/recording/chunk`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
   async submitAnswer(interviewId: string, questionId: string, payload: SubmitAnswerPayload): Promise<SubmitAnswerResponse> {
     const formData = new FormData();
     if (payload.userAnswer !== undefined) formData.append('userAnswer', payload.userAnswer);
@@ -97,6 +130,17 @@ const interviewService = {
 
   async deleteInterview(id: string): Promise<void> {
     await api.delete(`/interviews/${id}`);
+  },
+
+  async reportProctoringEvent(
+    id: string,
+    payload: ReportProctoringEventPayload
+  ): Promise<ReportProctoringEventResponse> {
+    const res = await api.post<{ data: ReportProctoringEventResponse }>(
+      `/interviews/${id}/proctoring/event`,
+      payload
+    );
+    return res.data.data;
   },
 };
 

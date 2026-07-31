@@ -115,12 +115,14 @@ const deleteAccount = async (req, res, next) => {
       }
     }
 
-    const interviews = await Interview.find({ user: user._id, isDeleted: { $in: [true, false] } }).select('_id recordingUrl').lean();
+    const interviews = await Interview.find({ user: user._id, isDeleted: { $in: [true, false] } }).select('_id recordingUrl recordingChunks').lean();
     const interviewIds = interviews.map((item) => item._id);
     const audioUrls = await Question.find({ interview: { $in: interviewIds } }).distinct('audioUrl');
+    const chunkUrls = interviews.flatMap((item) => (item.recordingChunks || []).map((c) => c.url));
     const blobResult = await deleteBlobUrls([
       user.avatar,
       ...interviews.map((item) => item.recordingUrl),
+      ...chunkUrls,
       ...audioUrls,
     ]);
 

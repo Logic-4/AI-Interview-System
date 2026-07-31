@@ -25,6 +25,7 @@ export interface InterviewWarmupStatus {
 export interface Interview {
   _id: string;
   user: string;
+  company?: string | null;
   title: string;
   type: InterviewType;
   difficulty: InterviewDifficulty;
@@ -42,10 +43,12 @@ export interface Interview {
   completedAt?: string;
   overallScore: number | null;
   recordingUrl?: string;
+  recordingStatus?: 'none' | 'recording' | 'processing' | 'ready' | 'failed';
   transcription?: string;
   aiModel?: string;
   tags?: string[];
   isDeleted?: boolean;
+  proctoring?: InterviewProctoring;
   createdAt: string;
   updatedAt: string;
 }
@@ -62,6 +65,38 @@ export interface PopulatedInterview extends Omit<Interview, 'questions'> {
 }
 
 export type InterviewLanguage = 'english' | 'somali';
+
+export type IdentityVerificationOutcome =
+  | 'passed'
+  | 'failed'
+  | 'no_face'
+  | 'multiple_faces'
+  | 'no_reference'
+  | 'provider_error'
+  | 'attempts_exhausted';
+
+export interface IdentityVerificationStatus {
+  required: boolean;
+  status: 'not_required' | 'pending' | 'passed' | 'failed' | 'blocked';
+  provider: string;
+  threshold: number | null;
+  similarity: number | null;
+  attempts: number;
+  maxAttempts: number;
+  attemptsRemaining: number;
+  hasReferenceImage: boolean;
+  referenceImageUrl: string;
+  referenceSource: 'application' | 'avatar' | 'none';
+  lastReason: string;
+  verifiedAt: string | null;
+}
+
+export interface IdentityVerificationResult {
+  verification: IdentityVerificationStatus;
+  outcome: IdentityVerificationOutcome;
+  passed: boolean;
+  message: string;
+}
 
 export interface CreateInterviewPayload {
   title: string;
@@ -102,6 +137,39 @@ export interface SubmitAnswerResponse {
   isFollowUp?: boolean;
   isTimeUp?: boolean;
   answeredCandidateQuestion?: boolean;
+}
+
+export type ProctoringViolationType =
+  | 'tab_switch'
+  | 'window_blur'
+  | 'gaze_away'
+  | 'face_not_detected';
+
+export interface ProctoringViolationRecord {
+  type: ProctoringViolationType;
+  timestamp: string;
+  details: string;
+  strike: number | null;
+}
+
+export interface InterviewProctoring {
+  enabled: boolean;
+  strikes: number;
+  integrityScore: number;
+  violations: ProctoringViolationRecord[];
+  flaggedForReview: boolean;
+}
+
+export interface ReportProctoringEventPayload {
+  type: ProctoringViolationType;
+  details?: string;
+  strike?: number;
+}
+
+export interface ReportProctoringEventResponse {
+  strikes: number;
+  integrityScore: number;
+  flaggedForReview: boolean;
 }
 
 export interface InterviewListParams {

@@ -17,10 +17,16 @@ const {
   startInterviewWarmup,
   getInterviewWarmupStatus,
 } = require('../services/interviewWarmupService');
+const { requiresVerification } = require('./verificationController');
+const { requiresRecording, uploadChunk: uploadRecordingChunkBuffer, finalizeRecording } = require('../services/recordingService');
 
 function escapeRegex(value = '') {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+// How early a candidate may enter a company-scheduled interview ahead of its
+// scheduledAt time. Kept in sync with the frontend waiting-room countdown.
+const EARLY_JOIN_WINDOW_MS = 15 * 60 * 1000;
 
 /* ─── Normalize interview difficulty → question difficulty ── */
 const DIFFICULTY_MAP = {
@@ -37,31 +43,49 @@ function toQuestionDifficulty(val) {
 /* ─── Category cycles by interview type ─────────────────── */
 const CATEGORY_CYCLES = {
   hr: ['motivation', 'strengths/weaknesses', 'culture fit', 'experience'],
-  technical: ['core skills', 'scenario tasks', 'debugging', 'fundamentals'],
+  technical: ['core skills', 'applied knowledge', 'debugging', 'fundamentals'],
   behavioral: ['STAR-based situation', 'past experience', 'problem solving'],
+  'system-design': ['architecture overview', 'scalability', 'trade-offs', 'component design'],
+  mixed: ['core skills', 'motivation', 'applied knowledge', 'culture fit', 'debugging', 'past experience'],
   default: ['conceptual', 'situational', 'behavioral', 'technical'],
 };
 
 function getCategoryForIndex(i, totalCount, interviewType) {
   if (i === 0) return 'intro';
   if (i === totalCount - 1) return 'outro';
-  const cycle = CATEGORY_CYCLES[(interviewType || 'mixed').toLowerCase()] || CATEGORY_CYCLES.default;
+  const key = (interviewType || 'mixed').toLowerCase();
+  const cycle = CATEGORY_CYCLES[key] ?? CATEGORY_CYCLES.default;
   return cycle[(i - 1) % cycle.length];
 }
 
 function buildFallbackFirstQuestion(interview, context) {
   const role = interview.jobRole || interview.domain || 'this role';
-  const name = context.candidateName || 'Candidate';
+  const domain = interview.domain || 'this field';
   const isSomali = String(interview.language).toLowerCase() === 'somali';
+
+  // Vary the opening based on available context so it doesn't feel robotic.
+  // This is a safety-net fallback; the AI generates the real question in normal flow.
+  const skills = context?.roleProfile?.requiredSkills || [];
+  const topSkill = skills[0] || '';
+
+  let text;
+  if (isSomali) {
+    text = topSkill
+      ? `Maxaad ka garanaysaa ${topSkill} iyo sida aad u isticmaali lahayd shaqada ${role}?`
+      : `Maxaa kuu keenay inaad codsi u gudbiso xagga shaqada ${role}? Noo sheeg wax ka yar khibraddaada la xiriirta ${domain}.`;
+  } else {
+    text = topSkill
+      ? `What has been your most hands-on experience working with ${topSkill} in a ${role} context?`
+      : `What drew you to applying for this ${role} position, and what relevant experience are you bringing?`;
+  }
+
   return {
-    text: isSomali
-      ? `Salaan ${name}. Fadlan si kooban isu bar oo sharax khibraddaada la xiriirta shaqada ${role}?`
-      : `Hi ${name}. Could you briefly introduce yourself and describe your experience relevant to the ${role} role?`,
+    text,
     category: 'intro',
     difficulty: interview.difficulty,
     expectedAnswer: isSomali
-      ? 'Musharraxu wuxuu soo koobayaa khibraddiisa, xirfadaha muhiimka ah, iyo xiriirka ay la leeyihiin shaqada.'
-      : 'The candidate summarizes relevant experience, key skills, and fit for the role.',
+      ? 'Musharraxu wuxuu sharaxaa xiriirka u dhexeeya khibradiisa iyo baahida shaqada.'
+      : 'The candidate connects their background and motivation directly to this role.',
     order: 0,
   };
 }
@@ -539,6 +563,30 @@ const startInterview = async (req, res, next) => {
       ));
     }
 
+    // Scheduling window gatekeeper — a company-scheduled interview only
+    // becomes active a short window before its scheduled time, so candidates
+    // cannot start early. Personal (non-tenant) interviews are unaffected
+    // since they are created and started by the same person on demand.
+    if (interview.company && interview.scheduledAt) {
+      const opensAt = new Date(interview.scheduledAt).getTime() - EARLY_JOIN_WINDOW_MS;
+      if (Date.now() < opensAt) {
+        return next(
+          ApiError.forbidden(
+            `This interview is not open yet. It becomes available at ${new Date(opensAt).toISOString()}.`
+          )
+        );
+      }
+    }
+
+    // Identity checkpoint gatekeeper — tenant interviews must clear the
+    // lobby face match before the candidate can enter the live session.
+    if (requiresVerification(interview) && interview.identityVerification?.status !== 'passed') {
+      if (interview.identityVerification?.status === 'blocked') {
+        return next(ApiError.forbidden('Identity verification failed. This interview has been blocked pending review.'));
+      }
+      return next(ApiError.forbidden('Identity verification is required before starting this interview.'));
+    }
+
     if (interview.status === 'scheduled') {
       interview.status = 'in-progress';
       await interview.save();
@@ -550,6 +598,52 @@ const startInterview = async (req, res, next) => {
     });
 
     ApiResponse.success(res, { interview: populated }, 'Interview started');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Upload one chunk of the live full-session webcam recording.
+ *          Chunks are small, immutable, and byte-concatenated back into a
+ *          single recording once the interview completes (see
+ *          services/recordingService.js).
+ * @route   POST /api/v1/interviews/:id/recording/chunk
+ * @access  Private
+ */
+const uploadRecordingChunk = async (req, res, next) => {
+  try {
+    if (!req.file?.buffer?.length) {
+      return next(ApiError.badRequest('A recording chunk file is required'));
+    }
+
+    const index = Number(req.body.index);
+    if (!Number.isInteger(index) || index < 0) {
+      return next(ApiError.badRequest('A valid chunk index is required'));
+    }
+
+    const interview = await Interview.findOne({ _id: req.params.id, user: req.user._id });
+    if (!interview) return next(ApiError.notFound('Interview not found'));
+
+    if (!requiresRecording(interview)) {
+      // Not an error — just a no-op for interviews that don't need a session
+      // recording (e.g. personal practice interviews).
+      return ApiResponse.success(res, { stored: false }, 'Recording not required for this interview');
+    }
+
+    if (interview.status !== 'in-progress') {
+      return next(ApiError.badRequest(`Cannot upload a recording chunk while interview status is '${interview.status}'`));
+    }
+
+    const url = await uploadRecordingChunkBuffer(req.file.buffer, req.user._id.toString(), interview._id.toString(), index);
+
+    if (!interview.recordingChunks.some((c) => c.index === index)) {
+      interview.recordingChunks.push({ index, url });
+    }
+    interview.recordingStatus = 'recording';
+    await interview.save();
+
+    ApiResponse.success(res, { stored: true, index }, 'Recording chunk stored');
   } catch (error) {
     next(error);
   }
@@ -766,6 +860,30 @@ const completeInterview = async (req, res, next) => {
     interview.status = 'completed';
     interview.overallScore = overallScore;
 
+    // Reassemble the session recording, if the candidate's browser uploaded
+    // any chunks during the live interview. This never blocks or fails the
+    // interview completion itself — a recording problem is not the
+    // candidate's fault and must not stop their score from being saved.
+    if (requiresRecording(interview) && interview.recordingChunks?.length) {
+      interview.recordingStatus = 'processing';
+      try {
+        const { url, recovered, expected } = await finalizeRecording(interview);
+        if (url) {
+          interview.recordingUrl = url;
+          interview.recordingStatus = 'ready';
+          interview.recordingChunks = [];
+          if (recovered < expected) {
+            logger.warn(`Interview ${interview._id} recording finalized with ${recovered}/${expected} chunks recovered`);
+          }
+        } else {
+          interview.recordingStatus = 'failed';
+        }
+      } catch (error) {
+        logger.error(`Failed to finalize recording for interview ${interview._id}: ${error.message}`);
+        interview.recordingStatus = 'failed';
+      }
+    }
+
     await interview.save();
 
     logger.info(`Interview completed: ${interview._id} — score: ${overallScore}`);
@@ -793,7 +911,8 @@ const deleteInterview = async (req, res, next) => {
     }
 
     const audioUrls = await Question.find({ interview: interview._id }).distinct('audioUrl');
-    await deleteBlobUrls([interview.recordingUrl, ...audioUrls]);
+    const chunkUrls = (interview.recordingChunks || []).map((c) => c.url);
+    await deleteBlobUrls([interview.recordingUrl, ...chunkUrls, ...audioUrls]);
 
     await Promise.all([
       Question.deleteMany({ interview: interview._id }),
@@ -1002,7 +1121,8 @@ const resetInterview = async (req, res, next) => {
     await Feedback.deleteMany({ interview: interview._id });
 
     const audioUrls = await Question.find({ interview: interview._id }).distinct('audioUrl');
-    await deleteBlobUrls([interview.recordingUrl, ...audioUrls]);
+    const chunkUrls = (interview.recordingChunks || []).map((c) => c.url);
+    await deleteBlobUrls([interview.recordingUrl, ...chunkUrls, ...audioUrls]);
 
     await Question.updateMany(
       { interview: interview._id },
@@ -1042,6 +1162,8 @@ const resetInterview = async (req, res, next) => {
     interview.status = 'scheduled';
     interview.overallScore = null;
     interview.recordingUrl = '';
+    interview.recordingChunks = [];
+    interview.recordingStatus = 'none';
     interview.startedAt = undefined;
     interview.completedAt = undefined;
     interview.conversationHistory = conversationHistory;
@@ -1060,6 +1182,69 @@ const resetInterview = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Receive a proctoring violation event from the client
+ * @route   POST /api/v1/interviews/:id/proctoring/event
+ * @access  Private
+ */
+const reportProctoringEvent = async (req, res, next) => {
+  try {
+    const interview = await Interview.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+      status: 'in-progress',
+    });
+
+    if (!interview) {
+      return next(ApiError.notFound('Active interview not found'));
+    }
+
+    const { type, details, strike } = req.body;
+
+    const validTypes = ['tab_switch', 'window_blur', 'gaze_away', 'face_not_detected'];
+    if (!type || !validTypes.includes(type)) {
+      return next(ApiError.badRequest(`Invalid violation type. Must be one of: ${validTypes.join(', ')}`));
+    }
+
+    if (!interview.proctoring) {
+      interview.proctoring = { enabled: true, strikes: 0, integrityScore: 100, violations: [], flaggedForReview: false };
+    }
+
+    interview.proctoring.enabled = true;
+    interview.proctoring.violations.push({
+      type,
+      timestamp: new Date(),
+      details: String(details || '').slice(0, 500),
+      strike: typeof strike === 'number' ? strike : null,
+    });
+
+    if (typeof strike === 'number' && strike > interview.proctoring.strikes) {
+      interview.proctoring.strikes = Math.min(strike, 3);
+    }
+
+    const totalViolations = interview.proctoring.violations.length;
+    const strikes = interview.proctoring.strikes;
+    const penalty = Math.min(totalViolations * 2 + strikes * 15, 100);
+    interview.proctoring.integrityScore = Math.max(0, 100 - penalty);
+
+    if (strikes >= 3) {
+      interview.proctoring.flaggedForReview = true;
+    }
+
+    await interview.save();
+
+    logger.info(`Proctoring event for interview ${interview._id}: ${type} (strike ${strikes})`);
+
+    ApiResponse.success(res, {
+      strikes: interview.proctoring.strikes,
+      integrityScore: interview.proctoring.integrityScore,
+      flaggedForReview: interview.proctoring.flaggedForReview,
+    }, 'Proctoring event recorded');
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createInterview,
   warmInterviewServices,
@@ -1069,10 +1254,12 @@ module.exports = {
   getInterviewProgress,
   retryQuestionGeneration,
   startInterview,
+  uploadRecordingChunk,
   submitAnswer,
   completeInterview,
   deleteInterview,
   retryEvaluate,
   reevaluateAnswer,
   resetInterview,
+  reportProctoringEvent,
 };

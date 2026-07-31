@@ -33,14 +33,23 @@ function buildInterviewPayload(job, application = null) {
   const { difficulty, difficultyLabel } = deriveDifficulty(job.experienceLevel);
   const focusSkills = job.focusSkills?.length ? job.focusSkills : (job.requiredSkills || []);
 
+  // Append education requirements to job description so the model sees them
+  // without requiring a separate Interview schema field.
+  let jobDescription = job.description || '';
+  const eduReq = (job.requiredEducation || job.education || '').trim();
+  if (eduReq && !jobDescription.toLowerCase().includes('education')) {
+    jobDescription = `${jobDescription}\n\nRequired Education: ${eduReq}`;
+  }
+
   return {
     // Interview.create() fields
     type: job.interviewType || 'mixed',
     difficulty,
     language: (job.interviewLanguage || 'English').toLowerCase(),
+    domain: job.domain || 'technology',
     jobRole: job.targetJobRole || job.title,
     title: job.title,
-    jobDescription: job.description || '',
+    jobDescription,
     focusSkills,
     duration: job.durationMinutes,
 
@@ -52,7 +61,7 @@ function buildInterviewPayload(job, application = null) {
     candidateName: application?.candidateName || '',
     resumeText: application?.resumeText || '',
 
-    // System-prompt-facing difficulty parameter for the fine-tuned Gemma model
+    // System-prompt-facing difficulty label for the fine-tuned Gemma model
     difficultyLabel,
   };
 }
