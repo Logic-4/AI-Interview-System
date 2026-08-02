@@ -85,6 +85,10 @@ const companyService = {
     return response.data.data.application;
   },
 
+  async deleteApplication(id: string): Promise<void> {
+    await api.delete(`/company/applications/${id}`);
+  },
+
   async updateApplicationStatus(id: string, payload: { status?: ApplicationStatus; isShortlisted?: boolean; reason?: string }): Promise<Application> {
     const response = await api.patch<ApiResponse<{ application: Application }>>(`/company/applications/${id}/status`, payload);
     return response.data.data.application;
@@ -139,6 +143,10 @@ const companyService = {
   async cancelInterview(id: string): Promise<CompanyInterview> {
     const response = await api.patch<ApiResponse<{ interview: CompanyInterview }>>(`/company/interviews/${id}/cancel`);
     return response.data.data.interview;
+  },
+
+  async deleteInterview(id: string): Promise<void> {
+    await api.delete(`/company/interviews/${id}`);
   },
 
   async getInterviewResults(id: string): Promise<CompanyInterview> {

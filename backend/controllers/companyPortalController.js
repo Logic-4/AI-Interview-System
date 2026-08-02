@@ -6,6 +6,8 @@ const Assessment = require('../models/Assessment');
 const Company = require('../models/Company');
 const User = require('../models/User');
 const VerificationEvent = require('../models/VerificationEvent');
+const Question = require('../models/Question');
+const Feedback = require('../models/Feedback');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { buildInterviewPayload } = require('../services/promptPayloadService');
@@ -17,6 +19,7 @@ const {
   sendInterviewCancelledEmail,
 } = require('../services/emailService');
 const { generateInterviewLinkToken } = require('../utils/tokenUtils');
+const { deleteBlobUrls } = require('../services/blobService');
 const logger = require('../utils/logger');
 
 const normalizePagination = (value, fallback, max) => Math.min(Math.max(parseInt(value, 10) || fallback, 1), max);
@@ -27,6 +30,28 @@ function notifyEmail(sendFn, ...args) {
   Promise.resolve()
     .then(() => sendFn(...args))
     .catch((error) => logger.warn(`Notification email failed: ${error.message}`));
+}
+
+async function deleteCompanyInterviewRecord(interview) {
+  const [audioUrls, verificationEvents] = await Promise.all([
+    Question.find({ interview: interview._id }).distinct('audioUrl'),
+    VerificationEvent.find({ interview: interview._id }).select('liveFrameUrl referenceImageUrl').lean(),
+  ]);
+  const chunkUrls = (interview.recordingChunks || []).map((chunk) => chunk.url);
+  const verificationUrls = verificationEvents.flatMap((event) => [event.liveFrameUrl, event.referenceImageUrl]);
+
+  await deleteBlobUrls([interview.recordingUrl, ...chunkUrls, ...audioUrls, ...verificationUrls]);
+  await Promise.all([
+    Question.deleteMany({ interview: interview._id }),
+    Feedback.deleteMany({ interview: interview._id }),
+    Assessment.deleteMany({ interview: interview._id }),
+    VerificationEvent.deleteMany({ interview: interview._id }),
+    Application.updateMany(
+      { company: interview.company, interview: interview._id },
+      { $set: { interview: null, interviewStatus: 'not_scheduled' } }
+    ),
+  ]);
+  await Interview.findByIdAndDelete(interview._id);
 }
 
 async function approveApplicationRecord(application, reviewerId) {
@@ -269,6 +294,23 @@ const getApplicationById = async (req, res, next) => {
 
     if (!application) return next(ApiError.notFound('Application not found'));
     ApiResponse.success(res, { application });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteApplication = async (req, res, next) => {
+  try {
+    const application = await Application.findOne({ _id: req.params.id, company: req.companyId });
+    if (!application) return next(ApiError.notFound('Application not found'));
+
+    if (application.interview) {
+      const interview = await Interview.findOne({ _id: application.interview, company: req.companyId });
+      if (interview) await deleteCompanyInterviewRecord(interview);
+    }
+
+    await application.deleteOne();
+    ApiResponse.success(res, null, 'Application deleted successfully');
   } catch (error) {
     next(error);
   }
@@ -614,6 +656,21 @@ const cancelInterview = async (req, res, next) => {
   }
 };
 
+const deleteInterview = async (req, res, next) => {
+  try {
+    const interview = await Interview.findOne({ _id: req.params.id, company: req.companyId });
+    if (!interview) return next(ApiError.notFound('Interview not found'));
+    if (interview.status === 'in-progress') {
+      return next(ApiError.badRequest('An interview in progress cannot be deleted'));
+    }
+
+    await deleteCompanyInterviewRecord(interview);
+    ApiResponse.success(res, null, 'Interview deleted successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getInterviewResults = async (req, res, next) => {
   try {
     const interview = await Interview.findOne({ _id: req.params.id, company: req.companyId })
@@ -912,6 +969,7 @@ module.exports = {
   deleteJob,
   getApplications,
   getApplicationById,
+  deleteApplication,
   updateApplicationStatus,
   approveApplication,
   getCandidates,
@@ -921,6 +979,7 @@ module.exports = {
   scheduleInterview,
   rescheduleInterview,
   cancelInterview,
+  deleteInterview,
   getInterviewResults,
   getAssessments,
   getAssessmentById,

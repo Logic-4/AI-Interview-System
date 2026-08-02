@@ -18,6 +18,7 @@ import {
   Briefcase,
   Copy,
   MoreHorizontal,
+  Trash2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { setPageTitle } from '@/store/themeConfigSlice';
@@ -196,6 +197,18 @@ const CompanyApplicationsPage = () => {
     }
   };
 
+  const handleDelete = async (app: Application) => {
+    if (!window.confirm(`Delete ${app.candidateName}'s application permanently? This also deletes its linked interview and cannot be undone.`)) return;
+    try {
+      await companyService.deleteApplication(app._id);
+      toast.success('Application deleted');
+      if (detailApp?._id === app._id) setDetailApp(null);
+      await load();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to delete application');
+    }
+  };
+
   const copyText = (text: string, label: string) => {
     void navigator.clipboard.writeText(text);
     toast.success(`${label} copied to clipboard`);
@@ -353,6 +366,12 @@ const CompanyApplicationsPage = () => {
                                     </button>
                                   </li>
                                 )}
+                                <li className="border-t border-white-light dark:border-[#1b2e4b] pt-1">
+                                  <button type="button" className="w-full flex items-center gap-2.5 px-3 py-2 text-left rounded-lg hover:bg-danger/10 text-danger transition-colors" onClick={() => void handleDelete(app)}>
+                                    <Trash2 className="h-4 w-4 shrink-0" />
+                                    <span>Delete Application</span>
+                                  </button>
+                                </li>
                               </ul>
                             </Dropdown>
                           </div>
@@ -661,6 +680,10 @@ const CompanyApplicationsPage = () => {
                     <span>Reject Candidate</span>
                   </button>
                 )}
+                <button type="button" className="btn btn-outline-danger btn-sm flex items-center gap-1.5" onClick={() => void handleDelete(detailApp)}>
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete</span>
+                </button>
               </div>
 
               <button type="button" className="btn btn-primary px-6 btn-sm" onClick={() => setDetailApp(null)}>

@@ -33,7 +33,7 @@ function Avatar({ src, name, size = 'md' }: { src?: string; name: string; size?:
 }
 
 function ProfileModal({
-  cand, onClose, onApprove, onSchedule, onReject, onHire, onRemove, approvingId,
+  cand, onClose, onApprove, onSchedule, onReject, onHire, onRemove, onDelete, approvingId,
 }: {
   cand: CandidateSummary;
   onClose: () => void;
@@ -42,6 +42,7 @@ function ProfileModal({
   onReject: (c: CandidateSummary) => void;
   onHire: (c: CandidateSummary) => void;
   onRemove: (c: CandidateSummary) => void;
+  onDelete: (c: CandidateSummary) => void;
   approvingId: string | null;
 }) {
   return (
@@ -181,6 +182,9 @@ function ProfileModal({
           >
             <Trash2 className="h-4 w-4" /> Remove from Shortlist
           </button>
+          <button type="button" className="btn btn-danger btn-sm flex items-center gap-1.5" onClick={() => onDelete(cand)}>
+            <Trash2 className="h-4 w-4" /> Delete Application
+          </button>
         </div>
       </div>
     </div>
@@ -240,6 +244,18 @@ const CompanyShortlistPage = () => {
       await load();
     } catch {
       toast.error('Failed to remove from shortlist');
+    }
+  };
+
+  const handleDelete = async (cand: CandidateSummary) => {
+    if (!window.confirm(`Delete ${cand.name}'s application permanently? This also deletes its linked interview and cannot be undone.`)) return;
+    try {
+      await companyService.deleteApplication(cand._id);
+      toast.success('Application deleted');
+      setProfileModal(null);
+      await load();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to delete application');
     }
   };
 
@@ -457,6 +473,12 @@ const CompanyShortlistPage = () => {
                                 <span>Remove Shortlist</span>
                               </button>
                             </li>
+                            <li>
+                              <button type="button" className="w-full flex items-center gap-2.5 px-3 py-2 text-left rounded-lg hover:bg-danger/10 text-danger transition-colors" onClick={() => void handleDelete(cand)}>
+                                <Trash2 className="h-4 w-4 shrink-0" />
+                                <span>Delete Application</span>
+                              </button>
+                            </li>
                           </ul>
                         </Dropdown>
                       </div>
@@ -481,6 +503,7 @@ const CompanyShortlistPage = () => {
           onReject={(c) => { setRejectModal(c); setProfileModal(null); }}
           onHire={(c) => void handleHire(c)}
           onRemove={(c) => void handleRemove(c)}
+          onDelete={(c) => void handleDelete(c)}
           approvingId={approvingId}
         />
       )}

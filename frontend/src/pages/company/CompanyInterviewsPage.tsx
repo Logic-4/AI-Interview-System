@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { Eye, XCircle, RefreshCw, AlertTriangle, ShieldAlert, ExternalLink } from 'lucide-react';
+import { Eye, XCircle, RefreshCw, AlertTriangle, ShieldAlert, ExternalLink, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { NavLink } from 'react-router-dom';
 import { setPageTitle } from '@/store/themeConfigSlice';
@@ -91,6 +91,18 @@ const CompanyInterviewsPage = () => {
     }
   };
 
+  const handleDelete = async (inv: CompanyInterview) => {
+    if (!window.confirm(`Delete the interview for ${inv.user?.name || inv.title} permanently? This cannot be undone.`)) return;
+    try {
+      await companyService.deleteInterview(inv._id);
+      toast.success('Interview deleted');
+      if (resultsModal?._id === inv._id) setResultsModal(null);
+      await load();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to delete interview');
+    }
+  };
+
   const totalPages = Math.max(1, Math.ceil(total / 10));
 
   return (
@@ -165,6 +177,11 @@ const CompanyInterviewsPage = () => {
                                 <XCircle className="h-4 w-4" />
                               </button>
                             </>
+                          )}
+                          {inv.status !== 'in-progress' && (
+                            <button title="Delete permanently" className="btn btn-sm btn-outline-danger p-2" onClick={() => void handleDelete(inv)}>
+                              <Trash2 className="h-4 w-4" />
+                            </button>
                           )}
                         </div>
                       </td>

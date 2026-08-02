@@ -23,6 +23,7 @@ router.delete('/jobs/:id', controller.deleteJob);
 // ─── Applications ───
 router.get('/applications', controller.getApplications);
 router.get('/applications/:id', controller.getApplicationById);
+router.delete('/applications/:id', controller.deleteApplication);
 router.patch('/applications/:id/status', controller.updateApplicationStatus);
 router.patch('/applications/:id/approve', controller.approveApplication);
 
@@ -36,6 +37,7 @@ router.get('/interviews', controller.getInterviews);
 router.post('/interviews/schedule', controller.scheduleInterview);
 router.patch('/interviews/:id/reschedule', controller.rescheduleInterview);
 router.patch('/interviews/:id/cancel', controller.cancelInterview);
+router.delete('/interviews/:id', controller.deleteInterview);
 router.get('/interviews/:id/results', controller.getInterviewResults);
 
 // ─── Assessments ───
