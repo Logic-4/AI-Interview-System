@@ -558,6 +558,30 @@ export default function InterviewDetailsPage() {
     />
   ) : null;
 
+  /* ─── Visible candidate self-view PiP (shares the recorder stream) ─── */
+  const selfViewPiP = recordingRequired ? (
+    <div className="fixed bottom-24 right-6 z-[10001] w-48 rounded-lg overflow-hidden border border-white-light dark:border-[#1b2e4b] shadow-2xl bg-black">
+      <div className="relative aspect-video">
+        <video
+          autoPlay
+          muted
+          playsInline
+          className="w-full h-full object-cover -scale-x-100"
+          ref={(el) => {
+            if (el && recorder.getStream() && el.srcObject !== recorder.getStream()) {
+              el.srcObject = recorder.getStream();
+              el.play().catch(() => {});
+            }
+          }}
+        />
+        <div className="absolute top-1 left-1 flex items-center gap-1 px-1.5 py-0.5 bg-danger/80 rounded text-[8px] font-bold text-white uppercase tracking-wider">
+          <span className="w-1 h-1 rounded-full bg-white animate-pulse" />
+          Live
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   /* ─── Active / Conversation Session ───────────────────────── */
   const progressPercent =
     questions.length > 0
@@ -624,6 +648,7 @@ export default function InterviewDetailsPage() {
     return (
       <>
         {gazeVideoElement}
+        {selfViewPiP}
         {createPortal(
           <div className="fixed top-0 left-0 w-screen h-screen z-[9999] bg-background text-text-primary dark:text-white flex flex-col">
 

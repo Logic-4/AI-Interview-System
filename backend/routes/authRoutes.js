@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { register, login, refreshToken, logout, getMe, validateSession, forgotPassword, resetPassword } = require('../controllers/authController');
+const { register, login, refreshToken, logout, getMe, validateSession, forgotPassword, resetPassword, redeemInterviewLink } = require('../controllers/authController');
 const { googleRedirect, googleCallback } = require('../controllers/oauthController');
 const { registerValidator, loginValidator, refreshTokenValidator, forgotPasswordValidator, resetPasswordValidator } = require('../validators/authValidator');
 const validate = require('../middleware/validate');
@@ -14,6 +14,9 @@ router.post('/refresh-token', authLimiter, refreshTokenValidator, validate, refr
 router.get('/session', validateSession);
 router.post('/forgot-password', authLimiter, forgotPasswordValidator, validate, forgotPassword);
 router.post('/reset-password/:token', authLimiter, resetPasswordValidator, validate, resetPassword);
+
+// Interview magic link — auto-authenticate candidate from email CTA
+router.get('/interview-link', authLimiter, redeemInterviewLink);
 
 // Google OAuth
 router.get('/google', googleRedirect);

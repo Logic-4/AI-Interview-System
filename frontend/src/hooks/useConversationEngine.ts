@@ -95,11 +95,45 @@ const SILENCE_AUTO_REVIEW_SEC = 2.5;
 const MIN_TRANSCRIPT_CHARS = 6;
 
 /* ─── Hook ──────────────────────────────────────────────── */
+/**
+ * Compose a warm, language-aware opening line for the interviewer to speak
+ * before the first question — greets the candidate by name and sets the
+ * expectation that this is a conversation, not a quiz.
+ */
+function buildWelcomeMessage(
+  userName: string,
+  interviewTitle: string,
+  language: string
+): string {
+  const isSomali = isSomaliLanguage(language);
+  const displayName = userName?.split(" ")[0] || (isSomali ? "musharrax" : "there");
+  const roleLabel = interviewTitle?.trim() || (isSomali ? "shaqada aad codsatay" : "your role");
+  if (isSomali) {
+    return `Salaan, ${displayName}. Ku soo dhawoow wareysigaaga AI ee ${roleLabel}. Waxaan ku waydiin doonaa dhowr su'aalood si aan si fiican kuu fahamno. Si dabiici ah u hadal — waxaad heli doontaa waqti aad ku fikirto ka hor su'aal kasta. Aan bilowno.`;
+  }
+  return `Hi ${displayName}, welcome to your AI interview for ${roleLabel}. I'll ask you a few questions so we can get to know you better. Speak naturally — you'll have time to think before each question. Let's begin.`;
+}
+
+/** Language-aware farewell said before the analysis screen appears. */
+function buildFarewellMessage(userName: string, language: string): string {
+  const isSomali = isSomaliLanguage(language);
+  const displayName = userName?.split(" ")[0] || "";
+  if (isSomali) {
+    return displayName
+      ? `Mahadsanid, ${displayName}. Taasi waa dhamaadka wareysiga. Waxaan hadda diyaarinaynaa warbixintaada.`
+      : `Mahadsanid. Taasi waa dhamaadka wareysiga. Waxaan hadda diyaarinaynaa warbixintaada.`;
+  }
+  return displayName
+    ? `Thank you, ${displayName}. That's the end of the interview. I'll prepare your report now.`
+    : `Thank you. That's the end of the interview. I'll prepare your report now.`;
+}
+
 export function useConversationEngine(
   config: ConversationEngineConfig
 ): ConversationEngineReturn {
   const {
     userName,
+    interviewTitle,
     interviewType,
     language = "english",
     questions,
@@ -338,21 +372,31 @@ export function useConversationEngine(
       }
 
       if (!transcript.trim() || isPlaceholderTranscript(transcript)) {
-        if (sttErrorMessage) {
-          const normalizedError = sttErrorMessage.toLowerCase();
-          const message = normalizedError.includes("503")
-            ? `Speech recognition did not respond in time and may still be warming (${sttErrorMessage.slice(0, 100)}). Please retry.`
-            : normalizedError.includes("fetch")
-              ? `Could not reach speech recognition: ${sttErrorMessage.slice(0, 120)}`
-              : `Could not transcribe your answer: ${sttErrorMessage.slice(0, 120)}`;
-          toast.error(message);
-        } else if (transcript.includes("[No speech detected]")) {
-          toast.error("We heard audio but could not detect speech. Speak louder and try again.");
+        // If we captured audio, submit anyway — the backend keeps the recording
+        // and can transcribe with its fallback path. Only bounce the candidate
+        // back to listening when there is truly nothing recorded.
+        if (audioAnswer && audioAnswer.size > 500) {
+          if (sttErrorMessage) {
+            toast("Speech-to-text is slow. Submitting your recorded answer for review.", { icon: "⚠️" });
+          }
+          transcript = "";
         } else {
-          toast.error("We didn't capture your answer. Please speak clearly and try again.");
+          if (sttErrorMessage) {
+            const normalizedError = sttErrorMessage.toLowerCase();
+            const message = normalizedError.includes("503")
+              ? `Speech recognition did not respond in time and may still be warming (${sttErrorMessage.slice(0, 100)}). Please retry.`
+              : normalizedError.includes("fetch")
+                ? `Could not reach speech recognition: ${sttErrorMessage.slice(0, 120)}`
+                : `Could not transcribe your answer: ${sttErrorMessage.slice(0, 120)}`;
+            toast.error(message);
+          } else if (transcript.includes("[No speech detected]")) {
+            toast.error("We heard audio but could not detect speech. Speak louder and try again.");
+          } else {
+            toast.error("We didn't capture your answer. Please speak clearly and try again.");
+          }
+          await beginListening();
+          return;
         }
-        await beginListening();
-        return;
       }
 
       // Use ref to always get the current question index (avoids stale closure)
@@ -390,10 +434,14 @@ export function useConversationEngine(
           setPhase("follow-up");
           setActiveFollowUpText(result.followUpText);
           activePromptRef.current = result.followUpText;
-          setIsQuestionTextVisible(true);
+          // Hide until voice actually begins to keep text + audio in sync.
+          setIsQuestionTextVisible(false);
           await delay(50);
           if (abortRef.current) return;
-          await speakAndWait(result.followUpText);
+          await tts.speak(result.followUpText, () => {
+            setIsQuestionTextVisible(true);
+          });
+          await delay(150);
           if (abortRef.current) return;
 
           await beginListening();
@@ -454,26 +502,40 @@ export function useConversationEngine(
 
       setPhase("asking");
       setActiveFollowUpText(null);
-      setIsQuestionTextVisible(true);
+      // Keep the question hidden until the voice actually starts — otherwise
+      // the text lands 1–2s before the audio while TTS is still streaming.
+      setIsQuestionTextVisible(false);
 
       await delay(50);
       if (abortRef.current) return;
 
       activePromptRef.current = q.text;
-      await speakAndWait(q.text);
+      await tts.speak(q.text, () => {
+        setIsQuestionTextVisible(true);
+      });
+      await delay(150);
       if (abortRef.current) return;
 
       await beginListening();
     },
-    [speakAndWait, beginListening]
+    [tts, beginListening]
   );
 
   /* ── Wrap up ───────────────────────────────────────────── */
   const wrapUp = useCallback(async () => {
     setPhase("wrapping-up");
 
-    // No hardcoded farewell — move directly to analysis
-    await delay(500);
+    // Speak a farewell so the session doesn't just cut to the analysis screen.
+    // Wrapped in try/catch — a TTS outage at the very end must not block the
+    // report from being generated.
+    const farewell = buildFarewellMessage(userName, languageRef.current);
+    activePromptRef.current = farewell;
+    try {
+      await tts.speak(farewell);
+    } catch {
+      // Ignore — proceed to analysis.
+    }
+    await delay(400);
 
     // Analysis phase
     setPhase("analyzing");
@@ -505,7 +567,7 @@ export function useConversationEngine(
     }
 
     setPhase("done");
-  }, [onComplete, onGenerateFeedback]);
+  }, [onComplete, onGenerateFeedback, tts, userName]);
 
   /* ── Greeting + Start ──────────────────────────────────── */
   const start = useCallback(async (opts?: { language?: string }) => {
@@ -519,13 +581,25 @@ export function useConversationEngine(
     setTimer(0);
     setIsQuestionTextVisible(false);
 
-    // No hardcoded greeting — the AI's intro-category question handles it
     setPhase("greeting");
     await delay(50);
     if (abortRef.current) return;
 
+    // Speak a warm welcome before diving into the first question. The
+    // question text stays hidden until the welcome finishes so the visible
+    // question and the voice never desync.
+    const welcome = buildWelcomeMessage(userName, interviewTitle, sessionLanguage);
+    activePromptRef.current = welcome;
+    try {
+      await tts.speak(welcome);
+    } catch {
+      // A TTS outage must not prevent the interview from starting.
+    }
+    if (abortRef.current) return;
+    await delay(250);
+
     await askQuestion(0);
-  }, [askQuestion]);
+  }, [askQuestion, tts, userName, interviewTitle]);
 
   /* ── Manual interrupt (skip / continue) ────────────────── */
   const interruptAndContinue = useCallback(() => {

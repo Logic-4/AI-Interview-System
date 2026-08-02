@@ -68,6 +68,22 @@ const getExpiryMs = (expiresIn) => {
   return parseInt(match[1], 10) * units[match[2]];
 };
 
+const getInterviewLinkSecret = () =>
+  process.env.JWT_INTERVIEW_LINK_SECRET || getAccessSecret();
+
+const generateInterviewLinkToken = (userId, interviewId, expiresIn = '30d') =>
+  jwt.sign(
+    { id: String(userId), interviewId: String(interviewId), purpose: 'interview_link' },
+    getInterviewLinkSecret(),
+    { expiresIn }
+  );
+
+const verifyInterviewLinkToken = (token) => {
+  const decoded = jwt.verify(token, getInterviewLinkSecret());
+  if (decoded.purpose !== 'interview_link') throw new Error('Invalid token purpose');
+  return decoded;
+};
+
 module.exports = {
   generateAccessToken,
   generateRefreshToken,
@@ -75,4 +91,6 @@ module.exports = {
   verifyRefreshToken,
   getTokenExpiry,
   getExpiryMs,
+  generateInterviewLinkToken,
+  verifyInterviewLinkToken,
 };

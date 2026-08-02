@@ -189,6 +189,15 @@ const interviewSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Distinguishes "candidate scored 0" from "AI/STT failure produced no
+    // scores at all" so the company dashboard can flag interviews for human
+    // review instead of misreporting them as failed.
+    completionFlag: {
+      type: String,
+      enum: ['ok', 'no_valid_evaluations', 'abandoned'],
+      default: 'ok',
+      index: true,
+    },
     // Pre-interview identity checkpoint (lobby face match). Legacy training
     // interviews without a company keep the default 'not_required'.
     identityVerification: {

@@ -3,6 +3,7 @@ const Interview = require('../models/Interview');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { generateComprehensiveFeedback, isPlaceholderAnswer } = require('../services/gemmaService');
+const { calculateOverallScore, isScorable } = require('../utils/evaluation');
 const logger = require('../utils/logger');
 
 /**
@@ -35,13 +36,10 @@ function normalizeFeedback(raw, interview) {
   const cats = raw.categories || raw.skillBreakdown || {};
   const defaultCat = { score: 0, feedback: '' };
 
-  const answeredQuestions = (interview.questions || []).filter(
-    (q) => q.isAnswered && typeof q.score === 'number'
-  );
-  const turnAverage = answeredQuestions.length > 0
-    ? Math.round(answeredQuestions.reduce((sum, q) => sum + q.score, 0) / answeredQuestions.length)
-    : null;
-  const authoritativeScore = turnAverage ?? interview.overallScore ?? 0;
+  // Use the same predicate everywhere so the number in the feedback report
+  // agrees with the number on the interview record and the assessment card.
+  const turnAverage = calculateOverallScore(interview.questions || []);
+  const authoritativeScore = turnAverage ?? interview.overallScore ?? null;
 
   return {
     overallScore: authoritativeScore,
@@ -83,9 +81,7 @@ const generateFeedback = async (req, res, next) => {
     const substantiveAnswers = (interview.questions || []).filter((question) =>
       question.isAnswered && question.userAnswer && question.userAnswer.trim() && !isPlaceholderAnswer(question.userAnswer)
     );
-    const incompleteEvaluations = substantiveAnswers.filter((question) =>
-      typeof question.score !== 'number'
-    );
+    const incompleteEvaluations = substantiveAnswers.filter((q) => !isScorable(q));
     if (!substantiveAnswers.length) {
       return next(ApiError.badRequest('No evaluated answers are available for feedback'));
     }

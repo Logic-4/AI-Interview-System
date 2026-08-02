@@ -42,7 +42,7 @@ const questionSchema = new mongoose.Schema(
     },
     evaluationStatus: {
       type: String,
-      enum: ['pending', 'completed', 'failed', 'invalid'],
+      enum: ['pending', 'completed', 'failed', 'invalid', 'transcription_failed'],
       default: 'pending',
       index: true,
     },

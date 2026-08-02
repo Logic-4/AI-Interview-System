@@ -155,12 +155,14 @@ const sendApplicationRejectedEmail = async ({ name, email }, job, company, reaso
   });
 };
 
-const sendInterviewScheduledEmail = async ({ name, email }, interview, job, company) => {
+const sendInterviewScheduledEmail = async ({ name, email }, interview, job, company, magicToken = null) => {
   const jobTitle = job?.title || interview.jobRole || 'your role';
   const companyName = company?.name || 'the hiring team';
   const when = formatInterviewDateTime(interview.scheduledAt, company?.timezone);
   const clientUrl = getClientUrl();
-  const detailsUrl = `${clientUrl}/interviews/${interview._id}`;
+  const detailsUrl = magicToken
+    ? `${clientUrl}/interview-link?token=${encodeURIComponent(magicToken)}&id=${interview._id}`
+    : `${clientUrl}/interviews/${interview._id}`;
 
   const detailRows = [
     ['Interview type', interview.type],
@@ -195,11 +197,14 @@ ${detailRows}
   });
 };
 
-const sendInterviewRescheduledEmail = async ({ name, email }, interview, job, company) => {
+const sendInterviewRescheduledEmail = async ({ name, email }, interview, job, company, magicToken = null) => {
   const jobTitle = job?.title || interview.jobRole || 'your role';
   const companyName = company?.name || 'the hiring team';
   const when = formatInterviewDateTime(interview.scheduledAt, company?.timezone);
-  const detailsUrl = `${getClientUrl()}/interviews/${interview._id}`;
+  const clientUrl = getClientUrl();
+  const detailsUrl = magicToken
+    ? `${clientUrl}/interview-link?token=${encodeURIComponent(magicToken)}&id=${interview._id}`
+    : `${clientUrl}/interviews/${interview._id}`;
 
   return sendEmail({
     to: email,

@@ -34,6 +34,7 @@ const RegisterPage = lazyWithRetry(() => import('../pages/auth/RegisterPage'));
 const ForgotPasswordPage = lazyWithRetry(() => import('../pages/auth/ForgotPasswordPage'));
 const ResetPasswordPage = lazyWithRetry(() => import('../pages/auth/ResetPasswordPage'));
 const AuthCallbackPage = lazyWithRetry(() => import('../pages/auth/AuthCallbackPage'));
+const InterviewLinkPage = lazyWithRetry(() => import('../pages/auth/InterviewLinkPage'));
 const MaintenancePage = lazyWithRetry(() => import('../pages/MaintenancePage'));
 const SuperadminLoginPage = lazyWithRetry(() => import('../pages/superadmin/SuperadminLoginPage'));
 const SuperadminDashboardPage = lazyWithRetry(() => import('../pages/superadmin/SuperadminDashboardPage'));
@@ -111,6 +112,11 @@ const routes = [
         layout: 'blank',
     },
     {
+        path: '/interview-link',
+        element: <InterviewLinkPage />,
+        layout: 'blank',
+    },
+    {
         path: '/superadmin/login',
         element: <SuperadminLoginPage />,
         layout: 'blank',
@@ -140,7 +146,7 @@ const routes = [
     {
         path: '/interviews/:id',
         element: <InterviewDetailsPage />,
-        layout: 'default',
+        layout: 'blank',
     },
     {
         path: '/interviews/:id/report',

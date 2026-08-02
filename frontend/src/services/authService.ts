@@ -44,6 +44,13 @@ const authService = {
     const res = await api.get<ApiResponse<{ authenticated: boolean }>>('/auth/session');
     return Boolean(res.data.data.authenticated);
   },
+
+  async redeemInterviewLink(token: string): Promise<AuthData & { interviewId: string }> {
+    const res = await api.get<ApiResponse<AuthData & { interviewId: string }>>(
+      `/auth/interview-link?token=${encodeURIComponent(token)}`
+    );
+    return res.data.data;
+  },
 };
 
 export default authService;

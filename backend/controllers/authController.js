@@ -3,7 +3,7 @@ const User = require('../models/User');
 const Company = require('../models/Company');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
-const { generateAccessToken, generateRefreshToken, verifyRefreshToken, getTokenExpiry, getExpiryMs } = require('../utils/tokenUtils');
+const { generateAccessToken, generateRefreshToken, verifyRefreshToken, getTokenExpiry, getExpiryMs, verifyInterviewLinkToken } = require('../utils/tokenUtils');
 const { sendPasswordResetEmail, sendGoogleSignInHelpEmail } = require('../services/emailService');
 const logger = require('../utils/logger');
 
@@ -372,6 +372,53 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Redeem an interview magic link and return a session
+ * @route   GET /api/v1/auth/interview-link
+ * @access  Public
+ */
+const redeemInterviewLink = async (req, res, next) => {
+  try {
+    const { token } = req.query;
+    if (!token) return next(ApiError.badRequest('Token is required'));
+
+    let decoded;
+    try {
+      decoded = verifyInterviewLinkToken(token);
+    } catch {
+      return next(ApiError.unauthorized('Interview link is invalid or has expired'));
+    }
+
+    const user = await User.findById(decoded.id);
+    if (!user) return next(ApiError.unauthorized('User not found'));
+    if (user.accountStatus !== 'active') return next(ApiError.unauthorized('Account is disabled'));
+
+    const refreshExpiresIn = DEFAULT_REFRESH_EXPIRES_IN;
+    const accessToken = generateAccessToken({ id: user._id, email: user.email, role: user.role });
+    const refreshToken = generateRefreshToken({ id: user._id }, refreshExpiresIn);
+
+    user.refreshTokens.push({
+      token: refreshToken,
+      expiresAt: getTokenExpiry(refreshExpiresIn),
+      rememberMe: false,
+    });
+    user.lastLogin = new Date();
+    await user.save();
+
+    res.cookie('refreshToken', refreshToken, getRefreshCookieOptions(refreshExpiresIn, false));
+
+    logger.info(`Interview link redeemed for user: ${user.email}`);
+
+    return ApiResponse.success(res, {
+      accessToken,
+      user: user.toSafeObject(),
+      interviewId: decoded.interviewId,
+    }, 'Authenticated via interview link');
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -381,4 +428,5 @@ module.exports = {
   validateSession,
   forgotPassword,
   resetPassword,
+  redeemInterviewLink,
 };

@@ -2,6 +2,7 @@ const Interview = require('../models/Interview');
 const Question = require('../models/Question');
 const User = require('../models/User');
 const Feedback = require('../models/Feedback');
+const Application = require('../models/Application');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { parseJobDescription, generateInterviewQuestions, processInterviewTurn, isPlaceholderAnswer } = require('../services/gemmaService');
@@ -12,7 +13,7 @@ const { stageTimer } = require('../middleware/requestContext');
 const {
   ensureInterviewerPromptInHistory,
 } = require('../utils/questionHelpers');
-const { normalizeEvaluation, calculateOverallScore } = require('../utils/evaluation');
+const { normalizeEvaluation, calculateOverallScore, isScorable, summarizeEvaluations } = require('../utils/evaluation');
 const {
   startInterviewWarmup,
   getInterviewWarmupStatus,
@@ -27,6 +28,10 @@ function escapeRegex(value = '') {
 // How early a candidate may enter a company-scheduled interview ahead of its
 // scheduledAt time. Kept in sync with the frontend waiting-room countdown.
 const EARLY_JOIN_WINDOW_MS = 15 * 60 * 1000;
+
+// After the scheduled slot ends we still allow a small grace so a candidate
+// who arrived on time but hit a network hiccup can rejoin.
+const LATE_JOIN_GRACE_MS = 10 * 60 * 1000;
 
 /* ─── Normalize interview difficulty → question difficulty ── */
 const DIFFICULTY_MAP = {
@@ -175,29 +180,40 @@ async function runQuestionGenerationPipeline(interviewId, context) {
     const existingFirst = await Question.findOne({ interview: interviewId, order: 0 });
     let firstQuestion = existingFirst;
     if (!firstQuestion) {
-      let generatedFirst;
-      try {
-        [generatedFirst] = await generateInterviewQuestions(
-          interview.type,
-          interview.domain,
-          interview.difficulty,
-          1,
-          {
-            ...generationContext,
-            _forcedCategory: getCategoryForIndex(0, totalCount, interview.type),
-            _forcedIndex: 0,
-            _forcedCount: totalCount,
-            requestTimeoutMs: Number(process.env.FIRST_QUESTION_TIMEOUT_MS || 4500),
-          }
-        );
-      } catch (error) {
-        logger.warn(JSON.stringify({
-          event: 'first_question_model_fallback',
-          requestId: context.requestId,
-          interviewId: String(interviewId),
-          message: error.message,
-        }));
-        generatedFirst = buildFallbackFirstQuestion(interview, context);
+      // Company-scheduled interviews get a deterministic warm-up opener — the
+      // fine-tuned model still drifts into technical questions on index 0 when
+      // the JD is skill-heavy, so we don't gamble on the intro for live hires.
+      // Personal training interviews keep the model-driven opener.
+      const useDeterministicIntro = Boolean(interview.company);
+
+      let generatedFirst = null;
+      if (!useDeterministicIntro) {
+        try {
+          [generatedFirst] = await generateInterviewQuestions(
+            interview.type,
+            interview.domain,
+            interview.difficulty,
+            1,
+            {
+              ...generationContext,
+              _forcedCategory: getCategoryForIndex(0, totalCount, interview.type),
+              _forcedIndex: 0,
+              _forcedCount: totalCount,
+              requestTimeoutMs: Number(process.env.FIRST_QUESTION_TIMEOUT_MS || 4500),
+            }
+          );
+        } catch (error) {
+          logger.warn(JSON.stringify({
+            event: 'first_question_model_fallback',
+            requestId: context.requestId,
+            interviewId: String(interviewId),
+            message: error.message,
+          }));
+        }
+      }
+
+      if (!generatedFirst?.text) {
+        generatedFirst = buildFallbackFirstQuestion(interview, generationContext);
       }
       await assertInterviewStillExists(interviewId);
       firstQuestion = await saveGeneratedQuestion(interviewId, generatedFirst, 0, interview.difficulty);
@@ -568,11 +584,23 @@ const startInterview = async (req, res, next) => {
     // cannot start early. Personal (non-tenant) interviews are unaffected
     // since they are created and started by the same person on demand.
     if (interview.company && interview.scheduledAt) {
-      const opensAt = new Date(interview.scheduledAt).getTime() - EARLY_JOIN_WINDOW_MS;
-      if (Date.now() < opensAt) {
+      const scheduledMs = new Date(interview.scheduledAt).getTime();
+      const opensAt = scheduledMs - EARLY_JOIN_WINDOW_MS;
+      const closesAt = scheduledMs + ((interview.duration || 30) * 60 * 1000) + LATE_JOIN_GRACE_MS;
+      const now = Date.now();
+      if (now < opensAt) {
         return next(
           ApiError.forbidden(
             `This interview is not open yet. It becomes available at ${new Date(opensAt).toISOString()}.`
+          )
+        );
+      }
+      if (now > closesAt && interview.status === 'scheduled') {
+        interview.status = 'cancelled';
+        await interview.save();
+        return next(
+          ApiError.forbidden(
+            'This interview window has closed. The candidate did not join in time. Contact the hiring team to reschedule.'
           )
         );
       }
@@ -585,6 +613,19 @@ const startInterview = async (req, res, next) => {
         return next(ApiError.forbidden('Identity verification failed. This interview has been blocked pending review.'));
       }
       return next(ApiError.forbidden('Identity verification is required before starting this interview.'));
+    }
+
+    // Re-verify the linked application is still approved — the company may
+    // have revoked approval or rejected the candidate after the interview was
+    // scheduled and before the candidate joined.
+    if (interview.company) {
+      const linkedApplication = await Application.findOne({
+        interview: interview._id,
+        company: interview.company,
+      }).select('approvalStatus status').lean();
+      if (linkedApplication && linkedApplication.approvalStatus !== 'approved') {
+        return next(ApiError.forbidden('Your application is no longer approved for this interview.'));
+      }
     }
 
     if (interview.status === 'scheduled') {
@@ -670,9 +711,25 @@ const submitAnswer = async (req, res, next) => {
       return next(ApiError.notFound('Active interview not found'));
     }
 
+    // Enforce the same gates as /start — otherwise a candidate can call
+    // submitAnswer directly and bypass identity + scheduling windows.
+    if (interview.company && interview.scheduledAt) {
+      const opensAt = new Date(interview.scheduledAt).getTime() - EARLY_JOIN_WINDOW_MS;
+      if (Date.now() < opensAt) {
+        return next(ApiError.forbidden('This interview is not open yet.'));
+      }
+    }
+    if (requiresVerification(interview) && interview.identityVerification?.status !== 'passed') {
+      const msg = interview.identityVerification?.status === 'blocked'
+        ? 'Identity verification failed. This interview has been blocked pending review.'
+        : 'Identity verification is required before submitting answers.';
+      return next(ApiError.forbidden(msg));
+    }
+
     // Coerce scheduled → in-progress on first answer
     if (interview.status === 'scheduled') {
       interview.status = 'in-progress';
+      if (!interview.startedAt) interview.startedAt = new Date();
     }
 
     // Find the question
@@ -689,6 +746,7 @@ const submitAnswer = async (req, res, next) => {
     let audioUrl = '';
     let transcribedAnswer = userAnswer || '';
 
+    let transcriptionFailed = false;
     if (req.file) {
       try {
         const audioResult = await uploadAudio(req.file.buffer, req.user._id.toString(), questionId);
@@ -697,13 +755,17 @@ const submitAnswer = async (req, res, next) => {
         logger.warn(`Audio upload failed, continuing with transcription: ${uploadError.message}`);
       }
 
-      // Transcribe audio if no text answer provided
+      // Transcribe audio if no text answer provided. STT outages must NOT
+      // block a live interview — the candidate already spoke the answer, so
+      // we persist the audio and flag the turn for re-transcription rather
+      // than failing the whole submission.
       if (!userAnswer) {
         try {
           transcribedAnswer = await transcribeAudio(req.file.buffer, req.file.originalname, req.file.mimetype, interview.language);
         } catch (transcriptionError) {
           logger.warn(`${interview.language} audio transcription failed: ${transcriptionError.message}`);
-          return next(ApiError.badRequest(`Could not transcribe the ${interview.language} audio answer. Please try recording again.`));
+          transcribedAnswer = '';
+          transcriptionFailed = true;
         }
       }
     }
@@ -728,7 +790,10 @@ const submitAnswer = async (req, res, next) => {
     let isFollowUp = false;
     let answeredCandidateQuestion = false;
 
-    if (transcribedAnswer && !isPlaceholderAnswer(transcribedAnswer)) {
+    if (transcriptionFailed) {
+      evaluation.feedback = 'Speech-to-text was unavailable — the audio is stored for re-transcription.';
+      evaluation.evaluationStatus = 'transcription_failed';
+    } else if (transcribedAnswer && !isPlaceholderAnswer(transcribedAnswer)) {
       try {
         const turnResult = await processInterviewTurn(
           interview.conversationHistory,
@@ -863,10 +928,40 @@ const completeInterview = async (req, res, next) => {
       return next(ApiError.badRequest(`Cannot complete interview with status '${interview.status}'`));
     }
 
-    const overallScore = calculateOverallScore(interview.questions);
+    // A topic that entered follow-up mode but never closed can still hold a
+    // valid tentative score. Promote it to 'completed' so it counts in the
+    // final average instead of silently vanishing.
+    const promotableFollowUps = (interview.questions || []).filter((q) =>
+      q &&
+      q.evaluationStatus === 'pending' &&
+      typeof q.score === 'number' &&
+      Number.isFinite(q.score) &&
+      q.score >= 0 &&
+      q.score <= 100 &&
+      q.userAnswer &&
+      q.userAnswer.trim()
+    );
+    for (const q of promotableFollowUps) {
+      q.evaluationStatus = 'completed';
+      q.isAnswered = true;
+      await q.save();
+    }
+
+    const summary = summarizeEvaluations(interview.questions);
+    const overallScore = summary.overallScore;
+
+    // A live company interview with no substantive evaluations at all is not
+    // a "candidate scored 0" — it's a platform failure or an abandoned session.
+    // Keep the record but tag it so the company dashboard can distinguish.
+    if (interview.company && !summary.hasAnyValidScore) {
+      interview.completionFlag = 'no_valid_evaluations';
+    } else {
+      interview.completionFlag = 'ok';
+    }
 
     interview.status = 'completed';
     interview.overallScore = overallScore;
+    if (!interview.completedAt) interview.completedAt = new Date();
 
     // Reassemble the session recording, if the candidate's browser uploaded
     // any chunks during the live interview. This never blocks or fails the
@@ -916,6 +1011,12 @@ const deleteInterview = async (req, res, next) => {
 
     if (!interview) {
       return next(ApiError.notFound('Interview not found'));
+    }
+
+    // Company-scheduled live interviews are not personal training records —
+    // candidates cannot delete them from their history.
+    if (interview.company) {
+      return next(ApiError.forbidden('Scheduled interviews cannot be deleted by candidates.'));
     }
 
     const audioUrls = await Question.find({ interview: interview._id }).distinct('audioUrl');
@@ -1057,6 +1158,12 @@ const retryEvaluate = async (req, res, next) => {
       return next(ApiError.notFound('Interview not found'));
     }
 
+    // The Practice Loop lets candidates re-answer for extra feedback — that is
+    // strictly a training feature, not something you can do inside a live hire.
+    if (interview.company) {
+      return next(ApiError.forbidden('Practice retries are not allowed on scheduled interviews.'));
+    }
+
     const question = await Question.findOne({
       _id: questionId,
       interview: interviewId,
@@ -1124,6 +1231,12 @@ const resetInterview = async (req, res, next) => {
 
     if (!interview) {
       return next(ApiError.notFound('Interview not found'));
+    }
+
+    // Retake is a training-only feature — a live scheduled interview is
+    // one-shot and its answers cannot be wiped by the candidate.
+    if (interview.company) {
+      return next(ApiError.forbidden('Scheduled interviews cannot be reset.'));
     }
 
     await Feedback.deleteMany({ interview: interview._id });
@@ -1223,25 +1336,35 @@ const reportProctoringEvent = async (req, res, next) => {
       type,
       timestamp: new Date(),
       details: String(details || '').slice(0, 500),
-      strike: typeof strike === 'number' ? strike : null,
+      strike: null, // filled in below from the server-computed count
     });
 
-    if (typeof strike === 'number' && strike > interview.proctoring.strikes) {
-      interview.proctoring.strikes = Math.min(strike, 3);
+    // Server-side strike accumulation — the client can send a strike hint
+    // but we never trust it. A single strike per two same-type violations
+    // (rounded up), capped at 3.
+    const violations = interview.proctoring.violations || [];
+    const groups = {};
+    for (const v of violations) {
+      groups[v.type] = (groups[v.type] || 0) + 1;
     }
+    const computedStrikes = Math.min(
+      3,
+      Object.values(groups).reduce((sum, n) => sum + Math.ceil(n / 2), 0)
+    );
+    interview.proctoring.strikes = computedStrikes;
+    interview.proctoring.violations[interview.proctoring.violations.length - 1].strike = computedStrikes;
 
-    const totalViolations = interview.proctoring.violations.length;
-    const strikes = interview.proctoring.strikes;
-    const penalty = Math.min(totalViolations * 2 + strikes * 15, 100);
+    const totalViolations = violations.length;
+    const penalty = Math.min(totalViolations * 2 + computedStrikes * 15, 100);
     interview.proctoring.integrityScore = Math.max(0, 100 - penalty);
 
-    if (strikes >= 3) {
+    if (computedStrikes >= 3 || interview.proctoring.integrityScore < 40) {
       interview.proctoring.flaggedForReview = true;
     }
 
     await interview.save();
 
-    logger.info(`Proctoring event for interview ${interview._id}: ${type} (strike ${strikes})`);
+    logger.info(`Proctoring event for interview ${interview._id}: ${type} (strike ${computedStrikes})`);
 
     ApiResponse.success(res, {
       strikes: interview.proctoring.strikes,

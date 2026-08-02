@@ -246,7 +246,10 @@ export default function InterviewsHistoryPage() {
                     </td>
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-1">
-                        {iv.status === "completed" && (
+                        {/* Retake and Delete are training-mode features. Live
+                            scheduled interviews are one-shot and owned by the
+                            hiring company — candidates can only review them. */}
+                        {!iv.company && iv.status === "completed" && (
                           <button
                             onClick={(e) => { e.preventDefault(); handleRetake(iv._id); }}
                             disabled={retakingId === iv._id}
@@ -260,18 +263,24 @@ export default function InterviewsHistoryPage() {
                             )}
                           </button>
                         )}
-                        <button
-                          onClick={(e) => { e.preventDefault(); setConfirmDelete({ id: iv._id, title: iv.title }); }}
-                          disabled={deletingId === iv._id}
-                          className="w-8 h-8 rounded-md flex items-center justify-center text-text-muted hover:text-danger hover:bg-danger/5 transition-all disabled:opacity-30"
-                          title="Delete interview"
-                        >
-                          {deletingId === iv._id ? (
-                             <LoadingSpinner size="sm" className="h-4 w-4 border-danger" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </button>
+                        {!iv.company ? (
+                          <button
+                            onClick={(e) => { e.preventDefault(); setConfirmDelete({ id: iv._id, title: iv.title }); }}
+                            disabled={deletingId === iv._id}
+                            className="w-8 h-8 rounded-md flex items-center justify-center text-text-muted hover:text-danger hover:bg-danger/5 transition-all disabled:opacity-30"
+                            title="Delete interview"
+                          >
+                            {deletingId === iv._id ? (
+                               <LoadingSpinner size="sm" className="h-4 w-4 border-danger" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        ) : (
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted opacity-60">
+                            Live
+                          </span>
+                        )}
                       </div>
                     </td>
                   </tr>

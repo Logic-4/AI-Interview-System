@@ -16,6 +16,7 @@ const {
   sendInterviewRescheduledEmail,
   sendInterviewCancelledEmail,
 } = require('../services/emailService');
+const { generateInterviewLinkToken } = require('../utils/tokenUtils');
 const logger = require('../utils/logger');
 
 const normalizePagination = (value, fallback, max) => Math.min(Math.max(parseInt(value, 10) || fallback, 1), max);
@@ -473,13 +474,17 @@ const scheduleInterview = async (req, res, next) => {
 
     if (applicationId) {
       application = await Application.findOne({ _id: applicationId, company: req.companyId });
-      if (application) {
-        if (application.approvalStatus !== 'approved') {
-          return next(ApiError.badRequest('Candidate must be approved before scheduling an interview'));
-        }
-        candidateId = candidateId || application.candidate;
-        job = await Job.findById(application.job);
+      if (!application) {
+        // An unknown applicationId used to fall through to unconditional
+        // scheduling as long as candidateId was also supplied — that skipped
+        // the approval gate entirely. Reject explicitly instead.
+        return next(ApiError.notFound('Application not found for this company'));
       }
+      if (application.approvalStatus !== 'approved') {
+        return next(ApiError.badRequest('Candidate must be approved before scheduling an interview'));
+      }
+      candidateId = candidateId || application.candidate;
+      job = await Job.findById(application.job);
     }
 
     if (!candidateId && !application) return next(ApiError.badRequest('Candidate is required for scheduling an interview'));
@@ -539,12 +544,14 @@ const scheduleInterview = async (req, res, next) => {
       await application.save();
     }
 
+    const scheduledMagicToken = generateInterviewLinkToken(candidate._id, interview._id);
     notifyEmail(
       sendInterviewScheduledEmail,
       { name: candidate.name, email: candidate.email },
       interview,
       job,
-      req.company
+      req.company,
+      scheduledMagicToken
     );
 
     ApiResponse.created(res, { interview }, 'Interview scheduled successfully');
@@ -566,12 +573,14 @@ const rescheduleInterview = async (req, res, next) => {
     interview.status = 'scheduled';
     await interview.save();
 
+    const rescheduledMagicToken = generateInterviewLinkToken(interview.user._id, interview._id);
     notifyEmail(
       sendInterviewRescheduledEmail,
       { name: interview.user?.name, email: interview.user?.email },
       interview,
       null,
-      req.company
+      req.company,
+      rescheduledMagicToken
     );
 
     ApiResponse.success(res, { interview }, 'Interview rescheduled successfully');
@@ -662,23 +671,37 @@ const getAssessments = async (req, res, next) => {
       );
 
       const synthesizedAssessments = completedInterviews.map((inv) => {
-        const score = inv.overallScore ?? inv.feedback?.overallScore ?? 0;
+        const rawScore = inv.overallScore ?? inv.feedback?.overallScore ?? null;
         const passingScore = thresholdMap[String(inv._id)] ?? 70;
+        const flaggedForReview = Boolean(inv.proctoring?.flaggedForReview);
+        const completionFlag = inv.completionFlag || 'ok';
+        // Never present a null score as a "0 / failed" — this is the difference
+        // between "candidate scored 0" and "platform never produced a score",
+        // and hiring managers must be able to tell them apart.
+        let passFailStatus;
+        if (rawScore == null || completionFlag === 'no_valid_evaluations') {
+          passFailStatus = 'pending_review';
+        } else if (flaggedForReview) {
+          passFailStatus = 'requires_review';
+        } else {
+          passFailStatus = rawScore >= passingScore ? 'passed' : 'failed';
+        }
         return {
           _id: inv._id,
           candidate: inv.user,
           candidateName: inv.user?.name || 'Candidate',
           job: { title: jobTitleMap[String(inv._id)] || inv.jobRole || inv.title || 'Technical Assessment' },
           assessmentType: `${inv.type.toUpperCase()} AI Evaluation`,
-          score,
+          score: rawScore,
           passingScore,
-          passFailStatus: score >= passingScore ? 'passed' : 'failed',
+          passFailStatus,
+          completionFlag,
           completionDate: inv.completedAt || inv.updatedAt,
           summaryNotes: inv.feedback?.summary || 'Completed automated AI Mock Interview evaluation.',
           strengths: inv.feedback?.strengths || [],
           improvements: inv.feedback?.improvements || [],
           integrityScore: inv.proctoring?.integrityScore ?? 100,
-          flaggedForReview: inv.proctoring?.flaggedForReview ?? false,
+          flaggedForReview,
           proctoringStrikes: inv.proctoring?.strikes ?? 0,
         };
       });
@@ -728,8 +751,18 @@ const getAssessmentById = async (req, res, next) => {
 
     if (!interview) return next(ApiError.notFound('Assessment report not found'));
 
-    const score = interview.overallScore ?? interview.feedback?.overallScore ?? 0;
+    const rawScore = interview.overallScore ?? interview.feedback?.overallScore ?? null;
     const passingScore = linkedApp?.job?.passingScoreThreshold ?? 70;
+    const flaggedForReview = Boolean(interview.proctoring?.flaggedForReview);
+    const completionFlag = interview.completionFlag || 'ok';
+    let passFailStatus;
+    if (rawScore == null || completionFlag === 'no_valid_evaluations') {
+      passFailStatus = 'pending_review';
+    } else if (flaggedForReview) {
+      passFailStatus = 'requires_review';
+    } else {
+      passFailStatus = rawScore >= passingScore ? 'passed' : 'failed';
+    }
 
     const synthesized = {
       _id: interview._id,
@@ -737,9 +770,10 @@ const getAssessmentById = async (req, res, next) => {
       candidateName: interview.user?.name || 'Candidate',
       job: linkedApp?.job || { title: interview.jobRole || interview.title },
       assessmentType: `${interview.type.toUpperCase()} AI Evaluation`,
-      score,
+      score: rawScore,
       passingScore,
-      passFailStatus: score >= passingScore ? 'passed' : 'failed',
+      passFailStatus,
+      completionFlag,
       completionDate: interview.completedAt || interview.updatedAt,
       summaryNotes: interview.feedback?.summary || 'Automated AI Interview Report',
       detailedFeedback: interview.feedback?.detailedFeedback || '',
@@ -747,7 +781,7 @@ const getAssessmentById = async (req, res, next) => {
       improvements: interview.feedback?.improvements || [],
       categoryScores: interview.feedback?.categories || null,
       integrityScore: interview.proctoring?.integrityScore ?? 100,
-      flaggedForReview: interview.proctoring?.flaggedForReview ?? false,
+      flaggedForReview,
       proctoringStrikes: interview.proctoring?.strikes ?? 0,
       identityVerification: interview.identityVerification || null,
       proctoringViolations: interview.proctoring?.violations || [],
@@ -758,8 +792,10 @@ const getAssessmentById = async (req, res, next) => {
           text: q.text,
           category: q.category,
           score: q.score,
+          evaluationStatus: q.evaluationStatus,
           aiFeedback: q.aiFeedback || '',
           userAnswer: q.userAnswer || '',
+          audioUrl: q.audioUrl || '',
         })),
     };
 
