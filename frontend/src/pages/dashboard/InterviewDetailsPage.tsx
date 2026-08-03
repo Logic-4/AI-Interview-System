@@ -101,10 +101,17 @@ export default function InterviewDetailsPage() {
   const loadedInterviewIdRef = useRef<string | null>(null);
 
   const applyInterview = useCallback(
-    (data: PopulatedInterview) => {
-      setInterview(data);
-      setActiveInterview(data);
-      setQuestionsReady(computeQuestionsReady(data));
+    (data: Partial<PopulatedInterview>) => {
+      // Merge with previous state — the /progress endpoint returns a partial
+      // interview payload (only generation-status fields), and a plain replace
+      // would wipe out type/duration/title/company/etc. that later render
+      // paths depend on (e.g. `interview.type.replace(...)`).
+      setInterview((prev) => {
+        const merged = (prev ? { ...prev, ...data } : data) as PopulatedInterview;
+        setActiveInterview(merged);
+        setQuestionsReady(computeQuestionsReady(merged));
+        return merged;
+      });
     },
     [setActiveInterview]
   );
