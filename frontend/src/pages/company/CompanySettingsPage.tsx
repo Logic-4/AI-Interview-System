@@ -23,7 +23,7 @@ const CompanySettingsPage = () => {
     address: '',
     description: '',
     preferredLanguage: 'English',
-    timezone: 'UTC',
+    timezone: 'Africa/Mogadishu',
   });
 
   const [currentPassword, setCurrentPassword] = useState('');
@@ -264,37 +264,6 @@ const CompanySettingsPage = () => {
             </div>
           </form>
 
-          {/* Preferences */}
-          <div className="space-y-4 pt-4 border-t border-white-light dark:border-white-light/10">
-            <h3 className="text-lg font-bold text-black dark:text-white">Regional Preferences</h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor="preferredLanguage">Preferred Language</label>
-                <select
-                  id="preferredLanguage"
-                  className="form-select"
-                  value={profile.preferredLanguage || 'English'}
-                  onChange={(e) => setProfile((prev) => ({ ...prev, preferredLanguage: e.target.value }))}
-                >
-                  <option value="English">English</option>
-                  <option value="Somali">Somali</option>
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="timezone">Time Zone</label>
-                <select
-                  id="timezone"
-                  className="form-select"
-                  value={profile.timezone || 'UTC'}
-                  onChange={(e) => setProfile((prev) => ({ ...prev, timezone: e.target.value }))}
-                >
-                  <option value="UTC">UTC (Coordinated Universal Time)</option>
-                  <option value="Africa/Mogadishu">EAT (East Africa Time - UTC+3)</option>
-                </select>
-              </div>
-            </div>
-          </div>
         </div>
       )}
     </div>
