@@ -365,16 +365,19 @@ export default function InterviewDetailsPage() {
   const toggleMic = useCallback(() => {
     const canToggle = engine.phase === "listening" || engine.phase === "reviewing";
     if (!canToggle) return;
+    const isSomali = isSomaliLanguage(interview?.language);
 
     setIsMicMuted((prev) => {
       if (prev) {
         engine.audioRecorder.resumeRecording();
+        if (!isSomali) engine.recognition.startListening();
       } else {
         engine.audioRecorder.pauseRecording();
+        if (!isSomali) engine.recognition.stopListening();
       }
       return !prev;
     });
-  }, [engine.audioRecorder, engine.phase]);
+  }, [engine.audioRecorder, engine.recognition, engine.phase, interview?.language]);
 
   /* ── End interview ───────────────────────────────────────── */
   const handleEndInterview = async () => {
@@ -382,6 +385,7 @@ export default function InterviewDetailsPage() {
     setIsEnding(true);
     engine.tts.cancel();
     engine.audioRecorder.stopRecording();
+    try { engine.recognition.stopListening(); } catch { /* ignore */ }
 
     try {
       if (!hasCompletedRef.current) {
@@ -864,7 +868,26 @@ export default function InterviewDetailsPage() {
             )}
           </div>
 
-          {/* Mic activity — no live transcript (transcription runs server-side after submit) */}
+          {/* Live interim transcript — English only (browser Web Speech API).
+              Somali has no browser STT, so the mic activity block below is
+              the only feedback for it. */}
+          {!isSomali && (engine.phase === "listening" || engine.phase === "reviewing") && engine.recognition.getTranscript() && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="max-w-lg w-full text-center mb-3 flex-shrink-0"
+            >
+              <div className="px-4 py-3 rounded-md bg-primary/10 border border-primary/20 inline-block max-w-full">
+                <p className="text-sm text-foreground dark:text-white font-semibold leading-relaxed">
+                  {engine.recognition.getTranscript()}
+                </p>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Mic activity — always shown while listening/reviewing. Transcription
+              itself: browser Web Speech API for English (primary), Gemini
+              backend as fallback; RunPod for Somali. */}
           {(engine.phase === "listening" || engine.phase === "reviewing") && (
             <motion.div
               initial={{ opacity: 0, y: 8 }}

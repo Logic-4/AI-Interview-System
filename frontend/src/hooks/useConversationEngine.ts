@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useSpeechSynthesis } from "./useSpeechSynthesis";
+import { useSpeechRecognition } from "./useSpeechRecognition";
 import { useAudioRecorder } from "./useAudioRecorder";
 import { transcribeAudio as transcribeWithSTT } from "../services/sttService";
 import { isPlaceholderTranscript, isSomaliLanguage, speechLanguageCode } from "../lib/interviewHelpers";
@@ -68,6 +69,7 @@ export interface ConversationEngineReturn {
   totalQuestions: number;
   answeredCount: number;
   tts: ReturnType<typeof useSpeechSynthesis>;
+  recognition: ReturnType<typeof useSpeechRecognition>;
   audioRecorder: ReturnType<typeof useAudioRecorder>;
   analysisStage: AnalysisStage;
   timer: number;
@@ -165,6 +167,13 @@ export function useConversationEngine(
 
   const languageCode = speechLanguageCode(language);
   const tts = useSpeechSynthesis(languageCode);
+  // Browser Web Speech API is used ONLY for English — it provides both live
+  // interim text for the UI and the primary submit-time transcript. On
+  // unsupported browsers or empty transcripts, submit falls back to the
+  // backend STT path (Gemini). Somali always uses the audio-upload path
+  // since the browser has no Somali model.
+  const recognitionEnabled = !isSomaliLanguage(language);
+  const recognition = useSpeechRecognition(languageCode, recognitionEnabled);
   const audioRecorder = useAudioRecorder();
 
   const phaseRef = useRef(phase);
@@ -195,8 +204,11 @@ export function useConversationEngine(
     tts.pause();
     if (phaseRef.current === "listening") {
       audioRecorder.pauseRecording();
+      if (recognitionEnabled) {
+        try { recognition.stopListening(); } catch { /* ignore */ }
+      }
     }
-  }, [tts, audioRecorder.pauseRecording]);
+  }, [tts, audioRecorder.pauseRecording, recognition, recognitionEnabled]);
 
   const resume = useCallback(() => {
     if (!isPausedRef.current) return;
@@ -205,8 +217,9 @@ export function useConversationEngine(
     tts.resume();
     if (phaseRef.current === "listening") {
       audioRecorder.resumeRecording();
+      if (recognitionEnabled) recognition.startListening();
     }
-  }, [tts, audioRecorder.resumeRecording]);
+  }, [tts, audioRecorder.resumeRecording, recognition, recognitionEnabled]);
 
   /* ── Speak and wait until done ─────────────────────────── */
   const speakAndWait = useCallback(
@@ -242,9 +255,12 @@ export function useConversationEngine(
   const stopRecordingForReview = useCallback(() => {
     if (phaseRef.current === "listening") {
       audioRecorder.stopRecording();
+      if (recognitionEnabled) {
+        try { recognition.stopListening(); } catch { /* ignore */ }
+      }
       setPhase("reviewing");
     }
-  }, [audioRecorder.stopRecording]);
+  }, [audioRecorder.stopRecording, recognition, recognitionEnabled]);
 
   /* ── Listen watchdog: silence auto-review, max listen time ──────────
      Single unified path for both English and Somali: mic volume from the
@@ -295,8 +311,14 @@ export function useConversationEngine(
     } catch {
       toast.error("Microphone access failed. Allow the mic in your browser and try again.");
       setPhase("reviewing");
+      return;
     }
-  }, [audioRecorder]);
+
+    if (recognitionEnabled) {
+      recognition.resetTranscript();
+      recognition.startListening();
+    }
+  }, [audioRecorder, recognition, recognitionEnabled]);
 
   /* ── Handle manual submit ────────────────────────────────── */
   const handleManualSubmit = useCallback(
@@ -308,14 +330,29 @@ export function useConversationEngine(
 
       try {
       const audioAnswer = await audioRecorder.finalizeRecording();
+      if (recognitionEnabled) {
+        try { recognition.stopListening(); } catch { /* ignore */ }
+      }
 
       // ── Determine transcript ─────────────────────────────────────────────
+      // Priority order:
+      //   1) An explicit textAnswer override (e.g. review-mode edit).
+      //   2) English: browser Web Speech API transcript (primary, live).
+      //   3) Backend STT: Gemini for English (fallback when browser is
+      //      unsupported or returned nothing), RunPod for Somali.
       let transcript: string;
       let sttErrorMessage: string | null = null;
       if (textAnswer !== undefined) {
         transcript = textAnswer.trim();
       } else {
-        if (!audioAnswer || audioAnswer.size < 500) {
+        const browserTranscript = recognitionEnabled
+          ? recognition.getTranscript().trim()
+          : "";
+
+        if (browserTranscript) {
+          transcript = browserTranscript;
+          console.log(`[STT] Using browser transcript (${transcript.length} chars): "${transcript.slice(0, 80)}"`);
+        } else if (!audioAnswer || audioAnswer.size < 500) {
           toast.error(
             audioAnswer
               ? "Recording too short. Speak for at least 2 seconds, then submit."
@@ -323,23 +360,21 @@ export function useConversationEngine(
           );
           await beginListening();
           return;
-        }
-        try {
-          console.log(`[STT] Sending ${(audioAnswer.size / 1024).toFixed(1)} KB to ASR…`);
-          transcript = await transcribeWithSTT(audioAnswer, 'answer.webm', languageCode);
-          if (!transcript.trim()) {
-            transcript = "[No speech detected]";
+        } else {
+          // Browser transcript unavailable — fall back to backend STT.
+          try {
+            console.log(`[STT] Sending ${(audioAnswer.size / 1024).toFixed(1)} KB to backend ASR…`);
+            transcript = await transcribeWithSTT(audioAnswer, 'answer.webm', languageCode);
+            if (!transcript.trim()) {
+              transcript = "[No speech detected]";
+            }
+            console.log(`[STT] Backend transcript received: "${transcript.slice(0, 80)}"`);
+          } catch (sttError) {
+            console.warn("[STT] Backend transcription failed:", sttError);
+            sttErrorMessage =
+              sttError instanceof Error ? sttError.message : "Speech recognition service unavailable";
+            transcript = "";
           }
-          console.log(`[STT] Transcript received: "${transcript.slice(0, 80)}"`);
-        } catch (sttError) {
-          console.warn("[STT] Transcription failed:", sttError);
-          sttErrorMessage =
-            sttError instanceof Error ? sttError.message : "Speech recognition service unavailable";
-          // No browser-speech fallback for either language — Gemini (English)
-          // and RunPod (Somali) are the only supported STT paths. Keep the
-          // audio and let the backend retry / persist the recording; the
-          // transcript stays empty so the caller can surface the error.
-          transcript = "";
         }
       }
 
@@ -592,6 +627,9 @@ export function useConversationEngine(
   const interruptAndContinue = useCallback(() => {
     tts.cancel();
     audioRecorder.stopRecording();
+    if (recognitionEnabled) {
+      try { recognition.stopListening(); } catch { /* ignore */ }
+    }
 
     if (phase === "listening" || phase === "reviewing") {
       handleManualSubmit();
@@ -600,6 +638,8 @@ export function useConversationEngine(
     phase,
     tts,
     audioRecorder.stopRecording,
+    recognition,
+    recognitionEnabled,
     handleManualSubmit,
   ]);
 
@@ -608,6 +648,7 @@ export function useConversationEngine(
     return () => {
       abortRef.current = true;
       tts.cancel();
+      try { recognition.stopListening(); } catch { /* ignore */ }
       audioRecorder.resetRecording().catch(() => {});
       if (timerRef.current) clearInterval(timerRef.current);
     };
@@ -620,6 +661,7 @@ export function useConversationEngine(
     totalQuestions: questions.length,
     answeredCount,
     tts,
+    recognition,
     audioRecorder,
     analysisStage,
     timer,
