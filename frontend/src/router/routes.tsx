@@ -48,6 +48,7 @@ const InterviewsHistoryPage = lazyWithRetry(() => import('../pages/dashboard/Int
 const NewInterviewPage = lazyWithRetry(() => import('../pages/dashboard/NewInterviewPage'));
 const InterviewDetailsPage = lazyWithRetry(() => import('../pages/dashboard/InterviewDetailsPage'));
 const InterviewReportPage = lazyWithRetry(() => import('../pages/dashboard/InterviewReportPage'));
+const InterviewCompletePage = lazyWithRetry(() => import('../pages/dashboard/InterviewCompletePage'));
 const InterviewReviewPage = lazyWithRetry(() => import('../pages/dashboard/InterviewReviewPage'));
 const AnalyticsPage = lazyWithRetry(() => import('../pages/dashboard/AnalyticsPage'));
 const ProfilePage = lazyWithRetry(() => import('../pages/dashboard/ProfilePage'));
@@ -152,6 +153,11 @@ const routes = [
         path: '/interviews/:id/report',
         element: <InterviewReportPage />,
         layout: 'default',
+    },
+    {
+        path: '/interviews/:id/complete',
+        element: <InterviewCompletePage />,
+        layout: 'blank',
     },
     {
         path: '/interviews/:id/review',

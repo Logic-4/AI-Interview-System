@@ -3,7 +3,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useSpeechSynthesis } from "./useSpeechSynthesis";
-import { useSpeechRecognition } from "./useSpeechRecognition";
 import { useAudioRecorder } from "./useAudioRecorder";
 import { transcribeAudio as transcribeWithSTT } from "../services/sttService";
 import { isPlaceholderTranscript, isSomaliLanguage, speechLanguageCode } from "../lib/interviewHelpers";
@@ -69,7 +68,6 @@ export interface ConversationEngineReturn {
   totalQuestions: number;
   answeredCount: number;
   tts: ReturnType<typeof useSpeechSynthesis>;
-  recognition: ReturnType<typeof useSpeechRecognition>;
   audioRecorder: ReturnType<typeof useAudioRecorder>;
   analysisStage: AnalysisStage;
   timer: number;
@@ -92,7 +90,6 @@ function delay(ms: number): Promise<void> {
 /* Maximum listen time per question */
 const MAX_LISTEN_SEC = 120;
 const SILENCE_AUTO_REVIEW_SEC = 2.5;
-const MIN_TRANSCRIPT_CHARS = 6;
 
 /* ─── Hook ──────────────────────────────────────────────── */
 /**
@@ -166,13 +163,8 @@ export function useConversationEngine(
   const languageRef = useRef(language);
   languageRef.current = language;
 
-  /** Locked when the session starts so speech mode cannot flip mid-interview. */
-  const isSomaliSessionRef = useRef(isSomaliLanguage(language));
-  const isSomaliSession = () => isSomaliSessionRef.current;
-
   const languageCode = speechLanguageCode(language);
   const tts = useSpeechSynthesis(languageCode);
-  const recognition = useSpeechRecognition(languageCode, !isSomaliLanguage(language));
   const audioRecorder = useAudioRecorder();
 
   const phaseRef = useRef(phase);
@@ -190,6 +182,10 @@ export function useConversationEngine(
   const activePromptRef = useRef("");
   const abortRef = useRef(false);
   const listenIntervalRef = useRef<ReturnType<typeof setInterval>>();
+  // Guards against a candidate double-clicking "Submit Answer" or the space
+  // watchdog racing with a manual click — a duplicate submission would
+  // upload the same audio twice and could re-score the topic.
+  const isSubmittingRef = useRef(false);
 
   /* ── Pause / Resume ────────────────────────────────────── */
   const pause = useCallback(() => {
@@ -197,12 +193,10 @@ export function useConversationEngine(
     isPausedRef.current = true;
     setIsPaused(true);
     tts.pause();
-    // Only pause audio/recording if actually in the listening phase
     if (phaseRef.current === "listening") {
       audioRecorder.pauseRecording();
-      if (!isSomaliSession()) try { recognition.stopListening(); } catch {}
     }
-  }, [tts, recognition, audioRecorder.pauseRecording, language]);
+  }, [tts, audioRecorder.pauseRecording]);
 
   const resume = useCallback(() => {
     if (!isPausedRef.current) return;
@@ -211,14 +205,18 @@ export function useConversationEngine(
     tts.resume();
     if (phaseRef.current === "listening") {
       audioRecorder.resumeRecording();
-      if (!isSomaliSession()) recognition.startListening();
     }
-  }, [tts, recognition, audioRecorder.resumeRecording]);
+  }, [tts, audioRecorder.resumeRecording]);
 
   /* ── Speak and wait until done ─────────────────────────── */
   const speakAndWait = useCallback(
     async (text: string, onPlay?: () => void) => {
-      await tts.speak(text, onPlay);
+      try {
+        await tts.speak(text, onPlay);
+      } catch {
+        // TTS failure is surfaced by useSpeechSynthesis. Do not break the
+        // conversation flow — proceed to the next step.
+      }
       await delay(150);
     },
     [tts]
@@ -244,54 +242,34 @@ export function useConversationEngine(
   const stopRecordingForReview = useCallback(() => {
     if (phaseRef.current === "listening") {
       audioRecorder.stopRecording();
-      if (!isSomaliSession()) recognition.stopListening();
       setPhase("reviewing");
     }
-  }, [recognition, audioRecorder.stopRecording]);
+  }, [audioRecorder.stopRecording]);
 
-  /* ── Listen watchdog: silence auto-review, max time, mic recovery ──── */
+  /* ── Listen watchdog: silence auto-review, max listen time ──────────
+     Single unified path for both English and Somali: mic volume from the
+     MediaRecorder analyser is the only signal we watch. Browser Web Speech
+     API is no longer used — transcription always goes through the backend
+     (Gemini for English, RunPod for Somali) at submit time. */
   useEffect(() => {
     if (phase !== "listening" || isPaused) {
       if (listenIntervalRef.current) clearInterval(listenIntervalRef.current);
       return;
     }
 
-    const isSomali = isSomaliSession();
-
     listenIntervalRef.current = setInterval(() => {
       if (phaseRef.current !== "listening" || isPausedRef.current) return;
 
-      if (!isSomali) {
-        const transcript = recognition.getTranscript();
-        if (transcript.length >= MIN_TRANSCRIPT_CHARS) {
-          hasSpokenRef.current = true;
-        }
+      if (audioRecorder.getVolume() > 0.02) {
+        hasSpokenRef.current = true;
+      }
 
-        if (
-          hasSpokenRef.current &&
-          recognition.silenceDuration >= SILENCE_AUTO_REVIEW_SEC &&
-          transcript.length >= MIN_TRANSCRIPT_CHARS
-        ) {
-          stopRecordingForReview();
-          return;
-        }
-
-        if (!recognition.isListening && !recognition.error) {
-          recognition.startListening();
-        }
-      } else {
-        const vol = audioRecorder.getVolume();
-        if (vol > 0.02) {
-          hasSpokenRef.current = true;
-        }
-
-        if (
-          hasSpokenRef.current &&
-          audioRecorder.getSilenceDuration() >= SILENCE_AUTO_REVIEW_SEC
-        ) {
-          stopRecordingForReview();
-          return;
-        }
+      if (
+        hasSpokenRef.current &&
+        audioRecorder.getSilenceDuration() >= SILENCE_AUTO_REVIEW_SEC
+      ) {
+        stopRecordingForReview();
+        return;
       }
 
       const elapsed = (Date.now() - listenStartRef.current) / 1000;
@@ -303,7 +281,7 @@ export function useConversationEngine(
     return () => {
       if (listenIntervalRef.current) clearInterval(listenIntervalRef.current);
     };
-  }, [phase, isPaused, recognition, stopRecordingForReview, audioRecorder]);
+  }, [phase, isPaused, stopRecordingForReview, audioRecorder]);
 
   const beginListening = useCallback(async () => {
     setPhase("listening");
@@ -317,24 +295,19 @@ export function useConversationEngine(
     } catch {
       toast.error("Microphone access failed. Allow the mic in your browser and try again.");
       setPhase("reviewing");
-      return;
     }
-
-    if (!isSomaliSession()) {
-      recognition.resetTranscript();
-      recognition.startListening();
-    }
-  }, [recognition, audioRecorder]);
+  }, [audioRecorder]);
 
   /* ── Handle manual submit ────────────────────────────────── */
   const handleManualSubmit = useCallback(
     async (textAnswer?: string) => {
       if (phaseRef.current !== "listening" && phaseRef.current !== "reviewing") return;
+      if (isSubmittingRef.current) return;
+      isSubmittingRef.current = true;
       setPhase("processing");
 
-      const isSomali = isSomaliSession();
+      try {
       const audioAnswer = await audioRecorder.finalizeRecording();
-      if (!isSomali) recognition.stopListening();
 
       // ── Determine transcript ─────────────────────────────────────────────
       let transcript: string;
@@ -362,12 +335,11 @@ export function useConversationEngine(
           console.warn("[STT] Transcription failed:", sttError);
           sttErrorMessage =
             sttError instanceof Error ? sttError.message : "Speech recognition service unavailable";
-          transcript = isSomali
-            ? "[Transcription unavailable — audio was recorded but could not be processed]"
-            : recognition.getTranscript();
-          if (!isSomali && transcript.trim()) {
-            toast("Whisper is unavailable; using the browser transcript for this answer.", { icon: "⚠️" });
-          }
+          // No browser-speech fallback for either language — Gemini (English)
+          // and RunPod (Somali) are the only supported STT paths. Keep the
+          // audio and let the backend retry / persist the recording; the
+          // transcript stays empty so the caller can surface the error.
+          transcript = "";
         }
       }
 
@@ -438,9 +410,13 @@ export function useConversationEngine(
           setIsQuestionTextVisible(false);
           await delay(50);
           if (abortRef.current) return;
-          await tts.speak(result.followUpText, () => {
+          try {
+            await tts.speak(result.followUpText, () => {
+              setIsQuestionTextVisible(true);
+            });
+          } catch {
             setIsQuestionTextVisible(true);
-          });
+          }
           await delay(150);
           if (abortRef.current) return;
 
@@ -478,6 +454,11 @@ export function useConversationEngine(
         toast.error(message);
         await beginListening();
       }
+      } finally {
+        // Always release the guard, whether we returned early (bad audio,
+        // no question, follow-up handoff) or completed the whole submit.
+        isSubmittingRef.current = false;
+      }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
@@ -510,9 +491,16 @@ export function useConversationEngine(
       if (abortRef.current) return;
 
       activePromptRef.current = q.text;
-      await tts.speak(q.text, () => {
+      try {
+        await tts.speak(q.text, () => {
+          setIsQuestionTextVisible(true);
+        });
+      } catch {
+        // TTS failed — reveal the question text so the candidate can still
+        // read and answer it, and proceed to listening. The error toast is
+        // surfaced by useSpeechSynthesis; no browser fallback runs.
         setIsQuestionTextVisible(true);
-      });
+      }
       await delay(150);
       if (abortRef.current) return;
 
@@ -572,7 +560,6 @@ export function useConversationEngine(
   /* ── Greeting + Start ──────────────────────────────────── */
   const start = useCallback(async (opts?: { language?: string }) => {
     const sessionLanguage = opts?.language ?? languageRef.current;
-    isSomaliSessionRef.current = isSomaliLanguage(sessionLanguage);
 
     abortRef.current = false;
     setCurrentQuestionIndex(0);
@@ -604,11 +591,7 @@ export function useConversationEngine(
   /* ── Manual interrupt (skip / continue) ────────────────── */
   const interruptAndContinue = useCallback(() => {
     tts.cancel();
-    if (!isSomaliSession()) {
-      recognition.stopListening();
-    } else {
-      audioRecorder.stopRecording();
-    }
+    audioRecorder.stopRecording();
 
     if (phase === "listening" || phase === "reviewing") {
       handleManualSubmit();
@@ -616,36 +599,18 @@ export function useConversationEngine(
   }, [
     phase,
     tts,
-    recognition,
     audioRecorder.stopRecording,
-    currentQuestionIndex,
-    questions.length,
     handleManualSubmit,
-    stopRecordingForReview,
-    askQuestion,
-    wrapUp,
-    language,
   ]);
-
-  useEffect(() => {
-    if (phase === "idle") {
-      isSomaliSessionRef.current = isSomaliLanguage(languageRef.current);
-    }
-  }, [language]);
 
   /* ── Cleanup on unmount ────────────────────────────────── */
   useEffect(() => {
     return () => {
       abortRef.current = true;
       tts.cancel();
-      if (!isSomaliSessionRef.current) {
-        recognition.stopListening();
-      } else {
-        audioRecorder.resetRecording().catch(() => {});
-      }
+      audioRecorder.resetRecording().catch(() => {});
       if (timerRef.current) clearInterval(timerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -655,7 +620,6 @@ export function useConversationEngine(
     totalQuestions: questions.length,
     answeredCount,
     tts,
-    recognition,
     audioRecorder,
     analysisStage,
     timer,

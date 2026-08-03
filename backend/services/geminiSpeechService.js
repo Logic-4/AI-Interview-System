@@ -2,7 +2,7 @@ const { GoogleGenAI, Modality, createUserContent, createPartFromBase64 } = requi
 const logger = require('../utils/logger');
 const { transcodeToWav } = require('./audioTranscodeService');
 
-const TTS_MODEL = process.env.GEMINI_TTS_MODEL || 'gemini-3.1-flash-tts-preview';
+const TTS_MODEL = process.env.GEMINI_TTS_MODEL || 'gemini-2.5-flash-preview-tts';
 const STT_MODEL = process.env.GEMINI_STT_MODEL || 'gemini-2.5-flash';
 const VOICE_NAME = process.env.GEMINI_TTS_VOICE || 'Kore';
 const MAX_TEXT_LENGTH = 1000;

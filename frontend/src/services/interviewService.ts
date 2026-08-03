@@ -68,7 +68,7 @@ const interviewService = {
       );
       return res.data.data;
     } catch (err: any) {
-      // 403 "attempts_exhausted" still carries a structured payload we need to render.
+      // 4xx responses may still carry a structured verification payload the UI needs to render.
       if (err?.response?.data?.data) {
         return err.response.data.data as IdentityVerificationResult;
       }

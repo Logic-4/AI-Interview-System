@@ -202,9 +202,9 @@ const CompanySecurityEventsPage = () => {
                 )}
               </div>
               <div>
-                <p className="mb-1 text-xs font-semibold uppercase text-white-dark">Live Frame (Evidence)</p>
+                <p className="mb-1 text-xs font-semibold uppercase text-white-dark">Verified Live Frame</p>
                 {selected.liveFrameUrl ? (
-                  <img src={selected.liveFrameUrl} alt="Live capture" className="h-40 w-full rounded-lg object-cover" />
+                  <img src={selected.liveFrameUrl} alt="Verified live capture" className="h-40 w-full rounded-lg object-cover" />
                 ) : (
                   <div className="flex h-40 w-full items-center justify-center rounded-lg border border-dashed border-white-light text-white-dark">
                     <ImageOff className="h-6 w-6" />

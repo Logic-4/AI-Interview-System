@@ -9,7 +9,6 @@ const {
   isVerificationEnabled,
   resolveProvider,
   getMatchThreshold,
-  getMaxAttempts,
 } = require('../services/faceVerificationService');
 const logger = require('../utils/logger');
 
@@ -19,7 +18,6 @@ const NON_PASS_SEVERITY = {
   no_face: 'info',
   no_reference: 'warning',
   provider_error: 'info',
-  attempts_exhausted: 'critical',
 };
 
 const OUTCOME_MESSAGES = {
@@ -29,7 +27,6 @@ const OUTCOME_MESSAGES = {
   multiple_faces: 'More than one person is visible. Only the candidate may be on camera.',
   no_reference: 'No profile photo is on file for this candidate, so identity cannot be verified.',
   provider_error: 'The verification service is temporarily unavailable. Please try again.',
-  attempts_exhausted: 'Identity verification failed. Access to this interview has been blocked.',
 };
 
 /**
@@ -69,8 +66,6 @@ function requiresVerification(interview) {
 
 function buildStatusPayload(interview, { referenceUrl, referenceSource, required }) {
   const iv = interview.identityVerification || {};
-  const maxAttempts = getMaxAttempts();
-  const attempts = iv.attempts || 0;
 
   return {
     required,
@@ -78,9 +73,7 @@ function buildStatusPayload(interview, { referenceUrl, referenceSource, required
     provider: required ? resolveProvider() : 'off',
     threshold: required ? getMatchThreshold() : null,
     similarity: iv.similarity ?? null,
-    attempts,
-    maxAttempts,
-    attemptsRemaining: Math.max(0, maxAttempts - attempts),
+    attempts: iv.attempts || 0,
     hasReferenceImage: Boolean(referenceUrl),
     referenceImageUrl: referenceUrl || '',
     referenceSource,
@@ -149,29 +142,7 @@ const verifyIdentity = async (req, res, next) => {
     }
 
     const iv = interview.identityVerification || {};
-    if (iv.status === 'blocked') {
-      return next(
-        ApiError.forbidden('Identity verification failed. This interview has been blocked pending review.')
-      );
-    }
-
     const { application, referenceUrl, referenceSource } = await resolveReference(interview);
-    const maxAttempts = getMaxAttempts();
-
-    if ((iv.attempts || 0) >= maxAttempts) {
-      interview.identityVerification.status = 'blocked';
-      await interview.save();
-      await logEvent(req, {
-        interview,
-        application,
-        outcome: 'attempts_exhausted',
-        result: { threshold: getMatchThreshold(), provider: resolveProvider(), similarity: null, facesDetected: 0 },
-        reason: 'Maximum verification attempts reached.',
-        referenceUrl,
-        liveFrameUrl: '',
-      });
-      return next(ApiError.forbidden(OUTCOME_MESSAGES.attempts_exhausted));
-    }
 
     const result = await compareFaces({
       liveBuffer: req.file.buffer,
@@ -189,40 +160,35 @@ const verifyIdentity = async (req, res, next) => {
     interview.identityVerification.lastAttemptAt = new Date();
     interview.identityVerification.lastReason = result.reason || '';
 
-    const attemptsExhausted =
-      !passed && consumesAttempt && interview.identityVerification.attempts >= maxAttempts;
-
+    // Persist the live frame ONLY on a successful match, so the admin panel
+    // can do a later side-by-side comparison. Failed attempts are discarded
+    // in-memory and never leave the request scope.
+    let liveFrameUrl = '';
     if (passed) {
       interview.identityVerification.status = 'passed';
       interview.identityVerification.verifiedAt = new Date();
-    } else if (attemptsExhausted) {
-      interview.identityVerification.status = 'blocked';
+      try {
+        const uploaded = await uploadCandidateFile(
+          req.file.buffer,
+          req.file.mimetype || 'image/jpeg',
+          `verification_${interview._id}_${Date.now()}.jpg`,
+          'verification-passed'
+        );
+        liveFrameUrl = uploaded.url;
+        interview.identityVerification.verifiedImageUrl = liveFrameUrl;
+      } catch (error) {
+        logger.warn(`Could not store successful verification frame: ${error.message}`);
+      }
     } else {
       interview.identityVerification.status = 'failed';
     }
 
     await interview.save();
 
-    // Retain the live frame as evidence only when the check did not pass.
-    let liveFrameUrl = '';
-    if (!passed) {
-      try {
-        const uploaded = await uploadCandidateFile(
-          req.file.buffer,
-          req.file.mimetype || 'image/jpeg',
-          `verification_${interview._id}_${Date.now()}.jpg`,
-          'verification-evidence'
-        );
-        liveFrameUrl = uploaded.url;
-      } catch (error) {
-        logger.warn(`Could not store verification evidence frame: ${error.message}`);
-      }
-    }
-
     await logEvent(req, {
       interview,
       application,
-      outcome: attemptsExhausted ? 'attempts_exhausted' : result.outcome,
+      outcome: result.outcome,
       result,
       reason: result.reason,
       referenceUrl,
@@ -231,19 +197,10 @@ const verifyIdentity = async (req, res, next) => {
 
     const payload = {
       verification: buildStatusPayload(interview, { referenceUrl, referenceSource, required }),
-      outcome: attemptsExhausted ? 'attempts_exhausted' : result.outcome,
+      outcome: result.outcome,
       passed,
-      message: OUTCOME_MESSAGES[attemptsExhausted ? 'attempts_exhausted' : result.outcome] || result.reason,
+      message: OUTCOME_MESSAGES[result.outcome] || result.reason,
     };
-
-    if (attemptsExhausted) {
-      return res.status(403).json({
-        statusCode: 403,
-        success: false,
-        message: OUTCOME_MESSAGES.attempts_exhausted,
-        data: payload,
-      });
-    }
 
     ApiResponse.success(res, payload, payload.message);
   } catch (error) {

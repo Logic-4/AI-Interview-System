@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import toast from "react-hot-toast";
-import { isSomaliLanguage } from "../lib/interviewHelpers";
 
 export interface WordHighlight {
   wordIndex: number;
@@ -10,7 +9,7 @@ export interface WordHighlight {
   charLength: number;
 }
 
-export type TtsStatus = "idle" | "preparing" | "ready" | "playing" | "retrying-fallback" | "unavailable";
+export type TtsStatus = "idle" | "preparing" | "ready" | "playing" | "unavailable";
 
 export interface UseSpeechSynthesisReturn {
   speak: (text: string, onPlay?: () => void) => Promise<void>;
@@ -67,7 +66,6 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
   const activeSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const pendingByteRef = useRef<Uint8Array | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const browserUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const languageCodeRef = useRef(languageCode);
   const operationRef = useRef(0);
   languageCodeRef.current = languageCode;
@@ -92,42 +90,10 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
       operationRef.current += 1;
       abortControllerRef.current?.abort();
       stopActiveSources();
-      window.speechSynthesis?.cancel();
       audioContextRef.current?.close().catch(() => {});
       audioContextRef.current = null;
     };
   }, [stopActiveSources]);
-
-  const speakWithBrowserFallback = useCallback((text: string, onPlay?: () => void) => new Promise<boolean>((resolve) => {
-    if (!window.speechSynthesis) return resolve(false);
-    const isSomali = isSomaliLanguage(languageCodeRef.current);
-    const voices = window.speechSynthesis.getVoices();
-    const matchingVoice = voices.find((voice) => voice.lang.toLowerCase().startsWith(isSomali ? "so" : "en"));
-    if (isSomali && !matchingVoice) return resolve(false);
-
-    let settled = false;
-    const finish = (played: boolean) => {
-      if (settled) return;
-      settled = true;
-      setIsSpeaking(false);
-      setIsPaused(false);
-      browserUtteranceRef.current = null;
-      resolve(played);
-    };
-    const timer = window.setTimeout(() => finish(false), 15000);
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = languageCodeRef.current;
-    if (matchingVoice) utterance.voice = matchingVoice;
-    utterance.onstart = () => {
-      setIsSpeaking(true);
-      setStatus("playing");
-      onPlay?.();
-    };
-    utterance.onend = () => { window.clearTimeout(timer); finish(true); };
-    utterance.onerror = () => { window.clearTimeout(timer); finish(false); };
-    browserUtteranceRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
-  }), []);
 
   const speak = useCallback(async (text: string, onPlay?: () => void): Promise<void> => {
     const cleaned = normalizeText(text);
@@ -136,20 +102,22 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
 
     abortControllerRef.current?.abort();
     stopActiveSources();
-    window.speechSynthesis?.cancel();
     setIsFetchingTTS(true);
     setStatus("preparing");
     setError(null);
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    const deadlineMs = isSomaliLanguage(languageCodeRef.current) ? 22000 : 12000;
+    // Gemini TTS can be slow to start; Somali segments are typically longer
+    // than English, so give them extra headroom before aborting.
+    const deadlineMs = 30000;
     const timeoutTimer = window.setTimeout(() => controller.abort("TTS request timed out"), deadlineMs);
 
     try {
       const audioContext = getAudioContext();
       if (audioContext.state === "suspended") await audioContext.resume();
 
+      const isSomali = /^so/i.test(languageCodeRef.current);
       const response = await fetch(`${API_BASE_URL}/tts`, {
         method: "POST",
         credentials: "include",
@@ -157,7 +125,7 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
         body: JSON.stringify({
           text: cleaned,
           languageCode: languageCodeRef.current,
-          language: isSomaliLanguage(languageCodeRef.current) ? "somali" : "english",
+          language: isSomali ? "somali" : "english",
         }),
         signal: controller.signal,
       });
@@ -244,29 +212,24 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
       const message = caught instanceof Error ? caught.message : "Speech synthesis failed";
       setError(message);
       setIsFetchingTTS(false);
-      setStatus("retrying-fallback");
-      const played = await speakWithBrowserFallback(text, onPlay);
-      if (!played) {
-        setStatus("unavailable");
-        onPlay?.();
-        toast.error(isSomaliLanguage(languageCodeRef.current)
-          ? "Somali audio is unavailable. The interview will continue with text; you can retry audio shortly."
-          : "Audio is unavailable. The interview will continue with text.");
-      } else {
-        setProvider("browser-fallback");
-        setStatus("ready");
-      }
+      setIsSpeaking(false);
+      setIsPaused(false);
+      setStatus("unavailable");
+      // No browser-speech fallback. Surface the failure so the caller can
+      // decide how to proceed and the candidate sees a real error, not a
+      // silently degraded voice.
+      onPlay?.();
+      toast.error(`Audio unavailable: ${message.slice(0, 120)}`);
+      throw caught instanceof Error ? caught : new Error(message);
     } finally {
       window.clearTimeout(timeoutTimer);
     }
-  }, [getAudioContext, stopActiveSources, speakWithBrowserFallback]);
+  }, [getAudioContext, stopActiveSources]);
 
   const cancel = useCallback(() => {
     operationRef.current += 1;
     abortControllerRef.current?.abort();
     stopActiveSources();
-    window.speechSynthesis?.cancel();
-    browserUtteranceRef.current = null;
     setIsSpeaking(false);
     setIsPaused(false);
     setIsFetchingTTS(false);
@@ -275,20 +238,18 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
 
   const pause = useCallback(() => {
     audioContextRef.current?.suspend().catch(() => {});
-    window.speechSynthesis?.pause();
     setIsPaused(true);
   }, []);
 
   const resume = useCallback(() => {
     audioContextRef.current?.resume().catch(() => {});
-    window.speechSynthesis?.resume();
     setIsPaused(false);
   }, []);
 
   return {
     speak, cancel, pause, resume,
     isSpeaking, isPaused, isFetchingTTS, highlight,
-    voiceName: isSomaliLanguage(languageCode) ? "Gemini TTS (Somali)" : "Gemini TTS",
+    voiceName: /^so/i.test(languageCode) ? "Gemini TTS (Somali)" : "Gemini TTS",
     ready: status === "ready" || status === "playing",
     status, error, provider,
   };

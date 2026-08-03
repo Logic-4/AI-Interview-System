@@ -608,10 +608,9 @@ const startInterview = async (req, res, next) => {
 
     // Identity checkpoint gatekeeper — tenant interviews must clear the
     // lobby face match before the candidate can enter the live session.
+    // Candidates may retry as many times as needed (no attempt cap), so the
+    // only terminal state that blocks entry here is 'passed' being absent.
     if (requiresVerification(interview) && interview.identityVerification?.status !== 'passed') {
-      if (interview.identityVerification?.status === 'blocked') {
-        return next(ApiError.forbidden('Identity verification failed. This interview has been blocked pending review.'));
-      }
       return next(ApiError.forbidden('Identity verification is required before starting this interview.'));
     }
 
@@ -720,10 +719,7 @@ const submitAnswer = async (req, res, next) => {
       }
     }
     if (requiresVerification(interview) && interview.identityVerification?.status !== 'passed') {
-      const msg = interview.identityVerification?.status === 'blocked'
-        ? 'Identity verification failed. This interview has been blocked pending review.'
-        : 'Identity verification is required before submitting answers.';
-      return next(ApiError.forbidden(msg));
+      return next(ApiError.forbidden('Identity verification is required before submitting answers.'));
     }
 
     // Coerce scheduled → in-progress on first answer
@@ -988,6 +984,39 @@ const completeInterview = async (req, res, next) => {
     }
 
     await interview.save();
+
+    // Propagate the finalized result to the linked Application so the
+    // hiring team's dashboard sees the score/status without having to walk
+    // the join in the UI. Never blocks completion — a link mismatch or
+    // stale row must not roll back the interview record.
+    if (interview.company) {
+      try {
+        const application = await Application.findOne({
+          interview: interview._id,
+          company: interview.company,
+          candidate: interview.user,
+        });
+        if (application) {
+          application.interviewStatus = 'completed';
+          application.overallScore = interview.overallScore;
+          if (
+            application.status === 'interview_scheduled' ||
+            application.status === 'applied' ||
+            application.status === 'under_review'
+          ) {
+            application.status = 'interviewed';
+          }
+          await application.save();
+          logger.info(`Application ${application._id} updated with interview ${interview._id} results`);
+        } else {
+          logger.warn(
+            `Interview ${interview._id} completed but no matching Application found (company=${interview.company}, candidate=${interview.user}). Score will not appear in the pipeline until the link is repaired.`
+          );
+        }
+      } catch (linkError) {
+        logger.error(`Failed to sync application after interview ${interview._id}: ${linkError.message}`);
+      }
+    }
 
     logger.info(`Interview completed: ${interview._id} — score: ${overallScore}`);
 

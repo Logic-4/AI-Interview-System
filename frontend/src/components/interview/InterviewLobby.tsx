@@ -13,10 +13,9 @@ import { Card } from "../ui/Card";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
 import { cn } from "../../lib/utils";
 import interviewService from "../../services/interviewService";
-import type { IdentityVerificationStatus } from "../../types/interview";
 
 type CamState = "idle" | "requesting" | "ready" | "denied" | "unsupported";
-type CheckState = "idle" | "capturing" | "verifying" | "passed" | "retry" | "blocked";
+type CheckState = "idle" | "capturing" | "verifying" | "passed" | "retry" | "status_error";
 
 interface InterviewLobbyProps {
   interviewId: string;
@@ -53,7 +52,6 @@ export default function InterviewLobby({
 
   const [camState, setCamState] = useState<CamState>("idle");
   const [checkState, setCheckState] = useState<CheckState>("idle");
-  const [verification, setVerification] = useState<IdentityVerificationStatus | null>(null);
   const [message, setMessage] = useState<string>("");
   const [statusLoading, setStatusLoading] = useState(true);
 
@@ -91,24 +89,21 @@ export default function InterviewLobby({
       try {
         const status = await interviewService.getIdentityStatus(interviewId);
         if (cancelled) return;
-        setVerification(status);
+        // Only a previously-passed check or a non-required interview may skip
+        // the lobby. A missing/failed status keeps the candidate here until
+        // they clear a live check — no silent fall-through, no attempt cap.
         if (status.status === "passed" || !status.required) {
           setCheckState("passed");
           setStatusLoading(false);
           onVerified(null);
           return;
         }
-        if (status.status === "blocked") {
-          setCheckState("blocked");
-          setMessage("Identity verification failed too many times. This interview has been blocked. Contact the hiring team.");
-        }
       } catch {
-        // If the status check fails, fall back to letting the candidate through
-        // rather than trapping them in the lobby indefinitely.
-        setCheckState("passed");
-        onVerified(null);
+        if (cancelled) return;
+        setCheckState("status_error");
+        setMessage("Could not reach the verification service. Please refresh and try again.");
       } finally {
-        setStatusLoading(false);
+        if (!cancelled) setStatusLoading(false);
       }
     })();
     return () => {
@@ -119,7 +114,7 @@ export default function InterviewLobby({
 
   useEffect(() => {
     if (statusLoading) return;
-    if (checkState === "passed" || checkState === "blocked") return;
+    if (checkState === "passed" || checkState === "status_error") return;
     void startCamera();
     return () => stopStream();
   }, [statusLoading, checkState, startCamera, stopStream]);
@@ -151,7 +146,6 @@ export default function InterviewLobby({
         setCheckState("verifying");
         try {
           const result = await interviewService.verifyIdentity(interviewId, blob);
-          setVerification(result.verification);
           setMessage(result.message);
 
           if (result.passed) {
@@ -167,10 +161,8 @@ export default function InterviewLobby({
               stopStream();
               onVerified(null);
             }
-          } else if (result.outcome === "attempts_exhausted" || result.verification.status === "blocked") {
-            setCheckState("blocked");
-            stopStream();
           } else {
+            // No attempt cap — the candidate may retry until they clear.
             setCheckState("retry");
           }
         } catch {
@@ -196,8 +188,6 @@ export default function InterviewLobby({
     return null;
   }
 
-  const attemptsRemaining = verification?.attemptsRemaining ?? null;
-
   return (
     <div className="max-w-2xl mx-auto py-12 space-y-6 animate-in fade-in duration-700">
       <Card hoverEffect={false} className="p-8 border border-white-light dark:border-[#1b2e4b] bg-white dark:bg-black">
@@ -211,13 +201,13 @@ export default function InterviewLobby({
           </p>
         </div>
 
-        {checkState === "blocked" ? (
+        {checkState === "status_error" ? (
           <div className="text-center space-y-4 py-6">
             <UserX className="w-12 h-12 text-danger mx-auto" />
-            <p className="text-sm font-bold text-danger">{message || "Identity verification failed."}</p>
-            <p className="text-xs text-text-muted">
-              This attempt has been logged and flagged for the hiring team. Please reach out to them if you believe this is a mistake.
-            </p>
+            <p className="text-sm font-bold text-danger">{message || "Verification service unavailable."}</p>
+            <Button size="sm" variant="outline" onClick={() => window.location.reload()} leftIcon={<RefreshCw className="w-3.5 h-3.5" />}>
+              Reload
+            </Button>
           </div>
         ) : (
           <div className="space-y-5">
@@ -273,12 +263,6 @@ export default function InterviewLobby({
                 <ShieldAlert className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <span>{message}</span>
               </div>
-            )}
-
-            {attemptsRemaining !== null && checkState === "retry" && (
-              <p className="text-center text-[11px] text-text-muted font-medium">
-                {attemptsRemaining} attempt{attemptsRemaining === 1 ? "" : "s"} remaining
-              </p>
             )}
 
             <div className="flex justify-center">

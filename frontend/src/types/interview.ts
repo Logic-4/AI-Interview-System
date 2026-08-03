@@ -72,8 +72,7 @@ export type IdentityVerificationOutcome =
   | 'no_face'
   | 'multiple_faces'
   | 'no_reference'
-  | 'provider_error'
-  | 'attempts_exhausted';
+  | 'provider_error';
 
 export interface IdentityVerificationStatus {
   required: boolean;
@@ -82,8 +81,6 @@ export interface IdentityVerificationStatus {
   threshold: number | null;
   similarity: number | null;
   attempts: number;
-  maxAttempts: number;
-  attemptsRemaining: number;
   hasReferenceImage: boolean;
   referenceImageUrl: string;
   referenceSource: 'application' | 'avatar' | 'none';

@@ -213,6 +213,10 @@ const interviewSchema = new mongoose.Schema(
       verifiedAt: { type: Date, default: null },
       lastAttemptAt: { type: Date, default: null },
       lastReason: { type: String, default: '', maxlength: 500 },
+      // Snapshot of the live frame captured on the successful match; used by
+      // the admin panel for later side-by-side comparison. Only populated on
+      // a passed verification — failed attempts are never persisted.
+      verifiedImageUrl: { type: String, default: '' },
     },
     proctoring: {
       enabled: { type: Boolean, default: false },
