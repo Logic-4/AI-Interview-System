@@ -75,7 +75,7 @@ export function Hero() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="mt-6 text-lg md:text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0"
           >
-            Practice with a realistic, role-specific AI interviewer. Get instant feedback on your answers, delivery, and confidence — then land the offer.
+            Practice with a realistic, role-specific AI interviewer, or streamline your company's hiring with automated candidate screening. Get instant feedback and scoring — then land the offer or hire top talent.
           </motion.p>
 
           <motion.div
@@ -91,6 +91,12 @@ export function Hero() {
               Start practicing free
               <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
             </Link>
+            <a
+              href="#companies"
+              className="inline-flex items-center gap-2 h-12 px-6 rounded-full border border-border/80 bg-surface/80 text-foreground font-semibold hover:bg-accent/80 transition-all"
+            >
+              For Companies & Employers
+            </a>
           </motion.div>
 
         </div>
