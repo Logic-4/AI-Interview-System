@@ -20,6 +20,7 @@ const {
 } = require('../services/emailService');
 const { generateInterviewLinkToken } = require('../utils/tokenUtils');
 const { deleteBlobUrls } = require('../services/blobService');
+const { parseScheduledAt } = require('../utils/scheduledTime');
 const logger = require('../utils/logger');
 
 const normalizePagination = (value, fallback, max) => Math.min(Math.max(parseInt(value, 10) || fallback, 1), max);
@@ -508,6 +509,8 @@ const getInterviews = async (req, res, next) => {
 const scheduleInterview = async (req, res, next) => {
   try {
     const { applicationId, jobRole, type, difficulty, domain, language, duration, scheduledAt } = req.body;
+    const scheduledDate = scheduledAt ? parseScheduledAt(scheduledAt, req.company?.timezone) : new Date();
+    if (!scheduledDate) return next(ApiError.badRequest('Scheduled date must be a valid date and time'));
     let candidateId = req.body.candidateId;
 
     let candidate = null;
@@ -575,7 +578,7 @@ const scheduleInterview = async (req, res, next) => {
       focusSkills: jobPayload?.focusSkills || [],
       duration: duration || jobPayload?.duration || 30,
       expectedQuestionCount: jobPayload?.numberOfQuestions || undefined,
-      scheduledAt: scheduledAt ? new Date(scheduledAt) : new Date(),
+      scheduledAt: scheduledDate,
       status: 'scheduled',
     });
 
@@ -605,13 +608,15 @@ const scheduleInterview = async (req, res, next) => {
 const rescheduleInterview = async (req, res, next) => {
   try {
     const { scheduledAt } = req.body;
+    const scheduledDate = parseScheduledAt(scheduledAt, req.company?.timezone);
+    if (!scheduledDate) return next(ApiError.badRequest('Scheduled date must be a valid date and time'));
     const interview = await Interview.findOne({ _id: req.params.id, company: req.companyId }).populate(
       'user',
       'name email'
     );
     if (!interview) return next(ApiError.notFound('Interview not found'));
 
-    interview.scheduledAt = new Date(scheduledAt);
+    interview.scheduledAt = scheduledDate;
     interview.status = 'scheduled';
     await interview.save();
 

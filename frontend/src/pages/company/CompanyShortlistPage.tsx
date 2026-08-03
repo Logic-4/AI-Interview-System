@@ -515,7 +515,7 @@ const CompanyShortlistPage = () => {
             <p className="text-sm text-white-dark">Candidate: <span className="font-bold text-black dark:text-white">{scheduleModal.name}</span></p>
             <form onSubmit={(e) => void handleScheduleSubmit(e)} className="space-y-4">
               <div>
-                <label htmlFor="scheduledAtSl">Date &amp; Time</label>
+                <label htmlFor="scheduledAtSl">Date &amp; Time (Somalia time)</label>
                 <input id="scheduledAtSl" type="datetime-local" className="form-input" value={scheduledAtDate} onChange={(e) => setScheduledAtDate(e.target.value)} required />
               </div>
               <div className="flex justify-end gap-3 pt-2">
