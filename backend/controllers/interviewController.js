@@ -17,6 +17,7 @@ const { normalizeEvaluation, calculateOverallScore, isScorable, summarizeEvaluat
 const {
   startInterviewWarmup,
   getInterviewWarmupStatus,
+  awaitCurrentWarmup,
 } = require('../services/interviewWarmupService');
 const { requiresVerification } = require('./verificationController');
 const { requiresRecording, uploadChunk: uploadRecordingChunkBuffer, finalizeRecording } = require('../services/recordingService');
@@ -148,6 +149,30 @@ async function runQuestionGenerationPipeline(interviewId, context) {
     roleProfile: context.roleProfile || interview.roleProfile,
     language: context.language || interview.language,
   };
+
+  // Sequence: kick warmup first, then wait up to 5s for it before firing the
+  // first `/generate-question`. On a cold RunPod endpoint this ensures the
+  // worker is spinning up in parallel with our own prep, so the generate call
+  // lands on a warm worker instead of triggering a second independent cold
+  // start. The wait is capped so a hung warmup never blocks generation.
+  try {
+    startInterviewWarmup({
+      requestId: context.requestId || `pipeline-warmup-${interviewId}`,
+      language: generationContext.language,
+    });
+  } catch (warmErr) {
+    logger.warn(`[pipeline] warmup kick failed for ${interviewId}: ${warmErr.message}`);
+  }
+  const warmupWait = await awaitCurrentWarmup(5000);
+  if (warmupWait.waited) {
+    logger.info(JSON.stringify({
+      event: 'pipeline_warmup_awaited',
+      requestId: context.requestId,
+      interviewId: String(interviewId),
+      elapsedMs: warmupWait.elapsedMs,
+      timedOut: warmupWait.timedOut,
+    }));
+  }
 
   const totalCount = interview.expectedQuestionCount > 0
     ? interview.expectedQuestionCount
@@ -1422,4 +1447,7 @@ module.exports = {
   reevaluateAnswer,
   resetInterview,
   reportProctoringEvent,
+  // Exported for cross-controller pre-generation on the company scheduling
+  // path so candidates don't hit a cold RunPod worker on first visit.
+  ensureQuestionGeneration,
 };

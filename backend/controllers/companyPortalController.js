@@ -20,6 +20,8 @@ const {
 } = require('../services/emailService');
 const { generateInterviewLinkToken } = require('../utils/tokenUtils');
 const { deleteBlobUrls } = require('../services/blobService');
+const { startInterviewWarmup } = require('../services/interviewWarmupService');
+const { ensureQuestionGeneration } = require('./interviewController');
 const logger = require('../utils/logger');
 
 const normalizePagination = (value, fallback, max) => Math.min(Math.max(parseInt(value, 10) || fallback, 1), max);
@@ -585,6 +587,29 @@ const scheduleInterview = async (req, res, next) => {
       application.status = 'interview_scheduled';
       await application.save();
     }
+
+    // Kick RunPod out of scale-to-zero and start question generation now, so
+    // the candidate is not the one to eat the ~30-90s cold start when they
+    // click the invite link. Both are fire-and-forget — a warmup or gen
+    // failure here must not block scheduling or the email.
+    try {
+      startInterviewWarmup({
+        requestId: req.requestId || `schedule-warmup-${interview._id}`,
+        language: interview.language,
+      });
+    } catch (warmErr) {
+      logger.warn(`[scheduleInterview] warmup kick failed: ${warmErr.message}`);
+    }
+    ensureQuestionGeneration(interview, {
+      requestId: req.requestId || `schedule-pregen-${interview._id}`,
+      source: 'schedule',
+      jobRole: interview.jobRole,
+      jobDescription: interview.jobDescription,
+      resumeText: interview.resumeText,
+      focusSkills: interview.focusSkills,
+      language: interview.language,
+      candidateName: candidate.name,
+    }).catch((genErr) => logger.warn(`[scheduleInterview] pre-gen failed: ${genErr.message}`));
 
     const scheduledMagicToken = generateInterviewLinkToken(candidate._id, interview._id);
     notifyEmail(

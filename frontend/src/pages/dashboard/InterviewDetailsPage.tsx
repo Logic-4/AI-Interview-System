@@ -94,7 +94,10 @@ export default function InterviewDetailsPage() {
   });
 
   const hasCompletedRef = useRef(false);
-  const pollDelayRef = useRef(2000);
+  // Aggressive first 3 polls (500ms) reveal an already-ready case instantly
+  // when questions were pre-generated on schedule; then back off.
+  const POLL_SCHEDULE_MS = [500, 500, 1000, 2000, 4000, 8000] as const;
+  const pollStepRef = useRef(0);
   const loadedInterviewIdRef = useRef<string | null>(null);
 
   const applyInterview = useCallback(
@@ -140,7 +143,7 @@ export default function InterviewDetailsPage() {
 
     loadedInterviewIdRef.current = interviewId;
     hasCompletedRef.current = false;
-    pollDelayRef.current = 2000;
+    pollStepRef.current = 0;
     setIdentityCleared(false);
     setTimeWindowForcedOpen(false);
     setRecordingConsent(false);
@@ -188,35 +191,55 @@ export default function InterviewDetailsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interviewId]);
 
-  /* ── Poll until all questions are ready (exponential backoff) ─ */
+  /* ── Poll until all questions are ready ─────────────────────────
+     Uses the lightweight /progress route so each poll returns only the
+     fields needed to decide readiness — the heavy full-populate
+     getInterview is called only ONCE, right after questionsReady flips
+     true, to feed the ready UI. */
   useEffect(() => {
     if (questionsReady || pagePhase !== "ready") return;
 
     let cancelled = false;
     let timeoutId: ReturnType<typeof setTimeout>;
 
+    const nextDelay = () => {
+      const idx = Math.min(pollStepRef.current, POLL_SCHEDULE_MS.length - 1);
+      pollStepRef.current += 1;
+      return POLL_SCHEDULE_MS[idx];
+    };
+
     const poll = async () => {
       if (cancelled || questionsReady) return;
       try {
-        const data = await interviewService.getInterview(interviewId);
+        const progress = await interviewService.getInterviewProgress(interviewId);
         if (cancelled) return;
-        applyInterview(data);
-        if (computeQuestionsReady(data)) {
-          setQuestionsReady(true);
+        applyInterview(progress);
+        if (computeQuestionsReady(progress)) {
+          // Fetch the full populated interview exactly once so the ready UI
+          // has feedback, roleProfile, etc. — anything the progress route
+          // deliberately omits.
+          try {
+            const full = await interviewService.getInterview(interviewId);
+            if (!cancelled) applyInterview(full);
+          } catch {
+            // Non-fatal — progress payload is enough to enter the ready
+            // state; anything missing will reload on interaction.
+          }
+          if (!cancelled) setQuestionsReady(true);
           return;
         }
       } catch {
         // Silently ignore poll errors
       }
-      pollDelayRef.current = Math.min(pollDelayRef.current * 1.5, 8000);
-      timeoutId = setTimeout(poll, pollDelayRef.current);
+      timeoutId = setTimeout(poll, nextDelay());
     };
 
-    timeoutId = setTimeout(poll, pollDelayRef.current);
+    timeoutId = setTimeout(poll, nextDelay());
     return () => {
       cancelled = true;
       clearTimeout(timeoutId);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questionsReady, pagePhase, interviewId, applyInterview]);
 
   /* ── Callbacks for conversation engine ─────────────────── */
@@ -507,14 +530,20 @@ export default function InterviewDetailsPage() {
             )}
 
             <div className="flex justify-center pt-4">
-              {!questionsReady ? (
+              {!questionsReady ? (() => {
+                const expected = Number((interview as any).expectedQuestionCount) || 0;
+                const readyCount = Array.isArray(interview.questions) ? interview.questions.length : 0;
+                const progressCopy = expected > 0
+                  ? `${readyCount} of ${expected} ready`
+                  : `${readyCount} ready`;
+                return (
                 <div className="text-center space-y-4">
                   <div className="flex items-center gap-3 px-6 py-4 rounded-md bg-primary/5 border border-primary/15">
                     <LoadingSpinner size="sm" className="flex-shrink-0" />
                     <div className="text-left">
                       <p className="text-sm font-bold text-text-primary dark:text-white">Preparing your questions…</p>
                       <p className="text-xs font-medium text-text-muted opacity-70">
-                        AI is generating {(interview as any).expectedQuestionCount ?? "your"} questions in the background
+                        {progressCopy}
                       </p>
                     </div>
                   </div>
@@ -527,10 +556,11 @@ export default function InterviewDetailsPage() {
                     />
                   </div>
                   <p className="text-xs text-text-muted opacity-60 font-medium">
-                    You&apos;ll be able to begin shortly — {questions.length} question{questions.length !== 1 ? "s" : ""} ready so far
+                    You&apos;ll be able to begin shortly.
                   </p>
                 </div>
-              ) : (
+                );
+              })() : (
                 <Button
                   size="xl"
                   className="h-14 px-12 rounded-md text-sm font-semibold uppercase tracking-wider shadow-xl shadow-primary/20 group text-white"

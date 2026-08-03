@@ -117,6 +117,26 @@ function getInterviewWarmupStatus() {
   return snapshot();
 }
 
+/**
+ * Wait for the currently-running warmup batch (if any) to settle, with a hard
+ * timeout so a slow RunPod cold start cannot indefinitely delay callers that
+ * only want a best-effort head start (e.g. the question generation pipeline).
+ * Resolves regardless of whether warmup succeeded — this is a "did I give it
+ * a chance?" signal, not a correctness gate.
+ */
+async function awaitCurrentWarmup(timeoutMs = 5000) {
+  if (!activeWarmup) return { waited: false };
+  const started = Date.now();
+  let timedOut = false;
+  await Promise.race([
+    activeWarmup.catch(() => {}),
+    new Promise((resolve) => {
+      setTimeout(() => { timedOut = true; resolve(); }, timeoutMs);
+    }),
+  ]);
+  return { waited: true, timedOut, elapsedMs: Date.now() - started };
+}
+
 function resetForTest() {
   Object.assign(state.gemma, createServiceState());
   Object.assign(state.speech, createServiceState());
@@ -127,6 +147,7 @@ function resetForTest() {
 module.exports = {
   startInterviewWarmup,
   getInterviewWarmupStatus,
+  awaitCurrentWarmup,
   _getActiveWarmup: () => activeWarmup,
   _setWarmersForTest: (nextWarmers) => { warmers = nextWarmers; },
   _resetForTest: resetForTest,
