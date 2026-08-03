@@ -213,7 +213,7 @@ const CompanyInterviewsPage = () => {
             <h3 className="text-lg font-bold text-black dark:text-white">Reschedule Interview</h3>
             <form onSubmit={(e) => void handleRescheduleSubmit(e)} className="space-y-4">
               <div>
-                <label htmlFor="newScheduledDate">New Date &amp; Time</label>
+                <label htmlFor="newScheduledDate">New Date &amp; Time (Somalia time)</label>
                 <input id="newScheduledDate" type="datetime-local" className="form-input" value={newDate} onChange={(e) => setNewDate(e.target.value)} required />
               </div>
               <div className="flex justify-end gap-3 pt-3">
