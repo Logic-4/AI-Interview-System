@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import ReactApexChart from 'react-apexcharts';
-import { Building2, BriefcaseBusiness, CirclePause, ClipboardCheck, UsersRound } from 'lucide-react';
+import { Building2, CirclePause } from 'lucide-react';
 import { setPageTitle } from '@/store/themeConfigSlice';
 import { IRootState } from '@/store';
 import superadminService from '@/services/superadminService';
@@ -38,9 +38,6 @@ const SuperadminDashboardPage = () => {
     { label: 'Total Companies', value: data!.metrics.totalCompanies, icon: Building2, iconClass: 'text-primary' },
     { label: 'Active Companies', value: data!.metrics.activeCompanies, icon: Building2, iconClass: 'text-success' },
     { label: 'Suspended Companies', value: data!.metrics.suspendedCompanies, icon: CirclePause, iconClass: 'text-warning' },
-    { label: 'Total Candidates', value: data!.metrics.totalCandidates, icon: UsersRound, iconClass: 'text-info' },
-    { label: 'Total Interviews', value: data!.metrics.totalInterviews, icon: ClipboardCheck, iconClass: 'text-secondary' },
-    { label: 'Total Job Posts', value: data!.metrics.totalJobPosts, icon: BriefcaseBusiness, iconClass: 'text-danger' },
   ];
 
   return (
