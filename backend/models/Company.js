@@ -22,7 +22,7 @@ const companySchema = new mongoose.Schema(
     address: { type: String, default: '', trim: true },
     description: { type: String, default: '', trim: true },
     preferredLanguage: { type: String, default: 'English' },
-    timezone: { type: String, default: 'UTC' },
+    timezone: { type: String, default: 'Africa/Mogadishu' },
     status: {
       type: String,
       enum: ['active', 'suspended', 'disabled'],

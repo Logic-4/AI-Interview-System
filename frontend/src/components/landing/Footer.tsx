@@ -10,8 +10,9 @@ export function Footer() {
         </div>
         <nav className="flex items-center gap-6 text-sm text-muted-foreground">
           <a href="#features" className="hover:text-foreground transition">Features</a>
+          <a href="#companies" className="hover:text-foreground transition">For Companies</a>
           <a href="#how" className="hover:text-foreground transition">How it works</a>
-          <a href="#stats" className="hover:text-foreground transition">Results</a>
+          <a href="/login" className="hover:text-foreground transition font-semibold text-primary">Company Portal</a>
         </nav>
         <p className="text-xs text-muted-foreground">© 2026 InterviewAI Pro · All rights reserved.</p>
       </div>
