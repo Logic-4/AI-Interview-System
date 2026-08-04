@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import toast from "react-hot-toast";
 
 export interface WordHighlight {
   wordIndex: number;
@@ -215,11 +214,9 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
       setIsSpeaking(false);
       setIsPaused(false);
       setStatus("unavailable");
-      // No browser-speech fallback. Surface the failure so the caller can
-      // decide how to proceed and the candidate sees a real error, not a
-      // silently degraded voice.
+      // Fail silently — reveal the caller's UI (question text) via onPlay so
+      // the candidate can still read and answer, without a noisy alert.
       onPlay?.();
-      toast.error(`Audio unavailable: ${message.slice(0, 120)}`);
       throw caught instanceof Error ? caught : new Error(message);
     } finally {
       window.clearTimeout(timeoutTimer);

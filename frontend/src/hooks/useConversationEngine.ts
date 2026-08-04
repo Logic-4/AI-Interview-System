@@ -518,23 +518,16 @@ export function useConversationEngine(
 
       setPhase("asking");
       setActiveFollowUpText(null);
-      // Keep the question hidden until the voice actually starts — otherwise
-      // the text lands 1–2s before the audio while TTS is still streaming.
-      setIsQuestionTextVisible(false);
+      setIsQuestionTextVisible(true);
 
       await delay(50);
       if (abortRef.current) return;
 
       activePromptRef.current = q.text;
       try {
-        await tts.speak(q.text, () => {
-          setIsQuestionTextVisible(true);
-        });
+        await tts.speak(q.text);
       } catch {
-        // TTS failed — reveal the question text so the candidate can still
-        // read and answer it, and proceed to listening. The error toast is
-        // surfaced by useSpeechSynthesis; no browser fallback runs.
-        setIsQuestionTextVisible(true);
+        // TTS failed — question text is already visible; proceed to listening.
       }
       await delay(150);
       if (abortRef.current) return;

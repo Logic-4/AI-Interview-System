@@ -751,12 +751,6 @@ export default function InterviewDetailsPage() {
                 </span>
               </div>
             )}
-            {engine.tts.isFetchingTTS && (
-              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-warning/10 border border-warning/30 rounded-md">
-                <LoadingSpinner size="sm" className="w-3 h-3" />
-                <span className="text-[10px] font-bold text-warning uppercase tracking-widest">Generating voice</span>
-              </div>
-            )}
             {engine.tts.isSpeaking && (
               <div className="flex items-center gap-1.5 px-2 py-0.5 bg-primary/10 border border-primary/20 rounded-md">
                 <Volume2 className="w-3 h-3 text-primary" />

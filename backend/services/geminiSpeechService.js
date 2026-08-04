@@ -8,11 +8,15 @@ const STT_MODEL = process.env.GEMINI_STT_MODEL || 'gemini-2.5-flash';
 // Env override is allowed for ops, but the product default is "Orus".
 const VOICE_NAME = process.env.GEMINI_TTS_VOICE || 'Orus';
 const MAX_TEXT_LENGTH = 1000;
-// Transient upstream failures (cold-start, 429, brief 5xx) are common with
-// preview TTS endpoints; retry the stream-start ONCE with short backoff.
-// We can only retry safely before any bytes have been yielded downstream.
-const MAX_STREAM_START_ATTEMPTS = 2;
-const STREAM_START_BACKOFF_MS = 500;
+// Gemini TTS docs state the model "occasionally returns text tokens instead of
+// audio tokens, causing the server to fail the request with a 500 error" and
+// recommend automated retry logic. We retry the FULL synthesis (connect + read
+// stream) since the failure can surface either as a thrown error at connect or
+// as a stream that completes with zero audio chunks. Chunks from a failed
+// attempt are buffered internally so nothing is yielded downstream until an
+// attempt succeeds, keeping retries safe.
+const MAX_SYNTHESIS_ATTEMPTS = 3;
+const SYNTHESIS_BACKOFF_MS = 400;
 const TRANSCRIBE_PROMPT = 'Transcribe this English audio recording exactly as spoken. '
   + 'Return only the transcription text, with no commentary, labels, or additional formatting. '
   + 'If nothing intelligible was said, return an empty string.';
@@ -57,42 +61,36 @@ async function* synthesizeSpeechStream(text, languageCode = 'en-US') {
     },
   };
 
-  let stream;
   let lastError;
-  for (let attempt = 1; attempt <= MAX_STREAM_START_ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= MAX_SYNTHESIS_ATTEMPTS; attempt++) {
+    const buffered = [];
     try {
-      stream = await ai.models.generateContentStream(streamConfig);
-      lastError = null;
-      break;
+      const stream = await ai.models.generateContentStream(streamConfig);
+      for await (const response of stream) {
+        const data = response.data;
+        if (!data) continue;
+        buffered.push(Buffer.from(data, 'base64'));
+      }
+      if (buffered.length > 0) {
+        for (const chunk of buffered) yield chunk;
+        logger.info(
+          `[geminiSpeechService] Synthesized ${buffered.length} chunk(s) on attempt ${attempt} [voice=${VOICE_NAME}, lang=${languageCode}]`,
+        );
+        return;
+      }
+      // Documented failure mode: model returned text tokens instead of audio.
+      lastError = new Error('Gemini TTS returned no audio data (model emitted text tokens)');
     } catch (err) {
       lastError = err;
-      if (attempt < MAX_STREAM_START_ATTEMPTS) {
-        logger.warn(
-          `[geminiSpeechService] TTS stream start failed (attempt ${attempt}/${MAX_STREAM_START_ATTEMPTS}) — retrying: ${err.message}`,
-        );
-        await new Promise((r) => setTimeout(r, STREAM_START_BACKOFF_MS * attempt));
-      }
+    }
+    if (attempt < MAX_SYNTHESIS_ATTEMPTS) {
+      logger.warn(
+        `[geminiSpeechService] TTS attempt ${attempt}/${MAX_SYNTHESIS_ATTEMPTS} failed — retrying: ${lastError.message}`,
+      );
+      await new Promise((r) => setTimeout(r, SYNTHESIS_BACKOFF_MS * attempt));
     }
   }
-  if (lastError || !stream) {
-    throw lastError || new Error('Gemini TTS stream failed to start');
-  }
-
-  let chunkCount = 0;
-  for await (const response of stream) {
-    const data = response.data;
-    if (!data) continue;
-    chunkCount += 1;
-    yield Buffer.from(data, 'base64');
-  }
-
-  if (chunkCount === 0) {
-    throw new Error('Gemini TTS returned no audio data');
-  }
-
-  logger.info(
-    `[geminiSpeechService] Synthesized ${chunkCount} chunk(s) [voice=${VOICE_NAME}, lang=${languageCode}]`,
-  );
+  throw lastError || new Error('Gemini TTS failed after all attempts');
 }
 
 /**
