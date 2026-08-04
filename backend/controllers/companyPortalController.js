@@ -382,7 +382,7 @@ const getCandidates = async (req, res, next) => {
     const limit = normalizePagination(req.query.limit, 10, 100);
     const { search = '', status = '', experienceLevel = '' } = req.query;
 
-    const filter = { company: req.companyId };
+    const filter = { company: req.companyId, isShortlisted: { $ne: true } };
     if (status) filter.status = status;
     if (search.trim()) {
       const pattern = new RegExp(search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
@@ -440,6 +440,8 @@ const toggleShortlist = async (req, res, next) => {
     application.isShortlisted = !application.isShortlisted;
     if (application.isShortlisted && application.status === 'applied') {
       application.status = 'shortlisted';
+    } else if (!application.isShortlisted && application.status === 'shortlisted') {
+      application.status = 'under_review';
     }
     await application.save();
 

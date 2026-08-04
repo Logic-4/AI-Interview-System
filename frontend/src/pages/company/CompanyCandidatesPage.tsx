@@ -189,7 +189,7 @@ function ProfileModal({
               <Star className="h-4 w-4" /> Shortlist
             </button>
           )}
-          {cand.isShortlisted && cand.approvalStatus === 'approved' && cand.status !== 'hired' && (
+          {cand.approvalStatus === 'approved' && cand.status !== 'hired' && cand.status !== 'rejected' && (
             <button
               type="button"
               className="btn btn-primary btn-sm flex items-center gap-1.5"
@@ -446,12 +446,12 @@ const CompanyCandidatesPage = () => {
                                   className="w-full flex items-center gap-2.5 px-3 py-2 text-left rounded-lg hover:bg-warning/10 text-warning transition-colors"
                                   onClick={() => void handleShortlist(cand)}
                                 >
-                                  <Star className={`h-4 w-4 shrink-0 ${cand.isShortlisted ? 'fill-warning' : ''}`} />
-                                  <span>{cand.isShortlisted ? 'Remove Shortlist' : 'Add to Shortlist'}</span>
+                                  <Star className="h-4 w-4 shrink-0" />
+                                  <span>Add to Shortlist</span>
                                 </button>
                               </li>
 
-                              {cand.isShortlisted && cand.approvalStatus === 'approved' && cand.status !== 'hired' && (
+                              {cand.approvalStatus === 'approved' && cand.status !== 'hired' && cand.status !== 'rejected' && (
                                 <li>
                                   <button
                                     type="button"

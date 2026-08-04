@@ -125,13 +125,13 @@ const CompanyDashboardPage = () => {
         })}
       </div>
 
-      {/* Grid Section: Recent Applications & Upcoming Interviews */}
+      {/* Grid Section: Recent Candidates & Upcoming Interviews */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Recent Applications */}
+        {/* Recent Candidates */}
         <div className="panel">
           <div className="mb-5 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-black dark:text-white">Recent Applications</h2>
-            <NavLink to="/company/applications" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
+            <h2 className="text-lg font-bold text-black dark:text-white">Recent Candidates</h2>
+            <NavLink to="/company/candidates" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
               View All <ArrowRight className="h-3 w-3" />
             </NavLink>
           </div>
@@ -164,7 +164,7 @@ const CompanyDashboardPage = () => {
                 {(!data?.recentApplications || data.recentApplications.length === 0) && (
                   <tr>
                     <td colSpan={4} className="py-8 text-center text-white-dark">
-                      No applications received yet.
+                      No candidates received yet.
                     </td>
                   </tr>
                 )}

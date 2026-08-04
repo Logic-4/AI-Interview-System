@@ -57,7 +57,6 @@ const SettingsPage = lazyWithRetry(() => import('../pages/dashboard/SettingsPage
 const CompanyDashboardPage = lazyWithRetry(() => import('../pages/company/CompanyDashboardPage'));
 const PostJobPage = lazyWithRetry(() => import('../pages/company/PostJobPage'));
 const CompanyJobsPage = lazyWithRetry(() => import('../pages/company/CompanyJobsPage'));
-const CompanyApplicationsPage = lazyWithRetry(() => import('../pages/company/CompanyApplicationsPage'));
 const CompanyCandidatesPage = lazyWithRetry(() => import('../pages/company/CompanyCandidatesPage'));
 const CompanyShortlistPage = lazyWithRetry(() => import('../pages/company/CompanyShortlistPage'));
 const CompanyInterviewsPage = lazyWithRetry(() => import('../pages/company/CompanyInterviewsPage'));
@@ -218,7 +217,7 @@ const routes = [
     },
     {
         path: '/company/applications',
-        element: <CompanyApplicationsPage />,
+        element: <Navigate to="/company/candidates" replace />,
         layout: 'default',
     },
     {

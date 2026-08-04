@@ -14,7 +14,6 @@ import {
     ChevronDown,
     Settings,
     Briefcase,
-    FileText,
     Users,
     Star,
     Video,
@@ -50,7 +49,6 @@ const Sidebar = () => {
     const companyNavItems = [
         { path: '/company/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
         { path: '/company/jobs', label: 'Jobs', icon: Briefcase, end: false },
-        { path: '/company/applications', label: 'Applications', icon: FileText, end: false },
         { path: '/company/candidates', label: 'Candidates', icon: Users, end: false },
         { path: '/company/shortlist', label: 'Shortlist', icon: Star, end: false },
         { path: '/company/interviews', label: 'Interviews', icon: Video, end: false },
