@@ -34,3 +34,5 @@ Models/Skydheere/transcription.json
 # OS files
 .DS_Store
 Thumbs.db
+
+dataset_defense_note_final.docx

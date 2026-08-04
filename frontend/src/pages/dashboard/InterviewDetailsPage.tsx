@@ -610,10 +610,10 @@ export default function InterviewDetailsPage() {
     />
   ) : null;
 
-  /* ─── Visible candidate self-view PiP (shares the recorder stream) ─── */
-  const selfViewPiP = recordingRequired ? (
-    <div className="fixed bottom-24 right-6 z-[10001] w-48 rounded-lg overflow-hidden border border-white-light dark:border-[#1b2e4b] shadow-2xl bg-black">
-      <div className="relative aspect-video">
+  /* ─── Inline candidate self-view panel (rendered inside the split layout) ─── */
+  const selfViewPanel = recordingRequired ? (
+    <div className="flex flex-col items-center justify-center w-full h-full min-h-0">
+      <div className="relative w-full max-w-[560px] aspect-video rounded-xl overflow-hidden border border-white-light dark:border-[#1b2e4b] bg-black shadow-2xl">
         <video
           autoPlay
           muted
@@ -626,11 +626,12 @@ export default function InterviewDetailsPage() {
             }
           }}
         />
-        <div className="absolute top-1 left-1 flex items-center gap-1 px-1.5 py-0.5 bg-danger/80 rounded text-[8px] font-bold text-white uppercase tracking-wider">
-          <span className="w-1 h-1 rounded-full bg-white animate-pulse" />
+        <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2 py-1 bg-danger/80 rounded text-[10px] font-bold text-white uppercase tracking-wider">
+          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
           Live
         </div>
       </div>
+      <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest mt-3">You</p>
     </div>
   ) : null;
 
@@ -697,7 +698,6 @@ export default function InterviewDetailsPage() {
     return (
       <>
         {gazeVideoElement}
-        {selfViewPiP}
         {createPortal(
           <div className="fixed top-0 left-0 w-screen h-screen z-[9999] bg-background text-text-primary dark:text-white flex flex-col">
 
@@ -770,8 +770,8 @@ export default function InterviewDetailsPage() {
           </div>
         </div>
 
-        {/* ── Center Content (visualizer + current question) ──── */}
-        <div className="flex-1 flex flex-col items-center justify-center px-6 py-4 overflow-y-auto relative">
+        {/* ── Center Content — split: live camera | question ──── */}
+        <div className="flex-1 flex flex-col md:flex-row items-stretch justify-center px-4 md:px-8 py-4 gap-6 overflow-y-auto relative min-h-0">
           {/* Paused overlay */}
           {engine.isPaused && (
             <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/80 dark:bg-black/80 backdrop-blur-sm">
@@ -788,6 +788,18 @@ export default function InterviewDetailsPage() {
             </div>
           )}
 
+          {/* Left column — live candidate camera */}
+          {selfViewPanel && (
+            <div className="w-full md:w-1/2 md:max-w-[640px] flex items-center justify-center">
+              {selfViewPanel}
+            </div>
+          )}
+
+          {/* Right column — visualizer + question + mic status */}
+          <div className={cn(
+            "flex flex-col items-center justify-center min-h-0",
+            selfViewPanel ? "w-full md:w-1/2 md:max-w-[640px]" : "max-w-2xl w-full"
+          )}>
           {/* Audio Visualizer */}
           <div className="relative w-24 h-24 mb-8 flex-shrink-0">
             <div className={cn(
@@ -940,6 +952,7 @@ export default function InterviewDetailsPage() {
               </span>
             </motion.div>
           )}
+          </div>
         </div>
 
         {/* ── Bottom Control Bar (fixed) ────────────────────────── */}

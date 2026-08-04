@@ -67,9 +67,21 @@ function requiresVerification(interview) {
 function buildStatusPayload(interview, { referenceUrl, referenceSource, required }) {
   const iv = interview.identityVerification || {};
 
+  // A prior "passed" only grants entry for the current live session. Once the
+  // candidate closes the tab and comes back (interview is still 'scheduled'),
+  // they must re-verify — otherwise verification becomes a one-time bypass.
+  // We still honor a prior pass mid-session ('in-progress') so refreshing
+  // during the interview doesn't lock the candidate out.
+  let effectiveStatus = iv.status;
+  if (required && effectiveStatus === 'passed' && interview.status !== 'in-progress') {
+    effectiveStatus = 'pending';
+  }
+
   return {
     required,
-    status: required ? iv.status === 'not_required' ? 'pending' : iv.status : 'not_required',
+    status: required
+      ? (effectiveStatus === 'not_required' ? 'pending' : effectiveStatus)
+      : 'not_required',
     provider: required ? resolveProvider() : 'off',
     threshold: required ? getMatchThreshold() : null,
     similarity: iv.similarity ?? null,

@@ -4,8 +4,15 @@ const { transcodeToWav } = require('./audioTranscodeService');
 
 const TTS_MODEL = process.env.GEMINI_TTS_MODEL || 'gemini-2.5-flash-preview-tts';
 const STT_MODEL = process.env.GEMINI_STT_MODEL || 'gemini-2.5-flash';
-const VOICE_NAME = process.env.GEMINI_TTS_VOICE || 'Kore';
+// Pinned to a specific prebuilt voice — do not let this fall back silently.
+// Env override is allowed for ops, but the product default is "Orus".
+const VOICE_NAME = process.env.GEMINI_TTS_VOICE || 'Orus';
 const MAX_TEXT_LENGTH = 1000;
+// Transient upstream failures (cold-start, 429, brief 5xx) are common with
+// preview TTS endpoints; retry the stream-start ONCE with short backoff.
+// We can only retry safely before any bytes have been yielded downstream.
+const MAX_STREAM_START_ATTEMPTS = 2;
+const STREAM_START_BACKOFF_MS = 500;
 const TRANSCRIBE_PROMPT = 'Transcribe this English audio recording exactly as spoken. '
   + 'Return only the transcription text, with no commentary, labels, or additional formatting. '
   + 'If nothing intelligible was said, return an empty string.';
@@ -37,7 +44,7 @@ async function* synthesizeSpeechStream(text, languageCode = 'en-US') {
   }
 
   const ai = getClient();
-  const stream = await ai.models.generateContentStream({
+  const streamConfig = {
     model: TTS_MODEL,
     contents: cleaned,
     config: {
@@ -48,7 +55,28 @@ async function* synthesizeSpeechStream(text, languageCode = 'en-US') {
         },
       },
     },
-  });
+  };
+
+  let stream;
+  let lastError;
+  for (let attempt = 1; attempt <= MAX_STREAM_START_ATTEMPTS; attempt++) {
+    try {
+      stream = await ai.models.generateContentStream(streamConfig);
+      lastError = null;
+      break;
+    } catch (err) {
+      lastError = err;
+      if (attempt < MAX_STREAM_START_ATTEMPTS) {
+        logger.warn(
+          `[geminiSpeechService] TTS stream start failed (attempt ${attempt}/${MAX_STREAM_START_ATTEMPTS}) — retrying: ${err.message}`,
+        );
+        await new Promise((r) => setTimeout(r, STREAM_START_BACKOFF_MS * attempt));
+      }
+    }
+  }
+  if (lastError || !stream) {
+    throw lastError || new Error('Gemini TTS stream failed to start');
+  }
 
   let chunkCount = 0;
   for await (const response of stream) {
@@ -62,7 +90,9 @@ async function* synthesizeSpeechStream(text, languageCode = 'en-US') {
     throw new Error('Gemini TTS returned no audio data');
   }
 
-  logger.info(`[geminiSpeechService] Synthesized ${chunkCount} chunk(s) for language ${languageCode}`);
+  logger.info(
+    `[geminiSpeechService] Synthesized ${chunkCount} chunk(s) [voice=${VOICE_NAME}, lang=${languageCode}]`,
+  );
 }
 
 /**
