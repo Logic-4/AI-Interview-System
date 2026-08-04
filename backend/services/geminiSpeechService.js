@@ -47,10 +47,21 @@ async function* synthesizeSpeechStream(text, languageCode = 'en-US') {
     throw new Error(`Text exceeds the ${MAX_TEXT_LENGTH} character synthesis limit`);
   }
 
+  // Gemini TTS is "controllable" — the model reads a natural-language style
+  // directive prefixed to the text and applies it to the whole utterance. Without
+  // one, it auto-detects language per-token and pronounces embedded English
+  // words (e.g. "React", "API", "senior developer") in English even when the
+  // sentence is Somali. Force the target language so every token is pronounced
+  // in the same voice/language.
+  const isSomali = /^so/i.test(String(languageCode));
+  const styledPrompt = isSomali
+    ? `Ku hadal Af-Soomaali kaliya, si dabiici ah oo xirfad leh, oo ku dhawaaq dhammaan ereyada — xataa erayada Ingiriisiga ah — sida Af-Soomaali:\n\n${cleaned}`
+    : `Read the following in natural, professional English:\n\n${cleaned}`;
+
   const ai = getClient();
   const streamConfig = {
     model: TTS_MODEL,
-    contents: cleaned,
+    contents: styledPrompt,
     config: {
       responseModalities: [Modality.AUDIO],
       speechConfig: {

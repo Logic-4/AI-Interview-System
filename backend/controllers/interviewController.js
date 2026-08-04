@@ -163,7 +163,11 @@ async function runQuestionGenerationPipeline(interviewId, context) {
   } catch (warmErr) {
     logger.warn(`[pipeline] warmup kick failed for ${interviewId}: ${warmErr.message}`);
   }
-  const warmupWait = await awaitCurrentWarmup(5000);
+  // RunPod cold starts for the fine-tuned Gemma model routinely take 15–30s.
+  // A 5s cap meant the first /generate-question call itself paid the cold-start
+  // bill — so we wait longer (env-tunable) before firing generation.
+  const warmupWaitMs = Number(process.env.PIPELINE_WARMUP_WAIT_MS || 20000);
+  const warmupWait = await awaitCurrentWarmup(warmupWaitMs);
   if (warmupWait.waited) {
     logger.info(JSON.stringify({
       event: 'pipeline_warmup_awaited',
