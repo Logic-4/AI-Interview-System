@@ -1,6 +1,7 @@
-export type InterviewType = 'technical' | 'behavioral' | 'system-design' | 'hr' | 'mixed';
+export type InterviewType = 'technical' | 'behavioral' | 'system-design' | 'mixed';
 export type InterviewDifficulty = 'junior' | 'mid' | 'senior' | 'lead';
-export type InterviewDomain = 'technology' | 'healthcare' | 'finance' | 'engineering' | 'education' | 'legal';
+export type InterviewDomain = 'technology';
+
 export type InterviewStatus = 'scheduled' | 'in-progress' | 'completed' | 'cancelled';
 export type InterviewWarmupPhase = 'idle' | 'warming' | 'ready' | 'failed';
 

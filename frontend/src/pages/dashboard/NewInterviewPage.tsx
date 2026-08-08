@@ -2,32 +2,17 @@ import * as React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "../../lib/utils";
-import { DOMAIN_ROLES, DOMAIN_LABELS } from "../../lib/constants";
+import toast from "react-hot-toast";
+
+import { TECHNOLOGY_SPECIALIZATIONS } from "../../lib/constants";
 import { estimateQuestionCount } from "../../lib/interviewHelpers";
 import interviewService from "../../services/interviewService";
 import { useInterviewStore } from "../../stores/interviewStore";
-import type { InterviewType, InterviewDifficulty, InterviewDomain, InterviewLanguage, CreateInterviewPayload, InterviewWarmupStatus } from "../../types/interview";
+import type { InterviewType, InterviewDifficulty, InterviewLanguage, CreateInterviewPayload, InterviewWarmupStatus } from "../../types/interview";
 
-import { Code, User, Users, Settings, Zap, Clock, MessageSquare, Video, Plus, X, ArrowLeft, AlertCircle, DollarSign, BookOpen, Heart, CheckCheck, Upload, FileText } from "lucide-react";
+import { Code, User, Settings, Zap, Clock, MessageSquare, Video, Plus, X, ArrowLeft, AlertCircle, CheckCheck, Upload, FileText, CheckSquare, Square } from "lucide-react";
 import { parseResumeFile } from "../../lib/fileParser";
 import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
-
-const DOMAIN_ICONS: Record<string, React.ElementType> = {
-  technology: Code,
-  healthcare: Heart,
-  finance: DollarSign,
-  engineering: Zap,
-  education: BookOpen,
-  legal: BookOpen,
-};
-
-const INTERVIEW_TYPES: { value: InterviewType; label: string; desc: string; icon: React.ElementType }[] = [
-  { value: "technical", label: "Technical", desc: "Skills deep-dive", icon: Code },
-  { value: "behavioral", label: "Behavioral", desc: "STAR questions", icon: Users },
-  { value: "hr", label: "HR Screening", desc: "Culture & motivation", icon: User },
-  { value: "system-design", label: "System Design", desc: "Architecture design", icon: Settings },
-  { value: "mixed", label: "Mixed", desc: "Balanced blend", icon: Zap },
-];
 
 const DIFFICULTY_LEVELS: { value: InterviewDifficulty; label: string; desc: string }[] = [
   { value: "junior", label: "Junior", desc: "Entry-level" },
@@ -36,23 +21,27 @@ const DIFFICULTY_LEVELS: { value: InterviewDifficulty; label: string; desc: stri
   { value: "lead", label: "Lead / Expert", desc: "10+ years exp" },
 ];
 
+
 const DURATION_OPTIONS = [10, 15, 20, 30, 45, 60];
+
+const MAX_SPECIALIZATIONS = 3;
 
 export default function NewInterviewPage() {
   const navigate = useNavigate();
   const setActiveInterview = useInterviewStore((s) => s.setActiveInterview);
 
-  // Wizard state (1, 2, or 3)
   const [step, setStep] = React.useState(1);
 
-  // Form parameters
-  const [domain, setDomain] = React.useState<InterviewDomain | "">("");
-  const [jobRole, setJobRole] = React.useState("");
+  // Specialization multi-select (replaces single jobRole dropdown + domain dropdown)
+  const [selectedSpecializations, setSelectedSpecializations] = React.useState<string[]>([]);
+
+  // Session configuration
   const [interviewType, setInterviewType] = React.useState<InterviewType>("technical");
   const [difficulty, setDifficulty] = React.useState<InterviewDifficulty>("junior");
   const [language, setLanguage] = React.useState<InterviewLanguage>("english");
   const [duration, setDuration] = React.useState(30);
-  const [jobDescription, setJobDescription] = React.useState("");
+
+  // Tailoring details
   const [resumeText, setResumeText] = React.useState("");
   const [focusSkills, setFocusSkills] = React.useState<string[]>([]);
   const [skillInput, setSkillInput] = React.useState("");
@@ -68,12 +57,17 @@ export default function NewInterviewPage() {
   const [resumeFileName, setResumeFileName] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const currentRoles = domain ? DOMAIN_ROLES[domain] : [];
-  const DomainIcon = domain ? DOMAIN_ICONS[domain] : Settings;
+  // The combined jobRole string sent to the model (e.g. "Frontend Development & Backend Development")
+  const jobRole = selectedSpecializations.join(" & ");
+  const generationFocusSkills = focusSkills.length > 0 ? focusSkills : selectedSpecializations;
 
-  React.useEffect(() => {
-    setJobRole("");
-  }, [domain]);
+  const toggleSpecialization = (spec: string) => {
+    setSelectedSpecializations((prev) => {
+      if (prev.includes(spec)) return prev.filter((s) => s !== spec);
+      if (prev.length >= MAX_SPECIALIZATIONS) return prev;
+      return [...prev, spec];
+    });
+  };
 
   const getRequestError = React.useCallback((err: unknown) => {
     const responseMessage = (err as { response?: { data?: { message?: string; error?: string } } })
@@ -93,20 +87,16 @@ export default function NewInterviewPage() {
     }
   }, [getRequestError, language]);
 
-  // Warm only after an authenticated user reaches interview setup.
   React.useEffect(() => {
     void triggerWarmup(language === "somali");
   }, [triggerWarmup, language]);
 
-  // Force a fresh provider check at the final step. With RunPod active workers
-  // set to zero, an earlier worker may have already scaled down.
   React.useEffect(() => {
     if (step === 3) void triggerWarmup(true);
   }, [step, triggerWarmup]);
 
   React.useEffect(() => {
     if (warmup?.status !== "warming" || warmupPollCountRef.current >= 48) return;
-
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       warmupPollCountRef.current += 1;
@@ -118,7 +108,6 @@ export default function NewInterviewPage() {
         if (!controller.signal.aborted) setWarmupRequestError(getRequestError(err));
       }
     }, 2500);
-
     return () => {
       window.clearTimeout(timer);
       controller.abort();
@@ -147,7 +136,6 @@ export default function NewInterviewPage() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     try {
       setIsUploadingResume(true);
       setError(null);
@@ -169,19 +157,30 @@ export default function NewInterviewPage() {
   };
 
   // Step validation
-  const isStep1Valid = !!domain && !!jobRole;
-  const isStep2Valid = !!interviewType && !!difficulty && !!duration;
+  const isStep1Valid = selectedSpecializations.length > 0;
+  const isStep2Valid = !!difficulty && !!duration;
   const isFormValid = isStep1Valid && isStep2Valid;
 
-  const autoTitle = jobRole ? `${jobRole} — ${INTERVIEW_TYPES.find((t) => t.value === interviewType)?.label ?? "Interview"}` : "";
+  const autoTitle = jobRole ? `${jobRole} — Technical Practice` : "";
+
 
   const handleGenerate = async () => {
+    if (selectedSpecializations.length === 0) {
+      toast.error('Please select at least one specialization in Step 1');
+      setStep(1);
+      return;
+    }
+
+    if (!duration || duration < 5 || duration > 120) {
+      toast.error('Please select a valid session duration in Step 2');
+      setStep(2);
+      return;
+    }
+
     if (!isFormValid || submittingRef.current) return;
     submittingRef.current = true;
     setIsLoading(true);
     setError(null);
-
-    // Refresh if readiness expired without delaying interview creation.
     void triggerWarmup();
 
     try {
@@ -189,18 +188,18 @@ export default function NewInterviewPage() {
         title: autoTitle,
         type: interviewType,
         difficulty,
-        domain: domain as InterviewDomain,
+        domain: "technology",
         language,
         duration,
         jobRole,
-        focusSkills: focusSkills.length > 0 ? focusSkills : undefined,
-        jobDescription: jobDescription.trim() || undefined,
+        focusSkills: generationFocusSkills,
         resumeText: resumeText.trim() || undefined,
       };
 
-      generationKeyRef.current ||= typeof crypto !== 'undefined' && crypto.randomUUID
+      generationKeyRef.current ||= typeof crypto !== "undefined" && crypto.randomUUID
         ? crypto.randomUUID()
         : `interview-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
       const interview = await interviewService.createInterview(payload, generationKeyRef.current);
       setActiveInterview(interview);
       navigate(`/interviews/${interview._id}`, {
@@ -218,16 +217,14 @@ export default function NewInterviewPage() {
   const providerWarmupError = warmup?.services.speech.error || warmup?.services.gemma.error;
   const warmupFailure = providerWarmupError || warmupRequestError;
 
-  /* ─── Fullscreen Loading Overlay ──────────────────────── */
+  /* ─── Fullscreen Loading Overlay ─────────────────────── */
   if (isLoading) {
     return (
       <div className="fixed inset-0 z-[9999] bg-background flex items-center justify-center text-text-primary dark:text-white">
         <div className="max-w-md w-full text-center space-y-6 px-6">
           <LoadingSpinner size="lg" className="mx-auto text-primary" />
           <div className="space-y-2">
-            <h2 className="text-xl font-bold text-foreground dark:text-white">
-              Creating your interview…
-            </h2>
+            <h2 className="text-xl font-bold text-foreground dark:text-white">Creating your interview…</h2>
             <p className="text-sm font-medium text-text-muted">
               Generating your first question. Remaining questions will load in the background.
             </p>
@@ -239,7 +236,7 @@ export default function NewInterviewPage() {
 
   return (
     <div className="max-w-5xl mx-auto py-8 space-y-6 animate-in fade-in duration-700 text-black dark:text-white-dark">
-      {/* Header breadcrumb & back */}
+      {/* Header */}
       <div className="flex items-center gap-4">
         <Link to="/interviews">
           <button className="w-10 h-10 rounded-md border border-[#ebedf2] dark:border-[#1b2e4b] flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-[#000]/[0.04] dark:hover:bg-[#1b2e4b] transition-all bg-white dark:bg-[#121e32]">
@@ -247,11 +244,16 @@ export default function NewInterviewPage() {
           </button>
         </Link>
         <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight leading-tight text-text-primary dark:text-white">Configure Your Interview</h1>
-          <p className="text-sm text-text-muted font-medium opacity-70">Set up your mock interview session step-by-step.</p>
+          <h1 className="text-3xl font-bold tracking-tight leading-tight text-text-primary dark:text-white">
+            Configure Your Interview
+          </h1>
+          <p className="text-sm text-text-muted font-medium opacity-70">
+            Set up your personal mock interview session step-by-step.
+          </p>
         </div>
       </div>
 
+      {/* AI Warmup Status Banner */}
       <AnimatePresence mode="wait">
         {(warmup?.status === "warming" || warmup?.status === "ready" || warmupFailure) && (
           <motion.div
@@ -264,8 +266,8 @@ export default function NewInterviewPage() {
               warmupFailure
                 ? "bg-danger/5 border-danger/20"
                 : warmup?.status === "ready"
-                  ? "bg-success/5 border-success/20"
-                  : "bg-primary/5 border-primary/20"
+                ? "bg-success/5 border-success/20"
+                : "bg-primary/5 border-primary/20"
             )}
           >
             {warmupFailure ? (
@@ -280,13 +282,14 @@ export default function NewInterviewPage() {
                 {warmupFailure
                   ? "AI service warmup needs attention"
                   : warmup?.status === "ready"
-                    ? "AI services are ready"
-                    : "AI services are warming up"}
+                  ? "AI services are ready"
+                  : "AI services are warming up"}
               </p>
               <p className={cn("text-xs mt-0.5 break-words", warmupFailure ? "text-danger" : "text-text-muted")}>
-                {warmupFailure || (warmup?.status === "ready"
-                  ? "Gemma and the selected English/Somali speech services are ready."
-                  : "You can continue configuring the interview while models load in the background.")}
+                {warmupFailure ||
+                  (warmup?.status === "ready"
+                    ? "Gemma and the selected speech services are ready."
+                    : "You can continue configuring the interview while models load in the background.")}
               </p>
             </div>
             {warmupFailure && (
@@ -322,15 +325,14 @@ export default function NewInterviewPage() {
         )}
       </AnimatePresence>
 
-      {/* Vristo Official Wizard Layout Panel */}
+      {/* Main Wizard Panel */}
       <div className="panel lg:col-span-2 p-6 md:p-10 min-h-[72vh]">
         <div className="mb-5 max-w-4xl mx-auto">
           <div className="inline-block w-full">
-            {/* Stepper Navigation Progress Line */}
+
+            {/* Stepper */}
             <div className="relative z-[1] max-w-2xl mx-auto w-full py-4 mb-8">
-              {/* Grey background track path */}
               <div className="absolute left-[16.6%] top-[48px] w-[66.6%] h-1 bg-[#f3f2ee] dark:bg-[#1b2e4b] -z-[1] rounded-full"></div>
-              {/* Blue active progress line */}
               <div
                 className={cn(
                   "bg-primary h-1 absolute left-[16.6%] top-[48px] -z-[1] transition-[width] duration-300 rounded-full",
@@ -349,10 +351,10 @@ export default function NewInterviewPage() {
                     )}
                     onClick={() => setStep(1)}
                   >
-                    <User className="w-6 h-6" />
+                    <Code className="w-6 h-6" />
                   </button>
                   <span className={cn("text-xs font-semibold block mt-2", step === 1 ? "text-primary dark:text-white" : "text-text-muted")}>
-                    Role Profile
+                    Specialization
                   </span>
                 </li>
                 <li>
@@ -370,7 +372,7 @@ export default function NewInterviewPage() {
                     <Settings className="w-6 h-6" />
                   </button>
                   <span className={cn("text-xs font-semibold block mt-2", step === 2 ? "text-primary dark:text-white" : "text-text-muted")}>
-                    Configure Session
+                    Session Setup
                   </span>
                 </li>
                 <li>
@@ -388,15 +390,17 @@ export default function NewInterviewPage() {
                     <CheckCheck className="w-6 h-6" />
                   </button>
                   <span className={cn("text-xs font-semibold block mt-2", step === 3 ? "text-primary dark:text-white" : "text-text-muted")}>
-                    Tailor Setup
+                    Personalise
                   </span>
                 </li>
               </ul>
             </div>
 
-            {/* Step Content Area */}
+            {/* Step Content */}
             <div className="py-4">
               <AnimatePresence mode="wait">
+
+                {/* ── STEP 1: Specialization Multi-Select ── */}
                 {step === 1 && (
                   <motion.div
                     key="step1"
@@ -407,49 +411,77 @@ export default function NewInterviewPage() {
                     className="space-y-6 flex-1"
                   >
                     <div className="border-b border-[#ebedf2] dark:border-[#1b2e4b] pb-4 mb-4">
-                      <h4 className="text-lg font-bold text-black dark:text-white-light">Step 1: Role Profile</h4>
-                      <p className="text-xs text-text-muted opacity-70">Specify your professional target to align the mock interview questions.</p>
+                      <h4 className="text-lg font-bold text-black dark:text-white-light">Step 1: Choose Your Specialization</h4>
+                      <p className="text-xs text-text-muted opacity-70 mt-1">
+                        Select up to <strong>{MAX_SPECIALIZATIONS}</strong> areas to practice. The AI will generate questions covering all selected areas.
+                        For Full Stack, pick <em>Frontend Development</em> + <em>Backend Development</em>.
+                      </p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      {/* Domain Focus */}
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em] px-1 dark:text-white">Domain Focus</label>
-                        <select
-                          value={domain}
-                          onChange={(e) => setDomain(e.target.value as InterviewDomain)}
-                          className="form-select h-12 border-[#ebedf2] dark:border-[#17263c] rounded-md px-5 text-sm font-semibold bg-white dark:bg-[#121e32]"
-                        >
-                          <option value="">Choose a domain</option>
-                          {Object.entries(DOMAIN_LABELS).map(([key, label]) => (
-                            <option key={key} value={key}>
-                              {label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                      {TECHNOLOGY_SPECIALIZATIONS.map((spec) => {
+                        const isSelected = selectedSpecializations.includes(spec);
+                        const isDisabled = !isSelected && selectedSpecializations.length >= MAX_SPECIALIZATIONS;
+                        return (
+                          <button
+                            key={spec}
+                            type="button"
+                            disabled={isDisabled}
+                            onClick={() => toggleSpecialization(spec)}
+                            className={cn(
+                              "relative flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all duration-200 text-center gap-2 min-h-[90px] group",
+                              isSelected
+                                ? "border-primary bg-primary/8 text-primary shadow-md shadow-primary/10"
+                                : isDisabled
+                                ? "border-[#ebedf2] dark:border-[#1b2e4b] bg-white-light/20 dark:bg-[#253b5c]/20 text-text-muted opacity-40 cursor-not-allowed"
+                                : "border-[#ebedf2] dark:border-[#1b2e4b] bg-white-light/30 dark:bg-[#253b5c]/30 text-text-muted hover:border-primary/60 hover:bg-primary/[0.04] hover:text-primary"
+                            )}
+                          >
+                            {/* Checkmark indicator */}
+                            <div className="absolute top-2 right-2">
+                              {isSelected ? (
+                                <CheckSquare className="w-4 h-4 text-primary" />
+                              ) : (
+                                <Square className="w-4 h-4 text-text-muted opacity-30" />
+                              )}
+                            </div>
+                            <Code className={cn("w-5 h-5", isSelected ? "text-primary" : "text-text-muted")} />
+                            <span className="text-[11px] font-bold leading-tight">{spec}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
 
-                      {/* Job Title / Role */}
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em] px-1 dark:text-white">Job Title / Role</label>
-                        <select
-                          value={jobRole}
-                          onChange={(e) => setJobRole(e.target.value)}
-                          disabled={!domain}
-                          className="form-select h-12 border-[#ebedf2] dark:border-[#17263c] rounded-md px-5 text-sm font-semibold bg-white dark:bg-[#121e32]"
-                        >
-                          <option value="">{domain ? "Select role" : "Select domain first"}</option>
-                          {currentRoles.map((role) => (
-                            <option key={role} value={role}>
-                              {role}
-                            </option>
+                    {/* Selection preview */}
+                    <div className="pt-2">
+                      {selectedSpecializations.length > 0 ? (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Selected:</span>
+                          {selectedSpecializations.map((spec) => (
+                            <span
+                              key={spec}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded-md text-xs font-semibold"
+                            >
+                              {spec}
+                              <button onClick={() => toggleSpecialization(spec)} className="hover:text-danger transition-colors">
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
                           ))}
-                        </select>
-                      </div>
+                          <span className="text-[10px] font-semibold text-text-muted opacity-60 ml-1">
+                            ({selectedSpecializations.length}/{MAX_SPECIALIZATIONS} selected)
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-text-muted italic opacity-60">
+                          No specialization selected yet. Pick at least one to continue.
+                        </p>
+                      )}
                     </div>
                   </motion.div>
                 )}
 
+                {/* ── STEP 2: Session Configuration ── */}
                 {step === 2 && (
                   <motion.div
                     key="step2"
@@ -460,16 +492,16 @@ export default function NewInterviewPage() {
                     className="space-y-8 flex-1"
                   >
                     <div className="border-b border-[#ebedf2] dark:border-[#1b2e4b] pb-4 mb-4">
-                      <h4 className="text-lg font-bold text-black dark:text-white-light">Step 2: Configure Session</h4>
-                      <p className="text-xs text-text-muted opacity-70">Customize the interview details, languages, and testing durations.</p>
+                      <h4 className="text-lg font-bold text-black dark:text-white-light">Step 2: Session Setup</h4>
+                      <p className="text-xs text-text-muted opacity-70">Customize the interview language, difficulty, and duration.</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       {/* Language */}
                       <div className="space-y-3">
-                        <label className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em] px-1 dark:text-white">Preferred Language</label>
+                        <label className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em] px-1 dark:text-white">Interview Language</label>
                         <div className="flex items-center gap-3">
-                          {(['english', 'somali'] as const).map((lang) => (
+                          {(["english", "somali"] as const).map((lang) => (
                             <button
                               key={lang}
                               type="button"
@@ -487,7 +519,7 @@ export default function NewInterviewPage() {
                         </div>
                       </div>
 
-                      {/* Duration Options */}
+                      {/* Duration */}
                       <div className="space-y-3">
                         <div className="flex items-center justify-between px-1">
                           <label className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em] dark:text-white">Session Duration</label>
@@ -513,36 +545,8 @@ export default function NewInterviewPage() {
                       </div>
                     </div>
 
-                    {/* Interview Type Selection Grid */}
-                    <div className="space-y-3 pt-2">
-                      <label className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em] px-1 dark:text-white">Interview Type</label>
-                      <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
-                        {INTERVIEW_TYPES.map((t) => {
-                          const isActive = interviewType === t.value;
-                          const Icon = t.icon;
-                          return (
-                            <button
-                              key={t.value}
-                              type="button"
-                              onClick={() => setInterviewType(t.value)}
-                              className={cn(
-                                "flex flex-col items-center justify-center p-5 rounded-lg border transition-all duration-200 text-center gap-2 group min-h-[120px]",
-                                isActive
-                                  ? "border-primary bg-primary/5 text-primary shadow-md shadow-primary/5"
-                                  : "border-[#ebedf2] dark:border-[#1b2e4b] bg-white-light/30 dark:bg-[#253b5c]/30 text-text-muted hover:border-primary/50 hover:bg-primary/[0.02]"
-                              )}
-                            >
-                              <Icon className={cn("w-6 h-6 transition-transform duration-200 group-hover:scale-110", isActive ? "text-primary" : "text-text-muted")} />
-                              <span className="text-xs font-bold tracking-tight">{t.label}</span>
-                              <span className="text-[10px] opacity-75 font-medium leading-tight line-clamp-2">{t.desc}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Difficulty Levels */}
-                    <div className="space-y-3 pt-2">
+                    {/* Experience Level */}
+                    <div className="space-y-3 pt-2 border-t border-[#ebedf2] dark:border-[#1b2e4b] mt-4">
                       <label className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em] px-1 dark:text-white">Experience Level</label>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {DIFFICULTY_LEVELS.map((level) => {
@@ -566,9 +570,11 @@ export default function NewInterviewPage() {
                         })}
                       </div>
                     </div>
+
                   </motion.div>
                 )}
 
+                {/* ── STEP 3: Personalise (Self-Training only) ── */}
                 {step === 3 && (
                   <motion.div
                     key="step3"
@@ -579,73 +585,20 @@ export default function NewInterviewPage() {
                     className="space-y-6 flex-1"
                   >
                     <div className="border-b border-[#ebedf2] dark:border-[#1b2e4b] pb-4 mb-4">
-                      <h4 className="text-lg font-bold text-black dark:text-white-light">Step 3: Tailoring Details</h4>
-                      <p className="text-xs text-text-muted opacity-70">Add focal skills or paste a specific job description to completely align the generated questions.</p>
+                      <h4 className="text-lg font-bold text-black dark:text-white-light">Step 3: Personalise Your Session</h4>
+                      <p className="text-xs text-text-muted opacity-70 mt-1">
+                        Upload your resume and add skills so the AI tailors questions directly to your background. Both fields are optional.
+                      </p>
                     </div>
 
                     <div className="space-y-6">
-                      {/* Focus Skills */}
+                      {/* Resume Upload */}
                       <div className="space-y-3">
                         <div className="flex items-center justify-between px-1">
-                          <label className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em] dark:text-white">Focus Skills</label>
-                          <span className="text-[10px] font-bold text-text-muted opacity-60">{focusSkills.length}/10</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={skillInput}
-                            onChange={(e) => setSkillInput(e.target.value)}
-                            onKeyDown={handleSkillKeyDown}
-                            placeholder="e.g. React, Leadership, SQL..."
-                            className="form-input flex-1 h-11"
-                          />
-                          <button
-                            type="button"
-                            onClick={addSkill}
-                            disabled={!skillInput.trim() || focusSkills.length >= 10}
-                            className="h-11 w-11 rounded-md border border-[#ebedf2] dark:border-[#1b2e4b] flex items-center justify-center text-text-muted hover:text-primary hover:border-primary/40 disabled:opacity-30 transition-all bg-[#f3f2ee] dark:bg-[#253b5c]"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
-                        </div>
-                        {focusSkills.length > 0 ? (
-                          <div className="flex flex-wrap gap-2 pt-1">
-                            {focusSkills.map((skill) => (
-                              <span
-                                key={skill}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded-md text-xs font-semibold"
-                              >
-                                {skill}
-                                <button onClick={() => removeSkill(skill)} className="hover:text-danger transition-colors">
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-text-muted italic px-1 pt-1 opacity-60">No custom skills added yet. Generic key skills for {jobRole || "role"} will be assessed.</p>
-                        )}
-                      </div>
-
-                      {/* Job Description Textarea */}
-                      <div className="space-y-3 pt-2">
-                        <div className="flex items-center justify-between px-1">
-                          <label className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em] dark:text-white">Job Description (JD)</label>
-                          <span className="text-[10px] font-bold text-text-muted italic opacity-60">Paste the JD for tailored questions</span>
-                        </div>
-                        <textarea
-                          value={jobDescription}
-                          onChange={(e) => setJobDescription(e.target.value)}
-                          placeholder="Paste the full job description here for AI to generate highly targeted questions..."
-                          rows={12}
-                          className="w-full min-h-[240px] md:min-h-[280px] form-input p-4 resize-y custom-scrollbar bg-white dark:bg-[#121e32] border-[#ebedf2] dark:border-[#1b2e4b]"
-                        />
-                      </div>
-
-                      {/* Resume / CV Upload */}
-                      <div className="space-y-3 pt-2 border-t border-[#ebedf2] dark:border-[#1b2e4b] mt-4 pt-4">
-                        <div className="flex items-center justify-between px-1">
-                          <label className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em] dark:text-white block">Your Resume / CV</label>
+                          <label className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em] dark:text-white block">
+                            Upload Your Resume / CV
+                            <span className="ml-2 text-[10px] font-semibold text-text-muted normal-case tracking-normal opacity-60">(optional — personalises questions to your background)</span>
+                          </label>
                         </div>
                         <div className="relative">
                           <input
@@ -655,7 +608,6 @@ export default function NewInterviewPage() {
                             ref={fileInputRef}
                             onChange={handleFileUpload}
                           />
-                          
                           {resumeFileName ? (
                             <div className="flex flex-col items-center justify-center w-full h-32 border-2 border-primary/30 border-dashed rounded-lg bg-primary/5">
                               <FileText className="w-8 h-8 text-primary mb-2" />
@@ -695,13 +647,61 @@ export default function NewInterviewPage() {
                           )}
                         </div>
                       </div>
+
+                      {/* Focus Skills */}
+                      <div className="space-y-3 pt-2 border-t border-[#ebedf2] dark:border-[#1b2e4b] mt-4">
+                        <div className="flex items-center justify-between px-1">
+                          <label className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em] dark:text-white">
+                            Focus Skills
+                            <span className="ml-2 text-[10px] font-semibold text-text-muted normal-case tracking-normal opacity-60">(optional — e.g. React, Docker, SQL)</span>
+                          </label>
+                          <span className="text-[10px] font-bold text-text-muted opacity-60">{focusSkills.length}/10</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={skillInput}
+                            onChange={(e) => setSkillInput(e.target.value)}
+                            onKeyDown={handleSkillKeyDown}
+                            placeholder="e.g. React, Node.js, Docker..."
+                            className="form-input flex-1 h-11"
+                          />
+                          <button
+                            type="button"
+                            onClick={addSkill}
+                            disabled={!skillInput.trim() || focusSkills.length >= 10}
+                            className="h-11 w-11 rounded-md border border-[#ebedf2] dark:border-[#1b2e4b] flex items-center justify-center text-text-muted hover:text-primary hover:border-primary/40 disabled:opacity-30 transition-all bg-[#f3f2ee] dark:bg-[#253b5c]"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
+                        {focusSkills.length > 0 ? (
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {focusSkills.map((skill) => (
+                              <span
+                                key={skill}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded-md text-xs font-semibold"
+                              >
+                                {skill}
+                                <button onClick={() => removeSkill(skill)} className="hover:text-danger transition-colors">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-text-muted italic px-1 pt-1 opacity-60">
+                            No custom skills added. Standard {jobRole || "technology"} skills will be assessed.
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
 
-            {/* Stepper Bottom Controls */}
+            {/* Navigation Controls */}
             <div className="flex justify-between items-center pt-6 mt-8 border-t border-[#ebedf2] dark:border-[#1b2e4b]">
               <div>
                 <button
@@ -712,7 +712,6 @@ export default function NewInterviewPage() {
                   Back
                 </button>
               </div>
-
               <div>
                 {step < 3 ? (
                   <button
@@ -740,7 +739,7 @@ export default function NewInterviewPage() {
         </div>
       </div>
 
-      {/* Feature Footers Grid */}
+      {/* Footer Info Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-4">
         <div className="flex items-center gap-4 group">
           <div className="w-10 h-10 rounded-md bg-white-light/30 dark:bg-[#1a2941]/50 border border-[#ebedf2] dark:border-[#1b2e4b] flex items-center justify-center text-text-muted group-hover:text-primary transition-all">

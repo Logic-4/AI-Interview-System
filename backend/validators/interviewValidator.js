@@ -23,8 +23,9 @@ const createInterviewValidator = [
   body('domain')
     .notEmpty()
     .withMessage('Domain is required')
-    .isIn(['technology', 'healthcare', 'finance', 'engineering', 'education', 'legal'])
-    .withMessage('Invalid domain'),
+    .isIn(['technology'])
+    .withMessage('Only the technology domain is supported'),
+
 
   body('jobRole')
     .optional()

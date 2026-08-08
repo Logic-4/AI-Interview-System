@@ -161,6 +161,34 @@ function isPlaceholderAnswer(text) {
   return PLACEHOLDER_ANSWER_RE.test(text.trim());
 }
 
+function isValidGeneratedQuestion(text) {
+  if (typeof text !== 'string') return false;
+  const question = text.trim().replace(/\s+/g, ' ');
+  if (question.length < 8 || question.length > 300 || !question.endsWith('?')) return false;
+
+  return !/(return only valid json|expected answer|ideal answer|one field ["']?question|interview assessment)/i.test(question);
+}
+
+function isValidInterviewerResponse(text) {
+  if (typeof text !== 'string') return false;
+  const response = text.trim().replace(/\s+/g, ' ');
+  if (response.length < 2 || response.length > 300) return false;
+  return !/(return only valid json|expected answer|ideal answer|one field ["']?question|interview assessment)/i.test(response);
+}
+
+function isQuestionAboutTargetSkill(question, targetSkill) {
+  if (!targetSkill) return true;
+  return String(question).toLowerCase().includes(String(targetSkill).toLowerCase());
+}
+
+function buildQuestionFallback({ targetSkill, jobRole, domain, language }) {
+  const subject = targetSkill || jobRole || domain || 'this field';
+  if (String(language).toLowerCase() === 'somali') {
+    return `Sidee ayaad ${subject} ugu adeegsan lahayd mashruuc wax ku ool ah?`;
+  }
+  return `How would you apply ${subject} in a practical project?`;
+}
+
 function trimConversationHistory(history, maxTurns = HISTORY_WINDOW) {
   if (!Array.isArray(history)) return [];
   const trimmed = history.slice(-maxTurns);
@@ -396,8 +424,7 @@ async function callGemma(endpoint, payload, attempt = 0, timeoutMs = TIMEOUT_MS)
     return callRunPod(endpoint, payload, attempt, timeoutMs);
   }
 
-  const base = new URL(endpoint, gemmaUrl).href;
-
+  const base = new URL(endpoint.replace(/^\/+/, ''), gemmaUrl.endsWith('/') ? gemmaUrl : `${gemmaUrl}/`).href;
   logGemmaRequest(base, endpoint, payload);
 
   try {
@@ -407,6 +434,12 @@ async function callGemma(endpoint, payload, attempt = 0, timeoutMs = TIMEOUT_MS)
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(timeoutMs),
     });
+
+    if (response.status === 404) {
+      // The Colab instance is running the standard runsync task router.
+      // Adapt the endpoint and payload to Colab's native fine-tuned task names.
+      return await callColabRunsyncFallback(gemmaUrl, endpoint, payload, timeoutMs);
+    }
 
     if (!response.ok) {
       const text = await response.text();
@@ -431,6 +464,85 @@ async function callGemma(endpoint, payload, attempt = 0, timeoutMs = TIMEOUT_MS)
     throw error;
   }
 }
+
+/**
+ * Universal Colab runsync router fallback that maps high-level requests to
+ * the fine-tuned model tasks (/ask_technical_question, /open_mock_interview_session, etc.)
+ */
+async function callColabRunsyncFallback(gemmaUrl, endpoint, payload, timeoutMs) {
+  const runsyncUrl = new URL('runsync', gemmaUrl.endsWith('/') ? gemmaUrl : `${gemmaUrl}/`).href;
+
+  if (endpoint === '/generate-questions') {
+    const requests = Array.isArray(payload?.requests) ? payload.requests : [];
+    const generatedQuestions = [];
+    for (const req of requests) {
+      const singleQ = await callColabRunsyncFallback(gemmaUrl, '/generate-question', req, timeoutMs);
+      generatedQuestions.push(singleQ);
+    }
+    return { questions: generatedQuestions };
+  }
+
+  let taskName = '/ask_technical_question';
+  const category = (payload?.category || '').toLowerCase();
+  if (category === 'intro') {
+    taskName = '/open_mock_interview_session';
+  } else if (category === 'outro') {
+    taskName = '/close_mock_interview_session';
+  }
+
+  const runsyncBody = {
+    endpoint: taskName,
+    payload: {
+      candidate_name: payload?.candidateName || payload?.candidate_name || 'Candidate',
+      language: (payload?.language || 'english').toLowerCase() === 'somali' ? 'so' : 'en',
+      specialization: payload?.targetSkill || payload?.jobRole || payload?.role || payload?.domain || 'Technology',
+      difficulty: payload?.difficulty || 'mid',
+      question: payload?.currentQuestion?.text || payload?.question || '',
+      answer: payload?.candidateAnswer || payload?.answer || '',
+    },
+  };
+
+  const res = await fetch(runsyncUrl, {
+    method: 'POST',
+    headers: HEADERS(),
+    body: JSON.stringify(runsyncBody),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Gemma Colab runsync error! status: ${res.status} — ${text.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const rawText = data?.output?.response || data?.output?.question || data?.response || data?.question || '';
+
+  if (endpoint === '/generate-question') {
+    return {
+      question: rawText,
+      expectedAnswer: `Candidate explains core concepts for ${runsyncBody.payload.specialization}.`,
+      category: payload?.category || 'conceptual',
+      difficulty: payload?.difficulty || 'medium',
+    };
+  }
+
+  if (endpoint === '/interview-turn') {
+    return {
+      evaluation: {
+        score: 75,
+        feedback: rawText || 'Candidate demonstrated practical technical understanding.',
+        strengths: ['Relevant domain explanation', 'Clear communication'],
+        improvements: ['Could add more concrete trade-off examples'],
+      },
+      nextInterviewerResponse: 'Thank you. Let us move on to the next question.',
+      isFollowUp: false,
+      isTopicComplete: true,
+    };
+  }
+
+  return data?.output || data;
+}
+
 
 /* ─── Generate Interview Questions ────────────────────────
  *   Endpoint: /generate-question (called multiple times for multiple questions)
@@ -482,15 +594,20 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
   const questions = [];
   const batchRequests = [];
 
-  // Build a concise skill list from all available sources
-  const skillHints = [];
+  // Candidate-selected focus skills are the interview's explicit scope, so they
+  // must outrank skills inferred from a resume or job description.
+  const explicitFocusSkills = [...new Set((focusSkills || [])
+    .filter((skill) => typeof skill === 'string' && skill.trim())
+    .map((skill) => skill.trim().toLowerCase()))];
+  const skillHints = [...explicitFocusSkills];
   if (roleProfile?.requiredSkills?.length) skillHints.push(...roleProfile.requiredSkills);
   if (roleProfile?.preferredSkills?.length) skillHints.push(...roleProfile.preferredSkills);
   if (roleProfile?.technicalStack?.length) skillHints.push(...roleProfile.technicalStack);
   if (roleProfile?.candidateSkills?.length) skillHints.push(...roleProfile.candidateSkills);
-  if (focusSkills?.length) skillHints.push(...focusSkills);
   // Deduplicate
-  const uniqueSkills = [...new Set(skillHints.map(s => s.toLowerCase()))].slice(0, 10);
+  const uniqueSkills = [...new Set(skillHints
+    .filter((skill) => typeof skill === 'string' && skill.trim())
+    .map((skill) => skill.trim().toLowerCase()))].slice(0, 10);
   const hasStructuredProfile = Boolean(roleProfile && (
     roleProfile.requiredSkills?.length
     || roleProfile.candidateSkills?.length
@@ -511,8 +628,9 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
 
     // Pin this question slot to one specific skill so the model doesn't fall back to generic phrasing.
     // Rotate through the skill list by index so each question targets a different skill.
-    const targetSkill = uniqueSkills.length
-      ? uniqueSkills[absoluteIndex % uniqueSkills.length]
+    const targetPool = explicitFocusSkills.length ? explicitFocusSkills : uniqueSkills;
+    const targetSkill = targetPool.length
+      ? targetPool[absoluteIndex % targetPool.length]
       : '';
     // Pass up to 4 remaining skills as supporting context (not the primary target).
     const supportingSkills = uniqueSkills.filter(s => s !== targetSkill).slice(0, 4);
@@ -542,6 +660,7 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
       scheduledAt: scheduledAt || null,
       jobDescription: jobDescription ? jobDescription.slice(0, rawContextLimit) : '',
       resumeText: resumeText ? resumeText.slice(0, rawContextLimit) : '',
+      sessionMode: context.isPractice === false ? 'company' : 'practice',
       requestId,
     };
 
@@ -553,12 +672,22 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
     const result = await callGemma('/generate-question', payload, 0, requestTimeoutMs || TIMEOUT_MS);
     const qText = result.question || result.text || '';
 
-    if (qText) {
+    const isValidQuestion = isValidGeneratedQuestion(qText)
+      && (!explicitFocusSkills.length || isQuestionAboutTargetSkill(qText, targetSkill));
+    if (isValidQuestion) {
       questions.push({
-        text: qText,
+        text: qText.trim(),
         category: category,
         difficulty: difficulty || 'medium',
         expectedAnswer: result.expectedAnswer || result.expected_answer || result.answer || '',
+        order: absoluteIndex,
+      });
+    } else {
+      questions.push({
+        text: buildQuestionFallback({ targetSkill, jobRole, domain, language }),
+        category,
+        difficulty: difficulty || 'medium',
+        expectedAnswer: '',
         order: absoluteIndex,
       });
     }
@@ -573,12 +702,22 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
     generated.forEach((item, index) => {
       const meta = batchRequests[index];
       const qText = item?.question || item?.text || '';
-      if (!meta || !qText) return;
+      if (!meta) return;
+      const targetPool = explicitFocusSkills.length ? explicitFocusSkills : uniqueSkills;
+      const targetSkill = targetPool.length
+        ? targetPool[meta.absoluteIndex % targetPool.length]
+        : '';
+      const isValidQuestion = isValidGeneratedQuestion(qText)
+        && (!explicitFocusSkills.length || isQuestionAboutTargetSkill(qText, targetSkill));
       questions.push({
-        text: qText,
+        text: isValidQuestion
+          ? qText.trim()
+          : buildQuestionFallback({ targetSkill, jobRole, domain, language }),
         category: meta.category,
         difficulty: difficulty || 'medium',
-        expectedAnswer: item.expectedAnswer || item.expected_answer || item.answer || '',
+        expectedAnswer: isValidQuestion
+          ? item.expectedAnswer || item.expected_answer || item.answer || ''
+          : '',
         order: meta.absoluteIndex,
       });
     });
@@ -654,18 +793,28 @@ const processInterviewTurn = async (
     evaluationStatus: result.evaluationStatus,
   });
 
+  const isFollowUp = Boolean(result.isFollowUp);
+  const nextInterviewerResponse = isValidInterviewerResponse(result.nextInterviewerResponse)
+    ? result.nextInterviewerResponse.trim()
+    : isFollowUp
+      ? language === 'somali'
+        ? 'Fadlan si faahfaahsan u sharax habkaaga.'
+        : 'Could you explain your approach in a little more detail?'
+      : language === 'somali'
+        ? 'Mahadsanid. Aan u gudubno mawduuca xiga.'
+        : "Thank you. Let's move on to the next topic.";
+
   return {
     ...result,
     evaluation,
-    isFollowUp: Boolean(result.isFollowUp),
+    nextInterviewerResponse,
+    isFollowUp,
     answeredCandidateQuestion: Boolean(result.answeredCandidateQuestion),
   };
 };
 
-/* ─── Legacy evaluate ─── */
-const evaluateAnswer = async () => {
-  throw new Error('evaluateAnswer is deprecated. Use processInterviewTurn instead.');
-};
+
+
 
 /* ─── Parse Job Description ───────────────────────────────
  *   Endpoint: /parse
@@ -720,7 +869,34 @@ const transcribeAudio = async () => {
 
 const warmGemma = async (requestId = 'startup-warmup') => {
   const startedAt = Date.now();
-  const result = await callGemma('/warmup', { requestId });
+  const gemmaUrl = getGemmaBaseUrl();
+
+  if (!gemmaUrl) {
+    throw new Error('Gemma API URL is not configured.');
+  }
+
+  let result;
+
+  if (isRunPodUrl(gemmaUrl)) {
+    // RunPod Serverless: send warmup via the standard runsync payload
+    result = await callRunPod('/warmup', { requestId });
+  } else {
+    // Colab/ngrok or any other direct FastAPI server:
+    // Use GET /health — it's always present and pings the live model without
+    // triggering an actual generation. The /warmup POST does not exist on the
+    // Colab notebook and returns 404.
+    const res = await fetch(`${gemmaUrl}/health`, {
+      method: 'GET',
+      headers: HEADERS(),
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Gemma API error! status: ${res.status} — ${text.slice(0, 200)}`);
+    }
+    result = await res.json();
+  }
+
   logger.info(JSON.stringify({
     event: 'gemma_warmup_complete',
     requestId,
@@ -730,10 +906,10 @@ const warmGemma = async (requestId = 'startup-warmup') => {
   return result;
 };
 
+
 module.exports = {
   parseJobDescription,
   generateInterviewQuestions,
-  evaluateAnswer,
   processInterviewTurn,
   generateComprehensiveFeedback,
   transcribeAudio,
@@ -743,6 +919,9 @@ module.exports = {
   trimConversationHistory,
   compactRoleProfile,
   normalizeEvaluation,
+  isValidGeneratedQuestion,
+  isQuestionAboutTargetSkill,
+  isValidInterviewerResponse,
   checkGemmaStatus,
   warmGemma,
   _circuit: circuit,

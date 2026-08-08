@@ -208,6 +208,36 @@ def difficulty_hint(difficulty: str) -> str:
     return mapping.get((difficulty or "mid").lower(), "mid-level")
 
 
+def is_valid_question(text: Any) -> bool:
+    if not isinstance(text, str):
+        return False
+    question = " ".join(text.split())
+    if len(question) < 8 or len(question) > 300 or not question.endswith("?"):
+        return False
+    invalid_markers = (
+        "return only valid json", "expected answer", "ideal answer",
+        'one field "question"', "interview assessment",
+    )
+    return not any(marker in question.lower() for marker in invalid_markers)
+
+
+def is_valid_interviewer_response(text: Any) -> bool:
+    if not isinstance(text, str):
+        return False
+    response = " ".join(text.split())
+    if len(response) < 2 or len(response) > 300:
+        return False
+    invalid_markers = (
+        "return only valid json", "expected answer", "ideal answer",
+        'one field "question"', "interview assessment",
+    )
+    return not any(marker in response.lower() for marker in invalid_markers)
+
+
+def is_question_about_target_skill(question: str, target_skill: str) -> bool:
+    return not target_skill or target_skill.lower() in question.lower()
+
+
 def category_rubric(category: str, type_str: str) -> str:
     cat = (category or "").lower()
     t = (type_str or "mixed").lower()
@@ -346,6 +376,13 @@ def normalize_turn_response(parsed: Optional[dict], raw_text: str = "") -> dict:
     clamped_score = clamp_score(score_raw) if score_raw is not None else None
     if clamped_score is not None and 1 <= clamped_score < 10:
         clamped_score = 10
+    next_response = parsed.get("nextInterviewerResponse") or ""
+    if not is_valid_interviewer_response(next_response):
+        next_response = (
+            "Could you explain your approach in a little more detail?"
+            if is_follow_up and not is_topic_complete
+            else "Thank you. Let's continue."
+        )
     return {
         "evaluation": {
             "score": clamped_score,
@@ -354,7 +391,7 @@ def normalize_turn_response(parsed: Optional[dict], raw_text: str = "") -> dict:
             "improvements": (evaluation.get("improvements") or [])[:3],
             "suggestedAnswer": (evaluation.get("suggestedAnswer") or "")[:350],
         },
-        "nextInterviewerResponse": (parsed.get("nextInterviewerResponse") or "Thank you.")[:300],
+        "nextInterviewerResponse": " ".join(next_response.split()),
         "isFollowUp": is_follow_up and not is_topic_complete,
         "answeredCandidateQuestion": bool(parsed.get("answeredCandidateQuestion", False)),
         "evaluationStatus": "ok",
@@ -551,6 +588,7 @@ def _category_opening_instruction(
     target_skill: str,
     candidate_experience: list,
     candidate_projects: list,
+    is_practice: bool,
 ) -> str:
     """Returns a category-specific instruction line for intro and outro slots."""
     cat = (category or "").lower()
@@ -577,6 +615,12 @@ def _category_opening_instruction(
         )
 
     if cat == "outro":
+        if is_practice:
+            return (
+                "- This is the CLOSING question for a personal practice session. "
+                "Invite the candidate to reflect on what they would like to practice next. "
+                "Do NOT mention a company, hiring team, application, role opportunity, or next steps.\n"
+            )
         return (
             "- This is the CLOSING question. Do NOT use 'Do you have any questions for me?' verbatim. "
             "Instead, close with ONE of these:\n"
@@ -609,6 +653,7 @@ def handle_generate_question(data: dict) -> dict:
     candidate_projects = data.get("candidateProjects", [])
     candidate_certifications = data.get("candidateCertifications", [])
     interview_title = data.get("interviewTitle", "")
+    is_practice = data.get("sessionMode", "practice") != "company"
     duration_minutes = data.get("durationMinutes")
     scheduled_at = data.get("scheduledAt")
     job_description = data.get("jobDescription", "")
@@ -623,6 +668,7 @@ def handle_generate_question(data: dict) -> dict:
     if target_skill:
         context_block += f"TARGET SKILL FOR THIS QUESTION: {target_skill}\n"
         context_block += f"Your question MUST directly test the candidate's knowledge of {target_skill}.\n"
+        context_block += "Do not substitute another framework, language, or skill for the target skill.\n"
         if supporting_skills:
             context_block += f"Related skills for context only (do not make the question about these): {', '.join(supporting_skills)}.\n"
     elif supporting_skills:
@@ -672,7 +718,9 @@ def handle_generate_question(data: dict) -> dict:
     )
 
     prompt_content = (
-        f"You are an expert {domain} interviewer hiring for a {role} position.\n"
+        f"You are an expert {domain} interviewer "
+        f"{'running a personal practice session on' if is_practice else 'hiring for'} a {role} "
+        f"{'focus area' if is_practice else 'position'}.\n"
         f"Interview type: {type_str}. Difficulty: {difficulty_hint(difficulty)}.\n"
         f"{lang_hint}\n\n"
         f"{context_block}\n"
@@ -682,7 +730,7 @@ def handle_generate_question(data: dict) -> dict:
         "- ONE clear, natural question only. No preamble or explanation.\n"
         "- Match difficulty to the level stated above.\n"
         f"- Category: {category}.\n"
-        f"{_category_opening_instruction(category, candidate_name, role, target_skill, candidate_experience, candidate_projects)}"
+        f"{_category_opening_instruction(category, candidate_name, role, target_skill, candidate_experience, candidate_projects, is_practice)}"
         "- Max 25 words. Direct and specific — no filler phrases.\n\n"
         f"Generate a {category} question {target_directive}.\n\n"
         'Return ONLY valid JSON: {"question": "...", "expectedAnswer": "..."}'
@@ -690,18 +738,15 @@ def handle_generate_question(data: dict) -> dict:
 
     messages = [{"role": "user", "content": prompt_content}]
     parsed, raw = generate_json_response(messages, max_new_tokens=96, temperature=0.3)
-    if parsed and ("question" in parsed or "text" in parsed):
+    parsed_question = (parsed or {}).get("question") or (parsed or {}).get("text", "")
+    if is_valid_question(parsed_question) and is_question_about_target_skill(parsed_question, target_skill):
         return {
-            "question": parsed.get("question") or parsed.get("text", ""),
+            "question": parsed_question.strip(),
             "expectedAnswer": parsed.get("expectedAnswer") or parsed.get("expected_answer") or parsed.get("answer", ""),
         }
 
     raw_fallback = raw.strip()
-    looks_like_question = "?" in raw_fallback and len(raw_fallback) < 300
-    constraint_keywords = ["no code", "not allowed", "external websites", "do not", "you must", "note:", "rule:"]
-    is_constraint = any(kw in raw_fallback.lower() for kw in constraint_keywords)
-
-    if looks_like_question and not is_constraint:
+    if is_valid_question(raw_fallback) and is_question_about_target_skill(raw_fallback, target_skill):
         return {"question": raw_fallback, "expectedAnswer": ""}
 
     if language.lower() == "somali":

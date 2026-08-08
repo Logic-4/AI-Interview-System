@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import {
   Search, Eye, Star, Calendar, XCircle, CheckCircle2, UserCheck,
-  Mail, Phone, Briefcase, Award, X, AlertTriangle, MoreVertical, MoreHorizontal, ChevronDown,
+  Mail, Phone, Briefcase, Award, X, AlertTriangle, MoreHorizontal, Download, FileText, Trash2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { setPageTitle } from '@/store/themeConfigSlice';
@@ -43,6 +43,7 @@ function ProfileModal({
   onShortlist,
   onReject,
   onHire,
+  onDelete,
   approvingId,
 }: {
   cand: CandidateSummary;
@@ -52,14 +53,15 @@ function ProfileModal({
   onShortlist: (c: CandidateSummary) => void;
   onReject: (c: CandidateSummary) => void;
   onHire: (c: CandidateSummary) => void;
+  onDelete: (c: CandidateSummary) => void;
   approvingId: string | null;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-xl rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-white-light dark:border-white-light/10 overflow-hidden">
+      <div className="w-full max-w-2xl rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-white-light dark:border-white-light/10 overflow-hidden">
         {/* Header */}
         <div className="flex items-center gap-4 px-6 py-5 border-b border-white-light dark:border-white-light/10 bg-slate-50/50 dark:bg-slate-800/40">
-          <Avatar src={cand.avatar} name={cand.name} size="lg" />
+          <Avatar src={cand.avatar || cand.profilePhotoUrl} name={cand.name} size="lg" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-lg font-bold text-black dark:text-white">{cand.name}</h3>
@@ -70,7 +72,7 @@ function ProfileModal({
                 {cand.approvalStatus}
               </span>
             </div>
-            <p className="text-sm text-primary mt-0.5 flex items-center gap-1">
+            <p className="text-sm text-primary mt-0.5 flex items-center gap-1 font-semibold">
               <Briefcase className="h-3.5 w-3.5 shrink-0" />
               {cand.appliedPosition}
             </p>
@@ -85,17 +87,62 @@ function ProfileModal({
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5 space-y-5 max-h-[55vh] overflow-y-auto">
-          {/* Contact */}
+        <div className="px-6 py-5 space-y-5 max-h-[60vh] overflow-y-auto">
+          {/* Contact Details */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <div className="flex items-center gap-2 rounded-lg border border-white-light dark:border-white-light/10 px-3 py-2">
               <Mail className="h-4 w-4 text-primary shrink-0" />
-              <a href={`mailto:${cand.email}`} className="text-primary hover:underline truncate text-xs">{cand.email}</a>
+              <a href={`mailto:${cand.email}`} className="text-primary hover:underline truncate text-xs font-medium">{cand.email}</a>
             </div>
-            <div className="flex items-center gap-2 rounded-lg border border-white-light dark:border-white-light/10 px-3 py-2">
-              <Briefcase className="h-4 w-4 text-white-dark shrink-0" />
-              <span className="capitalize text-xs text-black dark:text-white">{cand.experienceLevel} level</span>
+            {cand.phone ? (
+              <div className="flex items-center gap-2 rounded-lg border border-white-light dark:border-white-light/10 px-3 py-2">
+                <Phone className="h-4 w-4 text-success shrink-0" />
+                <a href={`tel:${cand.phone}`} className="text-black dark:text-white hover:underline truncate text-xs font-medium">{cand.phone}</a>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 rounded-lg border border-white-light dark:border-white-light/10 px-3 py-2">
+                <Briefcase className="h-4 w-4 text-white-dark shrink-0" />
+                <span className="capitalize text-xs text-black dark:text-white font-medium">{cand.experienceLevel} level</span>
+              </div>
+            )}
+          </div>
+
+          {/* Resume / CV Section */}
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-black dark:text-white">Candidate Resume / CV</h4>
+                  <p className="text-[11px] text-white-dark">Attached during job application</p>
+                </div>
+              </div>
+              {cand.resumeUrl ? (
+                <a
+                  href={cand.resumeUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-primary btn-sm flex items-center gap-1.5 shadow-sm"
+                  title="Download or view candidate resume"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Download / View CV</span>
+                </a>
+              ) : (
+                <span className="badge badge-outline-secondary text-[10px]">No CV File Attached</span>
+              )}
             </div>
+
+            {cand.resumeText && (
+              <details className="mt-2 text-xs bg-white dark:bg-slate-800 rounded-lg border border-white-light dark:border-white-light/10 p-3">
+                <summary className="cursor-pointer font-semibold text-primary hover:underline select-none">
+                  Preview Extracted Resume Text ({cand.resumeText.length} characters)
+                </summary>
+                <div className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap font-mono text-[11px] text-black dark:text-white-light bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded border border-white-light/50 dark:border-white-light/5">
+                  {cand.resumeText}
+                </div>
+              </details>
+            )}
           </div>
 
           {/* Skills */}
@@ -134,7 +181,6 @@ function ProfileModal({
                   className="mt-3 text-xs text-primary hover:underline font-semibold flex items-center gap-1"
                   onClick={async () => {
                     onClose();
-                    // navigate to assessments — open the detail
                     window.location.href = '/company/assessments';
                   }}
                 >
@@ -201,17 +247,26 @@ function ProfileModal({
           {cand.approvalStatus !== 'rejected' && cand.status !== 'hired' && (
             <button
               type="button"
-              className="btn btn-outline-danger btn-sm flex items-center gap-1.5 ml-auto"
+              className="btn btn-outline-danger btn-sm flex items-center gap-1.5"
               onClick={() => onReject(cand)}
             >
               <XCircle className="h-4 w-4" /> Reject
             </button>
           )}
+          <button
+            type="button"
+            className="btn btn-danger btn-sm flex items-center gap-1.5 ml-auto"
+            onClick={() => onDelete(cand)}
+            title="Permanently delete candidate application"
+          >
+            <Trash2 className="h-4 w-4" /> Delete
+          </button>
         </div>
       </div>
     </div>
   );
 }
+
 
 const CompanyCandidatesPage = () => {
   const dispatch = useDispatch();
@@ -300,6 +355,21 @@ const CompanyCandidatesPage = () => {
       toast.error(err.response?.data?.message || 'Failed to reject candidate');
     }
   };
+
+  const handleDelete = async (cand: CandidateSummary) => {
+    if (!window.confirm(`Are you sure you want to permanently delete the application for ${cand.name}?`)) {
+      return;
+    }
+    try {
+      await companyService.deleteApplication(cand._id);
+      toast.success(`Application for ${cand.name} deleted`);
+      if (profileModal?._id === cand._id) setProfileModal(null);
+      await load();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to delete application');
+    }
+  };
+
 
   const handleScheduleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -476,6 +546,17 @@ const CompanyCandidatesPage = () => {
                                   </button>
                                 </li>
                               )}
+
+                              <li className="border-t border-white-light dark:border-[#1b2e4b] pt-1">
+                                <button
+                                  type="button"
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-left rounded-lg hover:bg-danger/10 text-danger transition-colors"
+                                  onClick={() => void handleDelete(cand)}
+                                >
+                                  <Trash2 className="h-4 w-4 shrink-0" />
+                                  <span>Delete Application</span>
+                                </button>
+                              </li>
                             </ul>
                           </Dropdown>
                         </div>
@@ -493,7 +574,7 @@ const CompanyCandidatesPage = () => {
               <span className="text-white-dark">{total} candidates</span>
               <div className="flex items-center gap-2">
                 <button className="btn btn-outline-primary btn-sm" disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</button>
-                <span>Page {page} of {totalPages}</span>
+                <span className="font-semibold text-black dark:text-white">Page {page} of {totalPages}</span>
                 <button className="btn btn-outline-primary btn-sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</button>
               </div>
             </div>
@@ -510,6 +591,7 @@ const CompanyCandidatesPage = () => {
           onShortlist={(c) => void handleShortlist(c)}
           onReject={(c) => { setRejectModal(c); setProfileModal(null); }}
           onHire={(c) => void handleHire(c)}
+          onDelete={handleDelete}
           approvingId={approvingId}
         />
       )}

@@ -192,12 +192,66 @@ const PostJobPage = () => {
   };
 
   const handleSubmit = async (publishStatus: 'draft' | 'published') => {
-    if (!form.title || !form.location || !form.description) {
-      toast.error('Please fill in all required fields (Title, Location, Description)');
+    const trimmedTitle = form.title.trim();
+    const trimmedLocation = form.location.trim();
+    const trimmedDesc = form.description.trim();
+
+    if (!trimmedTitle || !trimmedLocation || !trimmedDesc) {
+      toast.error('Please fill in all required fields (Job Title, Location, and Description)');
       return;
     }
 
+    if (trimmedTitle.length < 3 || trimmedTitle.length > 150) {
+      toast.error('Job Title must be between 3 and 150 characters');
+      return;
+    }
+
+    if (trimmedLocation.length < 2) {
+      toast.error('Please specify a valid Location (e.g. Mogadishu, Remote, Hybrid)');
+      return;
+    }
+
+    if (trimmedDesc.length < 20) {
+      toast.error('Job Description must be at least 20 characters to provide sufficient context for AI interview generation');
+      return;
+    }
+
+    if (form.numberOfHiresNeeded < 1) {
+      toast.error('Number of hires needed must be at least 1');
+      return;
+    }
+
+    if (form.maxApplications !== undefined && form.maxApplications < 1) {
+      toast.error('Maximum candidate applications must be at least 1 or left blank');
+      return;
+    }
+
+    if (form.durationMinutes < 5 || form.durationMinutes > 120) {
+      toast.error('Interview duration must be between 5 and 120 minutes');
+      return;
+    }
+
+    if (form.numberOfQuestions < 1 || form.numberOfQuestions > 20) {
+      toast.error('Number of questions must be between 1 and 20');
+      return;
+    }
+
+    if (form.passingScoreThreshold < 0 || form.passingScoreThreshold > 100) {
+      toast.error('Passing score threshold must be between 0% and 100%');
+      return;
+    }
+
+    if (form.applicationDeadline) {
+      const selectedDeadline = new Date(form.applicationDeadline).getTime();
+      const today = new Date().setHours(0, 0, 0, 0);
+      if (selectedDeadline < today) {
+        toast.error('Application deadline cannot be a date in the past');
+        return;
+      }
+    }
+
     setSaving(true);
+
     try {
       if (editId) {
         await companyService.updateJob(editId, { ...form, status: publishStatus });
@@ -618,23 +672,7 @@ const PostJobPage = () => {
                   </select>
                 </div>
 
-                {/* 2. Interview Type * */}
-                <div>
-                  <label htmlFor="interviewType">Interview Type *</label>
-                  <select
-                    id="interviewType"
-                    name="interviewType"
-                    className="form-select"
-                    value={form.interviewType}
-                    onChange={handleChange}
-                  >
-                    <option value="mixed">Mixed (Technical + HR)</option>
-                    <option value="technical">Technical</option>
-                    <option value="behavioral">Behavioral</option>
-                    <option value="hr">HR / Culture Fit</option>
-                    <option value="system-design">System Design</option>
-                  </select>
-                </div>
+
 
                 {/* 6. Interview Duration (minutes) */}
                 <div>

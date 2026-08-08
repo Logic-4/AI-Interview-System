@@ -110,6 +110,46 @@ test('passes structured resume, title, skills, and timing context to question ge
   }
 });
 
+test('prioritizes selected focus skills and replaces off-target model questions', async () => {
+  resetCircuit();
+  const originalFetch = global.fetch;
+  let workerPayload;
+  global.fetch = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    workerPayload = body.input.payload;
+    return Response.json({
+      status: 'COMPLETED',
+      output: {
+        question: 'What is React?',
+        expectedAnswer: 'This must never be shown as a question.',
+      },
+    });
+  };
+  try {
+    const [question] = await gemma.generateInterviewQuestions('technical', 'technology', 'junior', 1, {
+      jobRole: 'Frontend Development',
+      focusSkills: ['HTML', 'CSS'],
+      roleProfile: { requiredSkills: ['React'] },
+    });
+
+    assert.equal(workerPayload.targetSkill, 'html');
+    assert.deepEqual(workerPayload.supportingSkills, ['css', 'react']);
+    assert.equal(question.text, 'How would you apply html in a practical project?');
+    assert.equal(question.expectedAnswer, '');
+  } finally {
+    global.fetch = originalFetch;
+    resetCircuit();
+  }
+});
+
+test('rejects leaked prompt text in dynamic interviewer responses', () => {
+  assert.equal(
+    gemma.isValidInterviewerResponse('A browser renders HTML. Return only valid JSON with one field "question".'),
+    false
+  );
+  assert.equal(gemma.isValidInterviewerResponse('Could you explain your approach in more detail?'), true);
+});
+
 test('duplicate-question helper rejects repeated normalized prompts', () => {
   const { isDuplicateOfExisting } = require('../utils/questionHelpers');
   assert.equal(isDuplicateOfExisting('Explain React hooks?', [{ text: '  Explain React hooks?  ' }]), true);

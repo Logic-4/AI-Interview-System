@@ -43,10 +43,11 @@ const interviewSchema = new mongoose.Schema(
       required: [true, 'Domain is required'],
       trim: true,
       enum: {
-        values: ['technology', 'healthcare', 'finance', 'engineering', 'education', 'legal'],
-        message: 'Invalid domain',
+        values: ['technology'],
+        message: 'Only the technology domain is supported',
       },
     },
+
     language: {
       type: String,
       enum: {

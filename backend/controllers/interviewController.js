@@ -148,6 +148,7 @@ async function runQuestionGenerationPipeline(interviewId, context) {
     focusSkills: context.focusSkills || interview.focusSkills,
     roleProfile: context.roleProfile || interview.roleProfile,
     language: context.language || interview.language,
+    isPractice: !interview.company,
   };
 
   // Sequence: kick warmup first, then wait up to 5s for it before firing the
@@ -209,36 +210,28 @@ async function runQuestionGenerationPipeline(interviewId, context) {
     const existingFirst = await Question.findOne({ interview: interviewId, order: 0 });
     let firstQuestion = existingFirst;
     if (!firstQuestion) {
-      // Company-scheduled interviews get a deterministic warm-up opener — the
-      // fine-tuned model still drifts into technical questions on index 0 when
-      // the JD is skill-heavy, so we don't gamble on the intro for live hires.
-      // Personal training interviews keep the model-driven opener.
-      const useDeterministicIntro = Boolean(interview.company);
-
       let generatedFirst = null;
-      if (!useDeterministicIntro) {
-        try {
-          [generatedFirst] = await generateInterviewQuestions(
-            interview.type,
-            interview.domain,
-            interview.difficulty,
-            1,
-            {
-              ...generationContext,
-              _forcedCategory: getCategoryForIndex(0, totalCount, interview.type),
-              _forcedIndex: 0,
-              _forcedCount: totalCount,
-              requestTimeoutMs: Number(process.env.FIRST_QUESTION_TIMEOUT_MS || 4500),
-            }
-          );
-        } catch (error) {
-          logger.warn(JSON.stringify({
-            event: 'first_question_model_fallback',
-            requestId: context.requestId,
-            interviewId: String(interviewId),
-            message: error.message,
-          }));
-        }
+      try {
+        [generatedFirst] = await generateInterviewQuestions(
+          interview.type,
+          interview.domain,
+          interview.difficulty,
+          1,
+          {
+            ...generationContext,
+            _forcedCategory: getCategoryForIndex(0, totalCount, interview.type),
+            _forcedIndex: 0,
+            _forcedCount: totalCount,
+            requestTimeoutMs: Number(process.env.FIRST_QUESTION_TIMEOUT_MS || 30000),
+          }
+        );
+      } catch (error) {
+        logger.warn(JSON.stringify({
+          event: 'first_question_model_fallback',
+          requestId: context.requestId,
+          interviewId: String(interviewId),
+          message: error.message,
+        }));
       }
 
       if (!generatedFirst?.text) {

@@ -396,12 +396,12 @@ const getCandidates = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    // Group or format candidates
     let candidates = applications.map((app) => ({
       _id: app._id,
       candidateId: app.candidate?._id || app._id,
       name: app.candidateName,
       email: app.candidateEmail,
+      phone: app.candidatePhone || '',
       appliedPosition: app.job?.title || 'N/A',
       jobId: app.job?._id,
       interviewId: app.interview?._id ?? app.interview ?? null,
@@ -412,8 +412,11 @@ const getCandidates = async (req, res, next) => {
       approvalStatus: app.approvalStatus || 'pending',
       rejectionReason: app.rejectionReason || '',
       appliedDate: app.appliedDate,
-      avatar: app.candidate?.avatar || '',
+      avatar: app.profilePhotoUrl || app.candidate?.avatar || '',
+      profilePhotoUrl: app.profilePhotoUrl || '',
       skills: app.candidate?.skills || [],
+      resumeUrl: app.resumeUrl || '',
+      resumeText: app.resumeText || '',
     }));
 
     if (experienceLevel) {
@@ -524,9 +527,6 @@ const scheduleInterview = async (req, res, next) => {
     if (applicationId) {
       application = await Application.findOne({ _id: applicationId, company: req.companyId });
       if (!application) {
-        // An unknown applicationId used to fall through to unconditional
-        // scheduling as long as candidateId was also supplied — that skipped
-        // the approval gate entirely. Reject explicitly instead.
         return next(ApiError.notFound('Application not found for this company'));
       }
       if (application.approvalStatus !== 'approved') {
@@ -764,9 +764,6 @@ const getAssessments = async (req, res, next) => {
         const passingScore = thresholdMap[String(inv._id)] ?? 70;
         const flaggedForReview = Boolean(inv.proctoring?.flaggedForReview);
         const completionFlag = inv.completionFlag || 'ok';
-        // Never present a null score as a "0 / failed" — this is the difference
-        // between "candidate scored 0" and "platform never produced a score",
-        // and hiring managers must be able to tell them apart.
         let passFailStatus;
         if (rawScore == null || completionFlag === 'no_valid_evaluations') {
           passFailStatus = 'pending_review';

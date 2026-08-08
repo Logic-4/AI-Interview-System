@@ -7,13 +7,7 @@ import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
 import interviewService from "../../services/interviewService";
 import type { PopulatedInterview } from "../../types/interview";
 
-/**
- * Secure completion screen for company-scheduled live interviews. Unlike the
- * training report page, this deliberately does NOT show scores, feedback, or
- * per-question breakdowns — the hiring team is the only audience for that
- * data. Candidates see confirmation that the interview was received and
- * linked to their application, nothing more.
- */
+/** Secure completion screen for company interviews and personal practice. */
 export default function InterviewCompletePage() {
   const { id } = useParams();
   const [interview, setInterview] = useState<PopulatedInterview | null>(null);
@@ -55,27 +49,36 @@ export default function InterviewCompletePage() {
         </div>
 
         <h1 className="text-2xl font-bold text-text-primary dark:text-white mb-3">
-          Interview Submitted
+          {isCompanyInterview ? "Interview Submitted" : "Practice Interview Complete"}
         </h1>
 
         <p className="text-sm font-semibold text-text-muted leading-relaxed mb-6">
-          Thank you for completing your interview{companyName ? ` with ${companyName}` : ""}.
-          Your answers, recording, and evaluation have been securely delivered
-          to the hiring team.
+          {isCompanyInterview
+            ? <>Thank you for completing your interview{companyName ? ` with ${companyName}` : ""}. Your answers, recording, and evaluation have been securely delivered to the hiring team.</>
+            : <>Your practice session is complete. Review your report for your score, feedback, and areas to practice next.</>}
         </p>
 
         <div className="rounded-md bg-primary/5 border border-primary/10 p-4 mb-6 text-left">
           <div className="flex items-start gap-3">
             <ShieldCheck className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
             <div className="text-xs font-semibold text-text-muted leading-relaxed space-y-1">
-              <p>
-                <strong className="text-text-primary dark:text-white">Results are not shared with candidates.</strong>{" "}
-                The company will contact you directly with next steps.
-              </p>
-              <p>
-                Please do not attempt to retake or resubmit this interview —
-                only the first completed session is used for review.
-              </p>
+              {isCompanyInterview ? (
+                <>
+                  <p>
+                    <strong className="text-text-primary dark:text-white">Results are not shared with candidates.</strong>{" "}
+                    The company will contact you directly with next steps.
+                  </p>
+                  <p>
+                    Please do not attempt to retake or resubmit this interview —
+                    only the first completed session is used for review.
+                  </p>
+                </>
+              ) : (
+                <p>
+                  <strong className="text-text-primary dark:text-white">This is a personal practice session.</strong>{" "}
+                  No hiring team or company is involved.
+                </p>
+              )}
             </div>
           </div>
         </div>

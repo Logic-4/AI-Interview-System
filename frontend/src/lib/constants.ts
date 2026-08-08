@@ -1,19 +1,22 @@
+export const TECHNOLOGY_SPECIALIZATIONS = [
+  "Frontend Development",
+  "Backend Development",
+  "Mobile App Development",
+  "DevOps & Infrastructure",
+  "Cloud Engineering",
+  "Database Administration",
+  "Data Science & Analytics",
+  "Machine Learning & AI",
+  "Cybersecurity",
+  "Software Architecture",
+];
+
 export const DOMAIN_ROLES: Record<string, string[]> = {
-  technology: ["Full Stack Developer", "Cybersecurity Analyst"],
-  healthcare: ["Registered Nurse (ER)", "Hospital Administrator"],
-  finance: ["Financial Analyst", "Supply Chain Manager"],
-  engineering: ["Civil Engineer", "Mechanical Engineer"],
-  education: ["High School Science Teacher", "University Admissions Officer"],
-  legal: ["Legal Assistant", "Urban Planner"],
+  technology: TECHNOLOGY_SPECIALIZATIONS,
 };
 
 export const DOMAIN_LABELS: Record<string, string> = {
   technology: "Technology",
-  healthcare: "Healthcare",
-  finance: "Finance",
-  engineering: "Engineering",
-  education: "Education",
-  legal: "Legal",
 };
 
 export const QUESTION_CATEGORIES = [

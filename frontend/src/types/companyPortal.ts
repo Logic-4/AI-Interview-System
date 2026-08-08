@@ -81,6 +81,7 @@ export interface CandidateSummary {
   candidateId: string;
   name: string;
   email: string;
+  phone?: string;
   appliedPosition: string;
   jobId?: string;
   interviewId?: string | null;
@@ -92,8 +93,12 @@ export interface CandidateSummary {
   rejectionReason?: string;
   appliedDate: string;
   avatar?: string;
+  profilePhotoUrl?: string;
+  resumeUrl?: string;
+  resumeText?: string;
   skills?: string[];
 }
+
 
 export interface CompanyInterview {
   _id: string;

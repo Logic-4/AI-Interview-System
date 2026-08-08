@@ -78,17 +78,59 @@ function ProfileModal({
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5 space-y-5 max-h-[50vh] overflow-y-auto">
+        <div className="px-6 py-5 space-y-5 max-h-[55vh] overflow-y-auto">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <div className="flex items-center gap-2 rounded-lg border border-white-light dark:border-white-light/10 px-3 py-2">
               <Mail className="h-4 w-4 text-primary shrink-0" />
-              <a href={`mailto:${cand.email}`} className="text-primary hover:underline truncate text-xs">{cand.email}</a>
+              <a href={`mailto:${cand.email}`} className="text-primary hover:underline truncate text-xs font-medium">{cand.email}</a>
             </div>
-            <div className="flex items-center gap-2 rounded-lg border border-white-light dark:border-white-light/10 px-3 py-2">
-              <Briefcase className="h-4 w-4 text-white-dark shrink-0" />
-              <span className="capitalize text-xs text-black dark:text-white">{cand.experienceLevel} level</span>
-            </div>
+            {cand.phone ? (
+              <div className="flex items-center gap-2 rounded-lg border border-white-light dark:border-white-light/10 px-3 py-2">
+                <Phone className="h-4 w-4 text-success shrink-0" />
+                <a href={`tel:${cand.phone}`} className="text-black dark:text-white hover:underline truncate text-xs font-medium">{cand.phone}</a>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 rounded-lg border border-white-light dark:border-white-light/10 px-3 py-2">
+                <Briefcase className="h-4 w-4 text-white-dark shrink-0" />
+                <span className="capitalize text-xs text-black dark:text-white font-medium">{cand.experienceLevel} level</span>
+              </div>
+            )}
           </div>
+
+          {/* Resume / CV Section */}
+          <div className="rounded-xl border border-warning/20 bg-warning/5 p-4 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-black dark:text-white">Candidate Resume / CV</h4>
+                <p className="text-[11px] text-white-dark">Uploaded during application</p>
+              </div>
+              {cand.resumeUrl ? (
+                <a
+                  href={cand.resumeUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-warning btn-sm flex items-center gap-1.5 shadow-sm"
+                  title="Download candidate resume"
+                >
+                  Download / View CV
+                </a>
+              ) : (
+                <span className="badge badge-outline-secondary text-[10px]">No CV File</span>
+              )}
+            </div>
+
+            {cand.resumeText && (
+              <details className="mt-2 text-xs bg-white dark:bg-slate-800 rounded-lg border border-white-light dark:border-white-light/10 p-3">
+                <summary className="cursor-pointer font-semibold text-warning hover:underline select-none">
+                  Preview Extracted Resume Text ({cand.resumeText.length} chars)
+                </summary>
+                <div className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap font-mono text-[11px] text-black dark:text-white-light bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded border border-white-light/50 dark:border-white-light/5">
+                  {cand.resumeText}
+                </div>
+              </details>
+            )}
+          </div>
+
 
           {cand.skills && cand.skills.length > 0 && (
             <div>

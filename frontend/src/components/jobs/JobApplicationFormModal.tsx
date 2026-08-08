@@ -62,13 +62,34 @@ export const JobApplicationFormModal = ({ job, isOpen, onClose }: JobApplication
     e.preventDefault();
 
     // 1. Validate Always Required Fields
-    if (!fullName.trim() || !email.trim() || !phone.trim()) {
+    const trimmedName = fullName.trim();
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedPhone = phone.trim();
+
+    if (!trimmedName || !trimmedEmail || !trimmedPhone) {
       toast.error('Please complete all required contact fields (Full Name, Email, Phone)');
       return;
     }
 
+    if (trimmedName.length < 2 || trimmedName.length > 100) {
+      toast.error('Full Name must be between 2 and 100 characters');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      toast.error('Please enter a valid email address (e.g. name@example.com)');
+      return;
+    }
+
+    const phoneDigits = trimmedPhone.replace(/\D/g, '');
+    if (phoneDigits.length < 7 || phoneDigits.length > 15) {
+      toast.error('Please enter a valid phone number (7 to 15 digits)');
+      return;
+    }
+
     if (!photoFile && !photoPreview) {
-      toast.error('Please upload your profile photo');
+      toast.error('Please upload your profile photo (headshot)');
       return;
     }
 
@@ -77,6 +98,7 @@ export const JobApplicationFormModal = ({ job, isOpen, onClose }: JobApplication
       toast.error('Resume / CV upload is mandatory for this job');
       return;
     }
+
 
     setSubmitting(true);
     try {
@@ -239,14 +261,14 @@ export const JobApplicationFormModal = ({ job, isOpen, onClose }: JobApplication
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="form-label text-xs">Full Name *</label>
+                  <label className="form-label text-xs font-bold text-black dark:text-white">Full Name *</label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white-dark" />
+                    <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-primary/70 pointer-events-none z-10" />
                     <input
                       type="text"
                       required
                       placeholder="e.g. Hassan Ahmed"
-                      className="form-input pl-9 text-sm"
+                      className="form-input !pl-10 text-sm font-medium bg-white dark:bg-[#121e32] border-[#ebedf2] dark:border-[#1b2e4b] focus:!border-primary"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                     />
@@ -254,14 +276,14 @@ export const JobApplicationFormModal = ({ job, isOpen, onClose }: JobApplication
                 </div>
 
                 <div>
-                  <label className="form-label text-xs">Email Address *</label>
+                  <label className="form-label text-xs font-bold text-black dark:text-white">Email Address *</label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white-dark" />
+                    <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-primary/70 pointer-events-none z-10" />
                     <input
                       type="email"
                       required
                       placeholder="hassan@example.com"
-                      className="form-input pl-9 text-sm"
+                      className="form-input !pl-10 text-sm font-medium bg-white dark:bg-[#121e32] border-[#ebedf2] dark:border-[#1b2e4b] focus:!border-primary"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                     />
@@ -269,20 +291,21 @@ export const JobApplicationFormModal = ({ job, isOpen, onClose }: JobApplication
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="form-label text-xs">Phone Number *</label>
+                  <label className="form-label text-xs font-bold text-black dark:text-white">Phone Number *</label>
                   <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white-dark" />
+                    <Phone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-primary/70 pointer-events-none z-10" />
                     <input
                       type="tel"
                       required
                       placeholder="+252 61 555 1234"
-                      className="form-input pl-9 text-sm"
+                      className="form-input !pl-10 text-sm font-medium bg-white dark:bg-[#121e32] border-[#ebedf2] dark:border-[#1b2e4b] focus:!border-primary"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                     />
                   </div>
                 </div>
               </div>
+
             </div>
 
             {/* Section 2: Resume Upload */}
