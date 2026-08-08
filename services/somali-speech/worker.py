@@ -23,9 +23,17 @@ from transformers import AutoModelForCTC, AutoProcessor
 device = "cuda" if torch.cuda.is_available() else "cpu"
 ASR_MODEL_ID = os.environ.get("ASR_MODEL_ID", "skydheere/wav2vec2-large-mms-1b-somalia")
 
+# ── Local CPU mode: use ONNX Runtime instead of PyTorch ──
+# Set USE_ONNX=1 and ONNX_MODEL_PATH=wav2vec2-somali-int8.onnx to enable.
+# Run quantize_asr.py once to generate the ONNX file.
+# GPU/RunPod path (USE_ONNX unset or 0) is unaffected.
+USE_ONNX = os.environ.get("USE_ONNX", "0").strip().lower() in {"1", "true", "yes"}
+ONNX_MODEL_PATH = os.environ.get("ONNX_MODEL_PATH", "wav2vec2-somali-int8.onnx")
+
 # Singletons for memory efficiency
 asr_processor = None
 asr_model = None
+ort_session = None  # onnxruntime.InferenceSession when USE_ONNX=1
 
 
 def validate_cuda_runtime() -> Dict[str, Any]:
@@ -71,11 +79,27 @@ def validate_cuda_runtime() -> Dict[str, Any]:
 
 
 def load_asr() -> None:
-    global asr_processor, asr_model
-    if asr_model is not None:
+    global asr_processor, asr_model, ort_session
+    if (ort_session if USE_ONNX else asr_model) is not None:
         return
-    print(f"Loading ASR model {ASR_MODEL_ID} on {device}…")
+
+    # Processor is needed in both paths for feature extraction and decoding
     asr_processor = AutoProcessor.from_pretrained(ASR_MODEL_ID)
+
+    if USE_ONNX:
+        try:
+            import onnxruntime as ort
+        except ImportError:
+            raise RuntimeError("Install onnxruntime: pip install onnxruntime")
+        print(f"Loading ONNX ASR model {ONNX_MODEL_PATH} on CPU…")
+        ort_session = ort.InferenceSession(
+            ONNX_MODEL_PATH,
+            providers=["CPUExecutionProvider"],
+        )
+        print("ONNX ASR model loaded successfully.")
+        return
+
+    print(f"Loading ASR model {ASR_MODEL_ID} on {device}…")
     asr_model = AutoModelForCTC.from_pretrained(ASR_MODEL_ID).to(device)
     asr_model.eval()
     print("ASR model loaded successfully.")
@@ -160,17 +184,21 @@ def handle_transcribe(payload: Dict[str, Any]) -> Dict[str, Any]:
             return_tensors="pt",
             padding=True,
         )
-        inputs = {key: val.to(device) for key, val in inputs.items()}
+        if USE_ONNX:
+            ort_inputs = {"input_values": inputs["input_values"].numpy()}
+            logits = ort_session.run(["logits"], ort_inputs)[0]
+            predicted_ids = np.argmax(logits, axis=-1)
+        else:
+            inputs = {key: val.to(device) for key, val in inputs.items()}
+            with torch.no_grad():
+                logits = asr_model(**inputs).logits
+            predicted_ids = torch.argmax(logits, dim=-1)
 
-        with torch.no_grad():
-            logits = asr_model(**inputs).logits
-
-        predicted_ids = torch.argmax(logits, dim=-1)
         text = asr_processor.batch_decode(predicted_ids)[0]
         return {
             "transcription": text,
-            "model": ASR_MODEL_ID,
-            "device": device,
+            "model": ONNX_MODEL_PATH if USE_ONNX else ASR_MODEL_ID,
+            "device": "cpu (onnx)" if USE_ONNX else device,
         }
     except Exception as err:
         traceback.print_exc()
@@ -198,14 +226,18 @@ def dispatch(payload: Dict[str, Any]) -> Dict[str, Any]:
             "service": service,
             "load_ms": round((time.perf_counter() - started_at) * 1000, 1),
             "models": {
-                "asr": ASR_MODEL_ID if asr_model is not None else "not_loaded",
+                "asr": (ONNX_MODEL_PATH if USE_ONNX else ASR_MODEL_ID)
+                        if (ort_session if USE_ONNX else asr_model) is not None
+                        else "not_loaded",
             },
         }
     elif action == "health":
         return {
             "status": "ok",
-            "device": device,
-            "asr_model": ASR_MODEL_ID if asr_model is not None else "not_loaded",
+            "device": "cpu (onnx)" if USE_ONNX else device,
+            "asr_model": (ONNX_MODEL_PATH if USE_ONNX else ASR_MODEL_ID)
+                         if (ort_session if USE_ONNX else asr_model) is not None
+                         else "not_loaded",
         }
     else:
         return {"error": f"Unknown action: {action}"}

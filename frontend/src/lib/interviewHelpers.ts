@@ -10,7 +10,9 @@ export function computeQuestionsReady(interview: PopulatedInterview): boolean {
     (interview as PopulatedInterview & { expectedQuestionCount?: number }).expectedQuestionCount
     ?? interview.questions.length;
   const flag = (interview as PopulatedInterview & { questionsReady?: boolean }).questionsReady;
-  return flag === true || interview.questions.length >= expected;
+  const genStatus = (interview as PopulatedInterview & { generationStatus?: string }).generationStatus;
+  const partialButUsable = (genStatus === 'partial' || genStatus === 'failed') && interview.questions.length > 0;
+  return flag === true || interview.questions.length >= expected || partialButUsable;
 }
 
 export const PLACEHOLDER_TRANSCRIPT_RE = /^\[(No |Transcription)/i;

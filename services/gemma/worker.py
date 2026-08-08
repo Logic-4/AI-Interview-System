@@ -21,8 +21,16 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, StoppingCriteria, 
 MODEL_ID = os.environ.get("GEMMA_MODEL_ID", "Mohamud24/gemma-3-technical-interviewer")
 HF_TOKEN = os.environ.get("HF_TOKEN", "").strip()
 
+# ── Local CPU mode: serve GGUF via llama-cpp-python instead of HF transformers ──
+# Set USE_GGUF=1 and GGUF_MODEL_PATH=<path/to/model.gguf> to enable.
+# GPU/RunPod path (USE_GGUF unset or 0) is unaffected.
+USE_GGUF = os.environ.get("USE_GGUF", "0").strip().lower() in {"1", "true", "yes"}
+GGUF_MODEL_PATH = os.environ.get("GGUF_MODEL_PATH", "gemma3-q5_k_m.gguf")
+GGUF_N_THREADS = int(os.environ.get("GGUF_N_THREADS", "0"))  # 0 = auto-detect
+
 tokenizer = None
 model = None
+llm = None  # llama_cpp.Llama instance when USE_GGUF=1
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 generation_timing: dict[str, Any] = {}
 
@@ -70,11 +78,29 @@ def validate_cuda_runtime() -> dict[str, Any]:
 
 
 def load_model() -> dict[str, Any]:
-    global tokenizer, model
-    if model is not None:
+    global tokenizer, model, llm
+    if (llm if USE_GGUF else model) is not None:
         return {"coldStart": False, "modelLoadMs": 0}
 
     started_at = time.perf_counter()
+
+    if USE_GGUF:
+        try:
+            from llama_cpp import Llama
+        except ImportError:
+            raise RuntimeError("Install llama-cpp-python: pip install llama-cpp-python")
+        n_threads = GGUF_N_THREADS or os.cpu_count() or 4
+        print(f"Loading GGUF model {GGUF_MODEL_PATH} on CPU ({n_threads} threads)…")
+        llm = Llama(
+            model_path=GGUF_MODEL_PATH,
+            n_ctx=4096,
+            n_threads=n_threads,
+            n_gpu_layers=0,  # CPU-only
+            verbose=False,
+        )
+        load_ms = round((time.perf_counter() - started_at) * 1000, 1)
+        print(f"GGUF model ready in {load_ms}ms.")
+        return {"coldStart": True, "modelLoadMs": load_ms, "backend": "gguf"}
 
     if not HF_TOKEN:
         raise RuntimeError("HF_TOKEN environment variable is required for the gated Gemma model.")
@@ -92,17 +118,17 @@ def load_model() -> dict[str, Any]:
         device_map="auto" if DEVICE == "cuda" else None,
         token=HF_TOKEN,
     )
-    
+
     from peft import PeftModel
     print(f"Loading LoRA adapter {MODEL_ID}...")
     model = PeftModel.from_pretrained(base_model, MODEL_ID, token=HF_TOKEN)
-    
+
     if DEVICE == "cpu":
         model = model.to(DEVICE)
     model.eval()
     load_ms = round((time.perf_counter() - started_at) * 1000, 1)
     print(f"Gemma model ready in {load_ms}ms.")
-    return {"coldStart": True, "modelLoadMs": load_ms}
+    return {"coldStart": True, "modelLoadMs": load_ms, "backend": "transformers"}
 
 
 def try_parse_json(text: str) -> Optional[dict]:
@@ -412,6 +438,21 @@ class _FirstTokenTimer(StoppingCriteria):
 def run_generation(messages, max_new_tokens: int, temperature: float = 0.2, do_sample: bool = False) -> str:
     global generation_timing
     started_at = time.perf_counter()
+
+    if USE_GGUF:
+        resp = llm.create_chat_completion(
+            messages=messages,
+            max_tokens=max_new_tokens,
+            temperature=temperature if do_sample else 0.0,
+        )
+        finished_at = time.perf_counter()
+        generation_timing = {
+            "generationMs": round((finished_at - started_at) * 1000, 1),
+            "inputTokens": resp.get("usage", {}).get("prompt_tokens", 0),
+            "outputTokens": resp.get("usage", {}).get("completion_tokens", 0),
+        }
+        return resp["choices"][0]["message"]["content"]
+
     prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     inputs = tokenizer(prompt, return_tensors="pt").to(DEVICE)
     generation_started_at = time.perf_counter()
@@ -427,7 +468,7 @@ def run_generation(messages, max_new_tokens: int, temperature: float = 0.2, do_s
         gen_kwargs["temperature"] = temperature
     with torch.no_grad():
         outputs = model.generate(**inputs, **gen_kwargs)
-    output_ids = outputs[0][inputs["input_ids"].shape[-1] :]
+    output_ids = outputs[0][inputs["input_ids"].shape[-1]:]
     finished_at = time.perf_counter()
     generation_timing = {
         "promptConstructionMs": round((generation_started_at - started_at) * 1000, 1),
@@ -436,10 +477,7 @@ def run_generation(messages, max_new_tokens: int, temperature: float = 0.2, do_s
         "inputTokens": int(inputs["input_ids"].shape[-1]),
         "outputTokens": int(output_ids.shape[-1]),
     }
-    return tokenizer.decode(
-        output_ids,
-        skip_special_tokens=True,
-    )
+    return tokenizer.decode(output_ids, skip_special_tokens=True)
 
 
 def generate_json_response(messages, max_new_tokens: int, temperature: float = 0.2) -> Tuple[Optional[dict], str]:

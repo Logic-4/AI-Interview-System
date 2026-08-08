@@ -1,5 +1,6 @@
 const logger = require('../utils/logger');
 const SystemConfig = require('../models/SystemConfig');
+const { isSimilarQuestionText } = require('../utils/questionHelpers');
 
 /* ─── API Configuration ─────────────────────────────────── */
 const currentGemmaUrl = (process.env.RUNPOD_API_URL || process.env.GEMMA_API_URL || '')
@@ -114,7 +115,7 @@ const MAX_RETRIES = Number(process.env.GEMMA_MAX_RETRIES || 1);
 const RETRY_DELAY_MS = 1500;
 const HISTORY_WINDOW = 8;
 const IS_PROD = process.env.NODE_ENV === 'production';
-const RUNPOD_POLL_MS = Number(process.env.RUNPOD_POLL_MS || 500);
+const RUNPOD_POLL_MS = Number(process.env.RUNPOD_POLL_MS || 300);
 const CIRCUIT_OPEN_MS = Number(process.env.GEMMA_CIRCUIT_OPEN_MS || 60000);
 
 const circuit = { failures: 0, openUntil: 0, reason: '' };
@@ -181,12 +182,29 @@ function isQuestionAboutTargetSkill(question, targetSkill) {
   return String(question).toLowerCase().includes(String(targetSkill).toLowerCase());
 }
 
+const FALLBACK_TEMPLATES_EN = [
+  (s) => `How would you apply ${s} in a practical project?`,
+  (s) => `What challenges have you faced working with ${s}?`,
+  (s) => `Can you describe a real-world scenario where ${s} was critical to the outcome?`,
+  (s) => `How do you stay current with best practices in ${s}?`,
+  (s) => `Walk me through your approach to debugging an issue related to ${s}.`,
+  (s) => `What trade-offs do you consider when using ${s}?`,
+];
+const FALLBACK_TEMPLATES_SO = [
+  (s) => `Sidee ayaad ${s} ugu adeegsan lahayd mashruuc wax ku ool ah?`,
+  (s) => `Caqabadaha ugu waaweyn ee aad la kulantay markaad la shaqeynaysay ${s} maxay ahaayeen?`,
+  (s) => `Sharax xaalad dhabta ah oo ${s} ay door muhiim ah ku lahayd natiijooyinka?`,
+  (s) => `Sidee ayaad ula socotaa habab cusub ee ${s}?`,
+  (s) => `Sharax qaababkaaga saxitaanka cilladaha la xiriira ${s}.`,
+  (s) => `Maxay yihiin waxyaabaha aad tixgeliso markaad isticmaalayso ${s}?`,
+];
+
+let _fallbackCounter = 0;
 function buildQuestionFallback({ targetSkill, jobRole, domain, language }) {
   const subject = targetSkill || jobRole || domain || 'this field';
-  if (String(language).toLowerCase() === 'somali') {
-    return `Sidee ayaad ${subject} ugu adeegsan lahayd mashruuc wax ku ool ah?`;
-  }
-  return `How would you apply ${subject} in a practical project?`;
+  const isSomali = String(language).toLowerCase() === 'somali';
+  const templates = isSomali ? FALLBACK_TEMPLATES_SO : FALLBACK_TEMPLATES_EN;
+  return templates[_fallbackCounter++ % templates.length](subject);
 }
 
 function trimConversationHistory(history, maxTurns = HISTORY_WINDOW) {
@@ -529,14 +547,20 @@ async function callColabRunsyncFallback(gemmaUrl, endpoint, payload, timeoutMs) 
   if (endpoint === '/interview-turn') {
     return {
       evaluation: {
-        score: 75,
-        feedback: rawText || 'Candidate demonstrated practical technical understanding.',
-        strengths: ['Relevant domain explanation', 'Clear communication'],
-        improvements: ['Could add more concrete trade-off examples'],
+        score: null,
+        feedback: rawText || 'Answer recorded — detailed evaluation will be available in the final report.',
+        strengths: [],
+        improvements: [],
+        evaluationStatus: 'fallback',
       },
-      nextInterviewerResponse: 'Thank you. Let us move on to the next question.',
+      nextInterviewerResponse: rawText
+        ? 'Thank you. Let us move on to the next question.'
+        : (payload?.language === 'somali'
+          ? 'Mahadsanid. Aan u gudubno mawduuca xiga.'
+          : 'Thank you. Let us move on to the next question.'),
       isFollowUp: false,
       isTopicComplete: true,
+      evaluationStatus: 'fallback',
     };
   }
 
@@ -672,14 +696,24 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
     const result = await callGemma('/generate-question', payload, 0, requestTimeoutMs || TIMEOUT_MS);
     const qText = result.question || result.text || '';
 
+    const isIntroOutro = category === 'intro' || category === 'outro';
     const isValidQuestion = isValidGeneratedQuestion(qText)
-      && (!explicitFocusSkills.length || isQuestionAboutTargetSkill(qText, targetSkill));
+      && (isIntroOutro || !explicitFocusSkills.length || isQuestionAboutTargetSkill(qText, targetSkill));
     if (isValidQuestion) {
       questions.push({
         text: qText.trim(),
         category: category,
         difficulty: difficulty || 'medium',
         expectedAnswer: result.expectedAnswer || result.expected_answer || result.answer || '',
+        order: absoluteIndex,
+      });
+    } else if (isIntroOutro) {
+      // Model output unusable — let the caller's dedicated fallback handle this
+      questions.push({
+        text: '',
+        category,
+        difficulty: difficulty || 'medium',
+        expectedAnswer: '',
         order: absoluteIndex,
       });
     } else {
@@ -707,12 +741,13 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
       const targetSkill = targetPool.length
         ? targetPool[meta.absoluteIndex % targetPool.length]
         : '';
+      const isIntroOutro = meta.category === 'intro' || meta.category === 'outro';
       const isValidQuestion = isValidGeneratedQuestion(qText)
-        && (!explicitFocusSkills.length || isQuestionAboutTargetSkill(qText, targetSkill));
+        && (isIntroOutro || !explicitFocusSkills.length || isQuestionAboutTargetSkill(qText, targetSkill));
       questions.push({
         text: isValidQuestion
           ? qText.trim()
-          : buildQuestionFallback({ targetSkill, jobRole, domain, language }),
+          : isIntroOutro ? '' : buildQuestionFallback({ targetSkill, jobRole, domain, language }),
         category: meta.category,
         difficulty: difficulty || 'medium',
         expectedAnswer: isValidQuestion
@@ -721,6 +756,21 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
         order: meta.absoluteIndex,
       });
     });
+  }
+
+  // Deduplicate: replace duplicate question text with a skill-rotated fallback
+  const seen = [];
+  for (const q of questions) {
+    if (q.text && isSimilarQuestionText(q.text, '')) continue; // skip empty
+    if (q.text && seen.some(s => isSimilarQuestionText(q.text, s))) {
+      const targetPool = explicitFocusSkills.length ? explicitFocusSkills : uniqueSkills;
+      const altSkill = targetPool.length
+        ? targetPool[(q.order + seen.length) % targetPool.length]
+        : '';
+      q.text = buildQuestionFallback({ targetSkill: altSkill, jobRole, domain, language });
+      q.expectedAnswer = '';
+    }
+    if (q.text) seen.push(q.text);
   }
 
   questions.sort((a, b) => a.order - b.order);

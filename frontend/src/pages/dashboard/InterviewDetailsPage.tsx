@@ -100,18 +100,16 @@ export default function InterviewDetailsPage() {
   const pollStepRef = useRef(0);
   const loadedInterviewIdRef = useRef<string | null>(null);
 
+  const interviewRef = useRef<PopulatedInterview | null>(null);
   const applyInterview = useCallback(
     (data: Partial<PopulatedInterview>) => {
-      // Merge with previous state — the /progress endpoint returns a partial
-      // interview payload (only generation-status fields), and a plain replace
-      // would wipe out type/duration/title/company/etc. that later render
-      // paths depend on (e.g. `interview.type.replace(...)`).
-      setInterview((prev) => {
-        const merged = (prev ? { ...prev, ...data } : data) as PopulatedInterview;
-        setActiveInterview(merged);
-        setQuestionsReady(computeQuestionsReady(merged));
-        return merged;
-      });
+      const merged = (interviewRef.current
+        ? { ...interviewRef.current, ...data }
+        : data) as PopulatedInterview;
+      interviewRef.current = merged;
+      setInterview(merged);
+      setActiveInterview(merged);
+      setQuestionsReady(computeQuestionsReady(merged));
     },
     [setActiveInterview]
   );
@@ -542,22 +540,36 @@ export default function InterviewDetailsPage() {
 
             <div className="flex justify-center pt-4">
               {!questionsReady ? (() => {
+                const genStatus = (interview as any).generationStatus as string | undefined;
+                const genError = (interview as any).generationError as string | undefined;
                 const expected = Number((interview as any).expectedQuestionCount) || 0;
                 const readyCount = Array.isArray(interview.questions) ? interview.questions.length : 0;
-                const progressCopy = expected > 0
-                  ? `${readyCount} of ${expected} ready`
-                  : `${readyCount} ready`;
+                const isFailed = genStatus === 'failed';
+                const isPartial = genStatus === 'partial';
+
+                const statusLabel = (() => {
+                  if (isFailed) return genError || 'Generation failed — retrying…';
+                  if (isPartial) return 'Partially ready — you can start';
+                  if (genStatus === 'queued') return 'Connecting to AI model…';
+                  if (genStatus === 'generating-first') return 'Generating your first question…';
+                  if (genStatus === 'generating-remaining') return expected > 0
+                    ? `${readyCount} of ${expected} questions ready…`
+                    : 'Generating remaining questions…';
+                  return expected > 0 ? `${readyCount} of ${expected} ready…` : 'Preparing questions…';
+                })();
+
                 return (
                 <div className="text-center space-y-4">
-                  <div className="flex items-center gap-3 px-6 py-4 rounded-md bg-primary/5 border border-primary/15">
-                    <LoadingSpinner size="sm" className="flex-shrink-0" />
+                  <div className={`flex items-center gap-3 px-6 py-4 rounded-md border ${isFailed ? 'bg-danger/5 border-danger/20' : 'bg-primary/5 border-primary/15'}`}>
+                    {!isFailed && <LoadingSpinner size="sm" className="flex-shrink-0" />}
                     <div className="text-left">
-                      <p className="text-sm font-bold text-text-primary dark:text-white">Preparing your questions…</p>
-                      <p className="text-xs font-medium text-text-muted opacity-70">
-                        {progressCopy}
+                      <p className="text-sm font-bold text-text-primary dark:text-white">
+                        {isFailed ? 'Having trouble generating questions' : 'Preparing your questions…'}
                       </p>
+                      <p className="text-xs font-medium text-text-muted opacity-70">{statusLabel}</p>
                     </div>
                   </div>
+                  {!isFailed && (
                   <div className="h-1 w-64 mx-auto bg-foreground/10 dark:bg-white/10 rounded-full overflow-hidden">
                     <motion.div
                       className="h-full bg-primary/60 rounded-full"
@@ -566,8 +578,9 @@ export default function InterviewDetailsPage() {
                       style={{ width: "55%" }}
                     />
                   </div>
+                  )}
                   <p className="text-xs text-text-muted opacity-60 font-medium">
-                    You&apos;ll be able to begin shortly.
+                    {isFailed ? 'Hang tight — fallback questions are being loaded.' : 'You\'ll be able to begin shortly.'}
                   </p>
                 </div>
                 );
@@ -992,6 +1005,22 @@ export default function InterviewDetailsPage() {
                     >
                       <Pause className="w-3 h-3 mr-1.5 inline-block align-middle" />
                       Stop Recording (Space)
+                    </button>
+                  )}
+                  {engine.phase === "reviewing" && engine.audioRecorder.audioUrl && (
+                    <audio
+                      src={engine.audioRecorder.audioUrl}
+                      controls
+                      className="h-8 max-w-[160px]"
+                    />
+                  )}
+                  {engine.phase === "reviewing" && (
+                    <button
+                      onClick={() => engine.beginListening?.()}
+                      className="h-8 px-3 rounded-md text-[10px] font-bold text-foreground dark:text-white bg-white-light/50 dark:bg-[#1a2941]/50 border border-white-light dark:border-[#1b2e4b] hover:bg-white-light dark:hover:bg-[#1b2e4b] transition-colors"
+                    >
+                      <Mic className="w-3 h-3 mr-1.5 inline-block align-middle" />
+                      Re-record
                     </button>
                   )}
                   <button

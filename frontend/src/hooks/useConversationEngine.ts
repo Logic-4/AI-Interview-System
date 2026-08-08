@@ -82,6 +82,7 @@ export interface ConversationEngineReturn {
   stopRecordingForReview: () => void;
   handleManualSubmit: (textAnswer?: string) => void;
   interruptAndContinue: () => void;
+  beginListening: () => Promise<void>;
 }
 
 /* ─── Helpers ───────────────────────────────────────────── */
@@ -667,5 +668,6 @@ export function useConversationEngine(
     stopRecordingForReview,
     handleManualSubmit,
     interruptAndContinue,
+    beginListening,
   };
 }

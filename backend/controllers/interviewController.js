@@ -68,21 +68,32 @@ function buildFallbackFirstQuestion(interview, context) {
   const role = interview.jobRole || interview.domain || 'this role';
   const domain = interview.domain || 'this field';
   const isSomali = String(interview.language).toLowerCase() === 'somali';
+  const isPractice = !interview.company;
 
-  // Vary the opening based on available context so it doesn't feel robotic.
-  // This is a safety-net fallback; the AI generates the real question in normal flow.
   const skills = context?.roleProfile?.requiredSkills || [];
   const topSkill = skills[0] || '';
 
   let text;
-  if (isSomali) {
-    text = topSkill
-      ? `Maxaad ka garanaysaa ${topSkill} iyo sida aad u isticmaali lahayd shaqada ${role}?`
-      : `Maxaa kuu keenay inaad codsi u gudbiso xagga shaqada ${role}? Noo sheeg wax ka yar khibraddaada la xiriirta ${domain}.`;
+  if (isPractice) {
+    if (isSomali) {
+      text = topSkill
+        ? `Noo sheeg khibraddaada la xiriirta ${topSkill} iyo sida aad ugu adeegsatay ${domain}.`
+        : `Noo sheeg khibraddaada iyo waxa aad ka taqaanno ${domain}. Sidee ayaad u bilowday xirfaddan?`;
+    } else {
+      text = topSkill
+        ? `Tell me about your experience with ${topSkill} and how you've used it in ${domain}.`
+        : `Tell me about your background in ${domain}. How did you get started in this field?`;
+    }
   } else {
-    text = topSkill
-      ? `What has been your most hands-on experience working with ${topSkill} in a ${role} context?`
-      : `What drew you to applying for this ${role} position, and what relevant experience are you bringing?`;
+    if (isSomali) {
+      text = topSkill
+        ? `Maxaad ka garanaysaa ${topSkill} iyo sida aad u isticmaali lahayd shaqada ${role}?`
+        : `Maxaa kuu keenay inaad codsi u gudbiso xagga shaqada ${role}? Noo sheeg wax ka yar khibraddaada la xiriirta ${domain}.`;
+    } else {
+      text = topSkill
+        ? `What has been your most hands-on experience working with ${topSkill} in a ${role} context?`
+        : `What drew you to applying for this ${role} position, and what relevant experience are you bringing?`;
+    }
   }
 
   return {
@@ -90,13 +101,71 @@ function buildFallbackFirstQuestion(interview, context) {
     category: 'intro',
     difficulty: interview.difficulty,
     expectedAnswer: isSomali
-      ? 'Musharraxu wuxuu sharaxaa xiriirka u dhexeeya khibradiisa iyo baahida shaqada.'
-      : 'The candidate connects their background and motivation directly to this role.',
+      ? 'Musharraxu wuxuu sharaxaa khibradiisa iyo aqoontiisa xirfadda.'
+      : 'The candidate describes their background and relevant experience.',
     order: 0,
   };
 }
 
 const activeGenerations = new Map();
+
+// Max wall-clock time for the whole generation pipeline (env-tunable).
+// Somali and cold-start RunPod can be slow; beyond this we fill with fallbacks.
+const MAX_GENERATION_TOTAL_MS = Number(process.env.MAX_GENERATION_TOTAL_MS || 120000);
+
+async function fillRemainingWithFallbacks(interviewId, interview, totalCount, context) {
+  try {
+    const existingOrders = new Set(
+      (await Question.find({ interview: interviewId }, 'order').lean()).map(q => q.order)
+    );
+    const isSomali = String(interview.language || '').toLowerCase() === 'somali';
+    const domain = interview.domain || 'general';
+    const role = interview.jobRole || domain;
+
+    const FALLBACK_EN = [
+      (i, r) => `Walk me through how you would approach a complex problem in ${r}.`,
+      (i, r) => `Describe a challenging situation you faced and how you resolved it.`,
+      (i, r) => `What relevant skills or experience do you bring to a ${r} role?`,
+      (i, r) => `How do you stay current with developments in your field?`,
+      (i, r) => `Can you give an example of working under tight deadlines in ${r}?`,
+    ];
+    const FALLBACK_SO = [
+      (i, r) => `Sidee ayaad u xallin lahayd dhibaato adag oo la xiriirta ${r}?`,
+      (i, r) => `Sharax xaaladda adag ee aad la kulantay iyo sida aad u xaltay.`,
+      (i, r) => `Waa maxay xirfadaha ugu muhiimsan ee aad u leedahay shaqada ${r}?`,
+      (i, r) => `Sidee ayaad ula socotaa horumarka xirfaddaada?`,
+      (i, r) => `Tusaale ka bixi sida aad ugu shaqeysay xaalad waqtigu kooban yahay.`,
+    ];
+    const templates = isSomali ? FALLBACK_SO : FALLBACK_EN;
+    const outroText = isSomali
+      ? 'Ma jiraan wax aad jeclaan lahayd inaad ku darto ka hor inta aanan wareysiga soo gabagabeynin?'
+      : 'Is there anything you would like to add before we wrap up?';
+
+    for (let i = 0; i < totalCount; i++) {
+      if (existingOrders.has(i)) continue;
+      const isOutro = i === totalCount - 1;
+      const text = isOutro ? outroText : templates[i % templates.length](i, role);
+      await saveGeneratedQuestion(interviewId, {
+        text,
+        category: isOutro ? 'outro' : 'conceptual',
+        difficulty: interview.difficulty || 'medium',
+        expectedAnswer: '',
+        order: i,
+      }, i, interview.difficulty);
+    }
+
+    const savedCount = await Question.countDocuments({ interview: interviewId });
+    await Interview.findByIdAndUpdate(interviewId, {
+      questionsReady: savedCount >= totalCount,
+      generationStatus: savedCount >= totalCount ? 'ready' : 'partial',
+      generationError: savedCount >= totalCount ? '' : `Timeout: only ${savedCount}/${totalCount} generated`,
+      generationCompletedAt: new Date(),
+    });
+    logger.info(`[pipeline] fallback-fill completed ${savedCount}/${totalCount} for ${interviewId}`);
+  } catch (err) {
+    logger.error(`[pipeline] fallback-fill failed for ${interviewId}: ${err.message}`);
+  }
+}
 
 async function assertInterviewStillExists(interviewId) {
   const exists = await Interview.exists({ _id: interviewId });
@@ -167,7 +236,8 @@ async function runQuestionGenerationPipeline(interviewId, context) {
   // RunPod cold starts for the fine-tuned Gemma model routinely take 15–30s.
   // A 5s cap meant the first /generate-question call itself paid the cold-start
   // bill — so we wait longer (env-tunable) before firing generation.
-  const warmupWaitMs = Number(process.env.PIPELINE_WARMUP_WAIT_MS || 20000);
+  // ponytail: was 20000 — too long, first question paid cold-start anyway. 8s is enough for warm workers.
+  const warmupWaitMs = Number(process.env.PIPELINE_WARMUP_WAIT_MS || 8000);
   const warmupWait = await awaitCurrentWarmup(warmupWaitMs);
   if (warmupWait.waited) {
     logger.info(JSON.stringify({
@@ -242,22 +312,25 @@ async function runQuestionGenerationPipeline(interviewId, context) {
     }
     if (!firstQuestion) throw new Error('The model did not return a valid first question');
 
-    await Interview.findOneAndUpdate(
-      { _id: interviewId, 'conversationHistory.content': { $ne: firstQuestion.text } },
-      {
-        $push: {
-          conversationHistory: {
-            role: 'interviewer',
-            content: firstQuestion.text,
-            timestamp: new Date(),
+    // Fire DB housekeeping and remaining-question generation concurrently
+    const dbHousekeeping = Promise.all([
+      Interview.findOneAndUpdate(
+        { _id: interviewId, 'conversationHistory.content': { $ne: firstQuestion.text } },
+        {
+          $push: {
+            conversationHistory: {
+              role: 'interviewer',
+              content: firstQuestion.text,
+              timestamp: new Date(),
+            },
           },
-        },
-      }
-    );
-    await Interview.findByIdAndUpdate(interviewId, {
-      firstQuestionReadyAt: new Date(),
-      generationStatus: totalCount > 1 ? 'generating-remaining' : 'ready',
-    });
+        }
+      ),
+      Interview.findByIdAndUpdate(interviewId, {
+        firstQuestionReadyAt: new Date(),
+        generationStatus: totalCount > 1 ? 'generating-remaining' : 'ready',
+      }),
+    ]);
     logger.info(JSON.stringify({
       event: 'first_question_ready',
       requestId: context.requestId,
@@ -266,22 +339,38 @@ async function runQuestionGenerationPipeline(interviewId, context) {
     }));
 
     if (totalCount > 1) {
-      const generatedRemaining = await generateInterviewQuestions(
-        interview.type,
-        interview.domain,
-        interview.difficulty,
-        totalCount - 1,
-        {
-          ...generationContext,
-          _startIndex: 1,
-          _forcedCount: totalCount,
-          requestTimeoutMs: Number(process.env.REMAINING_QUESTIONS_TIMEOUT_MS || 60000),
-        }
-      );
+      const [, generatedRemaining] = await Promise.all([
+        dbHousekeeping,
+        generateInterviewQuestions(
+          interview.type,
+          interview.domain,
+          interview.difficulty,
+          totalCount - 1,
+          {
+            ...generationContext,
+            _startIndex: 1,
+            _forcedCount: totalCount,
+            requestTimeoutMs: Number(process.env.REMAINING_QUESTIONS_TIMEOUT_MS || 60000),
+          }
+        ),
+      ]);
       await assertInterviewStillExists(interviewId);
       for (const generated of generatedRemaining) {
-        await saveGeneratedQuestion(interviewId, generated, generated.order, interview.difficulty);
+        if (!generated.text && generated.category === 'outro') {
+          const isSomali = String(interview.language).toLowerCase() === 'somali';
+          generated.text = isSomali
+            ? 'Ma jiraan wax aad jeclaan lahayd inaad ku darto ama aad na waydiiso ka hor inta aanan wareysiga soo gabagabeynin?'
+            : 'Is there anything you would like to add or ask us before we wrap up the interview?';
+          generated.expectedAnswer = isSomali
+            ? 'Musharraxu wuxuu soo gabagabeeynayaa qodobbo muhiim ah ama wuxuu weydiin su\'aalo macquul ah.'
+            : 'The candidate wraps up with relevant points or asks thoughtful questions.';
+        }
+        if (generated.text) {
+          await saveGeneratedQuestion(interviewId, generated, generated.order, interview.difficulty);
+        }
       }
+    } else {
+      await dbHousekeeping;
     }
 
     const savedCount = await Question.countDocuments({ interview: interviewId });
@@ -326,8 +415,21 @@ async function runQuestionGenerationPipeline(interviewId, context) {
 function ensureQuestionGeneration(interview, context) {
   const key = String(interview._id);
   if (activeGenerations.has(key)) return activeGenerations.get(key);
+
+  const totalCount = interview.expectedQuestionCount > 0
+    ? interview.expectedQuestionCount
+    : Math.max(1, Math.min(Math.floor((interview.duration || 30) / 2.5), 16));
+
+  const timeoutHandle = setTimeout(() => {
+    logger.warn(`[pipeline] generation timed out after ${MAX_GENERATION_TOTAL_MS}ms for ${interview._id} — filling with fallbacks`);
+    void fillRemainingWithFallbacks(interview._id, interview, totalCount, context);
+  }, MAX_GENERATION_TOTAL_MS);
+
   const task = runQuestionGenerationPipeline(interview._id, context)
-    .finally(() => activeGenerations.delete(key));
+    .finally(() => {
+      clearTimeout(timeoutHandle);
+      activeGenerations.delete(key);
+    });
   activeGenerations.set(key, task);
   return task;
 }
