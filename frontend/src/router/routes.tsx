@@ -38,7 +38,7 @@ const InterviewLinkPage = lazyWithRetry(() => import('../pages/auth/InterviewLin
 const MaintenancePage = lazyWithRetry(() => import('../pages/MaintenancePage'));
 const SuperadminLoginPage = lazyWithRetry(() => import('../pages/superadmin/SuperadminLoginPage'));
 const SuperadminDashboardPage = lazyWithRetry(() => import('../pages/superadmin/SuperadminDashboardPage'));
-const CompaniesPage = lazyWithRetry(() => import('../pages/superadmin/CompaniesPage'));
+
 const UsersPage = lazyWithRetry(() => import('../pages/superadmin/UsersPage'));
 const SuperadminSettingsPage = lazyWithRetry(() => import('../pages/superadmin/SuperadminSettingsPage'));
 const PublicCompanyProfilePage = lazyWithRetry(() => import('../pages/public/PublicCompanyProfilePage'));
@@ -180,11 +180,7 @@ const routes = [
         element: <SuperadminDashboardPage />,
         layout: 'default',
     },
-    {
-        path: '/superadmin/companies',
-        element: <CompaniesPage />,
-        layout: 'default',
-    },
+
     {
         path: '/superadmin/users',
         element: <UsersPage />,

@@ -1,8 +1,9 @@
 const User = require('../models/User');
+const Company = require('../models/Company');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 
-const MANAGEABLE_ROLES = ['user', 'candidate', 'company', 'interviewer'];
+const MANAGEABLE_ROLES = ['user', 'company', 'admin'];
 const normalize = (v, fallback, max) => Math.min(Math.max(parseInt(v, 10) || fallback, 1), max);
 
 const listUsers = async (req, res, next) => {
@@ -28,9 +29,30 @@ const listUsers = async (req, res, next) => {
 const createUser = async (req, res, next) => {
   try {
     const { name, email, password, role = 'user', status = 'active' } = req.body;
-    if (!MANAGEABLE_ROLES.includes(role)) return next(ApiError.badRequest('Invalid role'));
+    const assignable = ['user', 'company'];
+    if (!assignable.includes(role)) return next(ApiError.badRequest('Invalid role'));
     if (await User.findOne({ email })) return next(ApiError.badRequest('A user with this email already exists'));
+    if (role === 'company' && await Company.findOne({ contactEmail: email })) {
+      return next(ApiError.badRequest('A company account with this email already exists'));
+    }
+
     const user = await User.create({ name, email, password, role, accountStatus: status });
+
+    if (role === 'company') {
+      try {
+        const company = await Company.create({
+          name, contactEmail: email,
+          status: status === 'disabled' ? 'disabled' : 'active',
+          adminUser: user._id, createdBy: req.user._id,
+        });
+        user.company = company._id;
+        await user.save();
+      } catch (err) {
+        await user.deleteOne();
+        throw err;
+      }
+    }
+
     ApiResponse.created(res, { user: user.toSafeObject() }, 'User created successfully');
   } catch (error) { next(error); }
 };
@@ -39,12 +61,23 @@ const updateUser = async (req, res, next) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user || !MANAGEABLE_ROLES.includes(user.role)) return next(ApiError.notFound('User not found'));
-    if (req.body.email && req.body.email !== user.email) {
-      if (await User.findOne({ email: req.body.email, _id: { $ne: user._id } })) return next(ApiError.badRequest('Email already in use'));
+    const newEmail = req.body.email;
+    if (newEmail && newEmail !== user.email) {
+      if (await User.findOne({ email: newEmail, _id: { $ne: user._id } })) return next(ApiError.badRequest('Email already in use'));
     }
     if (req.body.name) user.name = req.body.name;
-    if (req.body.email) user.email = req.body.email;
-    if (req.body.role && MANAGEABLE_ROLES.includes(req.body.role)) user.role = req.body.role;
+    if (newEmail) user.email = newEmail;
+    const newRole = req.body.role;
+    if (newRole && ['user', 'company'].includes(newRole)) {
+      user.role = newRole;
+      if (newRole === 'company' && !user.company) {
+        const company = await Company.create({
+          name: user.name, contactEmail: user.email,
+          adminUser: user._id, createdBy: req.user._id,
+        });
+        user.company = company._id;
+      }
+    }
     await user.save();
     ApiResponse.success(res, { user: user.toSafeObject() }, 'User updated successfully');
   } catch (error) { next(error); }
@@ -76,6 +109,7 @@ const deleteUser = async (req, res, next) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user || !MANAGEABLE_ROLES.includes(user.role)) return next(ApiError.notFound('User not found'));
+    if (user.company) await Company.findByIdAndDelete(user.company);
     await user.deleteOne();
     ApiResponse.success(res, null, 'User deleted successfully');
   } catch (error) { next(error); }
