@@ -549,7 +549,11 @@ async function callColabRunsyncFallback(gemmaUrl, endpoint, payload, timeoutMs) 
   if (endpoint === '/interview-turn') {
     let parsed = null;
     try { parsed = safeParseJSON(rawText); } catch (_) {}
-    const score = parsed?.score != null ? clampScore(parsed.score) : null;
+    // Model may return a bare number (e.g. "3") instead of JSON — accept it as the score
+    const rawNum = parsed == null && rawText ? Number(rawText.trim()) : NaN;
+    const score = parsed?.score != null
+      ? clampScore(parsed.score)
+      : Number.isFinite(rawNum) ? clampScore(rawNum) : null;
     const isSomali = (payload?.language || '').toLowerCase() === 'somali';
     return {
       evaluation: {
@@ -558,14 +562,14 @@ async function callColabRunsyncFallback(gemmaUrl, endpoint, payload, timeoutMs) 
         strengths: Array.isArray(parsed?.strengths) ? parsed.strengths : [],
         improvements: Array.isArray(parsed?.improvements) ? parsed.improvements : [],
         suggestedAnswer: parsed?.suggestedAnswer || '',
-        evaluationStatus: score !== null ? 'ok' : 'fallback',
+        evaluationStatus: score !== null ? 'ok' : 'failed',
       },
       nextInterviewerResponse: isSomali
         ? 'Mahadsanid. Aan u gudubno mawduuca xiga.'
         : 'Thank you. Let us move on to the next question.',
       isFollowUp: false,
       isTopicComplete: true,
-      evaluationStatus: score !== null ? 'ok' : 'fallback',
+      evaluationStatus: score !== null ? 'ok' : 'failed',
     };
   }
 

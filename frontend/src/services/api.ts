@@ -6,6 +6,7 @@ const api = axios.create({
     "Content-Type": "application/json",
   },
   withCredentials: true, // required for cookies (refresh tokens)
+  timeout: 30000,
 });
 
 // Add Authorization header to every request
