@@ -30,7 +30,7 @@ const lazyWithRetry = <T extends ComponentType<any>>(
 
 const LandingPage = lazyWithRetry(() => import('../pages/LandingPage'));
 const LoginPage = lazyWithRetry(() => import('../pages/auth/LoginPage'));
-const RegisterPage = lazyWithRetry(() => import('../pages/auth/RegisterPage'));
+
 const ForgotPasswordPage = lazyWithRetry(() => import('../pages/auth/ForgotPasswordPage'));
 const ResetPasswordPage = lazyWithRetry(() => import('../pages/auth/ResetPasswordPage'));
 const AuthCallbackPage = lazyWithRetry(() => import('../pages/auth/AuthCallbackPage'));
@@ -39,6 +39,7 @@ const MaintenancePage = lazyWithRetry(() => import('../pages/MaintenancePage'));
 const SuperadminLoginPage = lazyWithRetry(() => import('../pages/superadmin/SuperadminLoginPage'));
 const SuperadminDashboardPage = lazyWithRetry(() => import('../pages/superadmin/SuperadminDashboardPage'));
 const CompaniesPage = lazyWithRetry(() => import('../pages/superadmin/CompaniesPage'));
+const UsersPage = lazyWithRetry(() => import('../pages/superadmin/UsersPage'));
 const SuperadminSettingsPage = lazyWithRetry(() => import('../pages/superadmin/SuperadminSettingsPage'));
 const PublicCompanyProfilePage = lazyWithRetry(() => import('../pages/public/PublicCompanyProfilePage'));
 const PublicJobDetailsPage = lazyWithRetry(() => import('../pages/public/PublicJobDetailsPage'));
@@ -91,11 +92,7 @@ const routes = [
         element: <LoginPage />,
         layout: 'blank',
     },
-    {
-        path: '/register',
-        element: <RegisterPage />,
-        layout: 'blank',
-    },
+
     {
         path: '/forgot-password',
         element: <ForgotPasswordPage />,
@@ -186,6 +183,11 @@ const routes = [
     {
         path: '/superadmin/companies',
         element: <CompaniesPage />,
+        layout: 'default',
+    },
+    {
+        path: '/superadmin/users',
+        element: <UsersPage />,
         layout: 'default',
     },
     {

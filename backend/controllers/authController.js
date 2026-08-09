@@ -31,7 +31,7 @@ const getRefreshCookieOptions = (expiresIn, rememberMe = true) => {
  */
 const register = async (req, res, next) => {
   try {
-    const { name, email, password, rememberMe = false } = req.body;
+    const { name, email, password, role = 'user', rememberMe = false } = req.body;
     const shouldRemember = Boolean(rememberMe);
     const refreshExpiresIn = getRefreshDuration(shouldRemember);
 
@@ -41,8 +41,8 @@ const register = async (req, res, next) => {
       return next(ApiError.badRequest('User with this email already exists'));
     }
 
-    // Create user
-    const user = await User.create({ name, email, password });
+    const safeRole = ['user', 'company'].includes(role) ? role : 'user';
+    const user = await User.create({ name, email, password, role: safeRole });
 
     // Generate tokens
     const accessToken = generateAccessToken({ id: user._id, email: user.email, role: user.role });

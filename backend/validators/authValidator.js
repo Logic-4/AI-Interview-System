@@ -24,6 +24,11 @@ const registerValidator = [
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
     .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
 
+  body('role')
+    .optional()
+    .isIn(['user', 'company'])
+    .withMessage('Role must be user or company'),
+
   body('rememberMe')
     .optional()
     .isBoolean()
