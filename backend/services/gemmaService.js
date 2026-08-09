@@ -502,7 +502,9 @@ async function callColabRunsyncFallback(gemmaUrl, endpoint, payload, timeoutMs) 
 
   let taskName = '/ask_technical_question';
   const category = (payload?.category || '').toLowerCase();
-  if (category === 'intro') {
+  if (endpoint === '/interview-turn') {
+    taskName = '/score_candidate_answer';
+  } else if (category === 'intro') {
     taskName = '/open_mock_interview_session';
   } else if (category === 'outro') {
     taskName = '/close_mock_interview_session';
@@ -545,22 +547,25 @@ async function callColabRunsyncFallback(gemmaUrl, endpoint, payload, timeoutMs) 
   }
 
   if (endpoint === '/interview-turn') {
+    let parsed = null;
+    try { parsed = safeParseJSON(rawText); } catch (_) {}
+    const score = parsed?.score != null ? clampScore(parsed.score) : null;
+    const isSomali = (payload?.language || '').toLowerCase() === 'somali';
     return {
       evaluation: {
-        score: null,
-        feedback: rawText || 'Answer recorded — detailed evaluation will be available in the final report.',
-        strengths: [],
-        improvements: [],
-        evaluationStatus: 'fallback',
+        score,
+        feedback: parsed?.feedback || rawText || 'Answer recorded — detailed evaluation will be available in the final report.',
+        strengths: Array.isArray(parsed?.strengths) ? parsed.strengths : [],
+        improvements: Array.isArray(parsed?.improvements) ? parsed.improvements : [],
+        suggestedAnswer: parsed?.suggestedAnswer || '',
+        evaluationStatus: score !== null ? 'ok' : 'fallback',
       },
-      nextInterviewerResponse: rawText
-        ? 'Thank you. Let us move on to the next question.'
-        : (payload?.language === 'somali'
-          ? 'Mahadsanid. Aan u gudubno mawduuca xiga.'
-          : 'Thank you. Let us move on to the next question.'),
+      nextInterviewerResponse: isSomali
+        ? 'Mahadsanid. Aan u gudubno mawduuca xiga.'
+        : 'Thank you. Let us move on to the next question.',
       isFollowUp: false,
       isTopicComplete: true,
-      evaluationStatus: 'fallback',
+      evaluationStatus: score !== null ? 'ok' : 'fallback',
     };
   }
 
