@@ -911,6 +911,21 @@ export default function InterviewDetailsPage() {
             </motion.div>
           )}
 
+          {/* Prompt candidate to start recording manually */}
+          {engine.phase === "asked" && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="max-w-lg w-full text-center px-4 mb-4 flex-shrink-0"
+            >
+              <div className="rounded-md border border-white-light dark:border-[#1b2e4b] bg-white dark:bg-black px-4 py-3 inline-block">
+                <p className="text-sm font-semibold text-text-muted dark:text-white-dark">
+                  {isSomali ? "Diyaar miyaad tahay? Riix badhanka si aad u bilaabto" : "Ready? Press Start Recording when you're ready to answer"}
+                </p>
+              </div>
+            </motion.div>
+          )}
+
           {/* Mic activity — always shown while listening/reviewing. Transcription
               itself: browser Web Speech API for English (primary), Gemini
               backend as fallback; RunPod for Somali. */}
@@ -996,6 +1011,15 @@ export default function InterviewDetailsPage() {
             </div>
 
             <div className="flex items-center gap-2">
+              {engine.phase === "asked" && (
+                <button
+                  onClick={() => engine.beginListening()}
+                  className="h-8 px-4 rounded-md text-[10px] font-bold text-white bg-primary hover:bg-primary/90 transition-colors shadow-md"
+                >
+                  <Mic className="w-3 h-3 mr-1.5 inline-block align-middle" />
+                  Start Recording
+                </button>
+              )}
               {(engine.phase === "listening" || engine.phase === "reviewing") && (
                 <div className="flex items-center gap-2">
                   {engine.phase === "listening" && (

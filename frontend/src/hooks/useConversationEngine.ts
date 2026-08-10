@@ -14,6 +14,7 @@ export type ConversationPhase =
   | "idle"
   | "greeting"
   | "asking"
+  | "asked"
   | "listening"
   | "processing"
   | "reacting"
@@ -239,7 +240,7 @@ export function useConversationEngine(
   /* ── Session timer ─────────────────────────────────────── */
   // Timer only runs during active interaction phases — NOT during
   // processing/reacting/transitioning (AI is working) or analysis/done.
-  const TIMER_ACTIVE_PHASES: ConversationPhase[] = ["greeting", "asking", "listening", "reviewing", "wrapping-up"];
+  const TIMER_ACTIVE_PHASES: ConversationPhase[] = ["greeting", "asking", "asked", "listening", "reviewing", "wrapping-up"];
   useEffect(() => {
     if (TIMER_ACTIVE_PHASES.includes(phase) && !isPaused) {
       timerRef.current = setInterval(() => setTimer((p) => p + 1), 1000);
@@ -456,7 +457,7 @@ export function useConversationEngine(
           await delay(150);
           if (abortRef.current) return;
 
-          await beginListening();
+          setPhase("asked");
           return;
         }
 
@@ -533,9 +534,9 @@ export function useConversationEngine(
       await delay(150);
       if (abortRef.current) return;
 
-      await beginListening();
+      setPhase("asked");
     },
-    [tts, beginListening]
+    [tts]
   );
 
   /* ── Wrap up ───────────────────────────────────────────── */

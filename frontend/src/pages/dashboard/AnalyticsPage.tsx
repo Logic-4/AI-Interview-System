@@ -6,7 +6,7 @@ import { setPageTitle } from '../../store/themeConfigSlice';
 import feedbackService from '../../services/feedbackService';
 import { UserProgress, ProgressPeriod } from '../../types/feedback';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
-import { Info, TrendingUp, Star, CheckCheck, Users } from 'lucide-react';
+import { Info, Star, Users } from 'lucide-react';
 
 const PERIOD_MAP: Record<string, ProgressPeriod> = { '1W': '7d', '1M': '30d', '1Y': '365d' };
 
@@ -34,13 +34,11 @@ const AnalyticsPage = () => {
 
     // Timeline Area Chart
     const timelineData = useMemo(() => {
-        if (!progress?.timeline?.length) return { dates: [], scores: [], technical: [], communication: [] };
+        if (!progress?.timeline?.length) return { dates: [], scores: [] };
         const timeline = progress.timeline;
         return {
             dates: timeline.map((item) => new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
             scores: timeline.map((item) => item.overallScore),
-            technical: timeline.map((item) => item.categories?.technicalAccuracy?.score || 0),
-            communication: timeline.map((item) => item.categories?.communication?.score || 0),
         };
     }, [progress]);
 
@@ -49,10 +47,6 @@ const AnalyticsPage = () => {
             {
                 name: 'Overall Score',
                 data: timelineData.scores,
-            },
-            {
-                name: 'Technical Accuracy',
-                data: timelineData.technical,
             },
         ],
         options: {
@@ -63,7 +57,7 @@ const AnalyticsPage = () => {
                 toolbar: { show: false },
             },
             stroke: { show: true, curve: 'smooth', width: 2.5 },
-            colors: ['#EE4264', '#e2a03f'],
+            colors: ['#EE4264'],
             dataLabels: { enabled: false },
             xaxis: {
                 categories: timelineData.dates,
@@ -81,46 +75,6 @@ const AnalyticsPage = () => {
             legend: {
                 position: 'top',
                 horizontalAlign: 'right',
-            },
-        },
-    };
-
-    // Skills Radar/Polar Chart
-    const radarChart: any = {
-        series: [
-            {
-                name: 'Level',
-                data: progress
-                    ? [
-                          progress.averages.overall,
-                          progress.averages.technicalAccuracy,
-                          progress.averages.communication,
-                          progress.averages.confidence,
-                          progress.averages.problemSolving,
-                      ]
-                    : [0, 0, 0, 0, 0],
-            },
-        ],
-        options: {
-            chart: {
-                height: 320,
-                type: 'radar',
-                fontFamily: 'Nunito, sans-serif',
-                toolbar: { show: false },
-            },
-            colors: ['#009688'],
-            labels: ['Overall', 'Technical', 'Communication', 'Confidence', 'Problem Solving'],
-            plotOptions: {
-                radar: {
-                    polygons: {
-                        strokeColors: isDark ? '#191E3A' : '#E0E6ED',
-                        connectorColors: isDark ? '#191E3A' : '#E0E6ED',
-                    },
-                },
-            },
-            yaxis: {
-                max: 100,
-                tickAmount: 5,
             },
         },
     };
@@ -185,7 +139,7 @@ const AnalyticsPage = () => {
             </div>
 
             {/* Performance Averages */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
                 <div className="panel flex items-center justify-between p-6">
                     <div>
                         <span className="text-xs font-bold text-white-dark uppercase tracking-widest">Average Score</span>
@@ -193,26 +147,6 @@ const AnalyticsPage = () => {
                     </div>
                     <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center">
                         <Star className="w-5 h-5" />
-                    </div>
-                </div>
-
-                <div className="panel flex items-center justify-between p-6">
-                    <div>
-                        <span className="text-xs font-bold text-white-dark uppercase tracking-widest">Technical Skill</span>
-                        <div className="text-2xl font-extrabold dark:text-white-light mt-1">{progress?.averages.technicalAccuracy ?? 0}%</div>
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-warning/10 text-warning flex items-center justify-center">
-                        <TrendingUp className="w-5 h-5" />
-                    </div>
-                </div>
-
-                <div className="panel flex items-center justify-between p-6">
-                    <div>
-                        <span className="text-xs font-bold text-white-dark uppercase tracking-widest">Communication</span>
-                        <div className="text-2xl font-extrabold dark:text-white-light mt-1">{progress?.averages.communication ?? 0}%</div>
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-success/10 text-success flex items-center justify-center">
-                        <CheckCheck className="w-5 h-5" />
                     </div>
                 </div>
 
@@ -228,24 +162,15 @@ const AnalyticsPage = () => {
             </div>
 
             {/* Performance charts */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
-                <div className="panel xl:col-span-2">
-                    <h5 className="font-semibold text-lg dark:text-white-light mb-4">Score Trends Over Time</h5>
-                    {timelineData.scores.length === 0 ? (
-                        <div className="h-[360px] flex items-center justify-center text-white-dark">
-                            No sessions found in the selected period.
-                        </div>
-                    ) : (
-                        <ReactApexChart options={timelineChart.options} series={timelineChart.series} type="area" height={360} />
-                    )}
-                </div>
-
-                <div className="panel">
-                    <h5 className="font-semibold text-lg dark:text-white-light mb-4">Competency Breakdown</h5>
-                    <div className="flex justify-center">
-                        <ReactApexChart options={radarChart.options} series={radarChart.series} type="radar" height={320} className="w-full" />
+            <div className="panel mb-6">
+                <h5 className="font-semibold text-lg dark:text-white-light mb-4">Score Trends Over Time</h5>
+                {timelineData.scores.length === 0 ? (
+                    <div className="h-[360px] flex items-center justify-center text-white-dark">
+                        No sessions found in the selected period.
                     </div>
-                </div>
+                ) : (
+                    <ReactApexChart options={timelineChart.options} series={timelineChart.series} type="area" height={360} />
+                )}
             </div>
 
             {/* Focus areas and weak spots */}

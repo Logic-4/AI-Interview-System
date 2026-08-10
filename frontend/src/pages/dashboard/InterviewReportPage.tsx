@@ -11,8 +11,6 @@ import {
   XCircle,
   MessageSquare,
   Lightbulb,
-  Target,
-  TrendingUp,
   RefreshCw,
   FileText,
   ChevronDown,
@@ -29,7 +27,7 @@ import interviewService from "../../services/interviewService";
 import feedbackService from "../../services/feedbackService";
 import type { PopulatedInterview } from "../../types/interview";
 import type { Question } from "../../types/question";
-import type { Feedback, FeedbackCategories } from "../../types/feedback";
+import type { Feedback } from "../../types/feedback";
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -52,13 +50,6 @@ function getScoreLabel(score: number) {
   return "Poor";
 }
 
-const CATEGORY_LABELS: Record<keyof FeedbackCategories, { label: string; icon: React.ElementType }> = {
-  communication: { label: "Communication", icon: MessageSquare },
-  technicalAccuracy: { label: "Technical Accuracy", icon: Target },
-  problemSolving: { label: "Problem Solving", icon: Lightbulb },
-  codeQuality: { label: "Code Quality", icon: FileText },
-  confidence: { label: "Confidence", icon: TrendingUp },
-};
 
 export default function InterviewReportPage() {
   const params = useParams();
@@ -270,55 +261,6 @@ export default function InterviewReportPage() {
         </Card>
       )}
 
-      {/* Category Breakdown */}
-      {feedback?.categories && (
-        <Card hoverEffect={false} className="p-6 border border-white-light dark:border-[#1b2e4b] bg-white dark:bg-black">
-          <h3 className="text-sm font-bold text-text-primary dark:text-white mb-5 flex items-center gap-2">
-            <BarChart3 className="w-4 h-4 text-primary" />
-            Category Breakdown
-          </h3>
-          <div className="space-y-4">
-            {(Object.entries(feedback.categories) as [keyof FeedbackCategories, { score: number; feedback: string }][]).map(
-              ([key, cat]) => {
-                const meta = CATEGORY_LABELS[key];
-                if (!meta || cat.score === undefined) return null;
-                const Icon = meta.icon;
-                const color = getScoreColor(cat.score);
-                return (
-                  <div key={key} className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Icon className="w-3.5 h-3.5 text-text-muted" />
-                        <span className="text-xs font-semibold text-text-primary dark:text-white">{meta.label}</span>
-                      </div>
-                      <span className={cn(
-                        "text-xs font-bold",
-                        color === "success" ? "text-success" : color === "warning" ? "text-warning" : "text-danger"
-                      )}>
-                        {cat.score}/100
-                      </span>
-                    </div>
-                    <div className="h-2 w-full bg-white-light dark:bg-[#1b2e4b] rounded-full overflow-hidden">
-                      <motion.div
-                        className={cn(
-                          "h-full rounded-full",
-                          color === "success" ? "bg-success" : color === "warning" ? "bg-warning" : "bg-danger"
-                        )}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${cat.score}%` }}
-                        transition={{ duration: 0.8, delay: 0.2 }}
-                      />
-                    </div>
-                    {cat.feedback && (
-                      <p className="text-[11px] text-text-muted font-medium leading-relaxed">{cat.feedback}</p>
-                    )}
-                  </div>
-                );
-              }
-            )}
-          </div>
-        </Card>
-      )}
 
 
 
