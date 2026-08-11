@@ -43,7 +43,7 @@ const Sidebar = () => {
     ];
     const superadminNavItems = [
         { path: '/superadmin/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
-        { path: '/superadmin/companies', label: 'Companies', icon: History, end: false },
+        { path: '/superadmin/users', label: 'Users', icon: Users, end: false },
         { path: '/superadmin/settings', label: 'Profile & Security', icon: Settings, end: false },
     ];
     const companyNavItems = [

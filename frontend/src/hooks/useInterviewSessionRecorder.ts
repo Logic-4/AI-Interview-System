@@ -91,7 +91,11 @@ export function useInterviewSessionRecorder(interviewId: string) {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
 
-    await uploadQueueRef.current.catch(() => {});
+    // ponytail: 15s timeout so recorder.stop() can never hang wrapUp indefinitely
+    await Promise.race([
+      uploadQueueRef.current.catch(() => {}),
+      new Promise<void>((resolve) => setTimeout(resolve, 15_000)),
+    ]);
     setStatus("stopped");
   }, []);
 

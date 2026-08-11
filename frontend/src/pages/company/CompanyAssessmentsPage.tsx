@@ -20,13 +20,6 @@ const VIOLATION_LABEL: Record<string, string> = {
   face_not_detected: 'Face not detected',
 };
 
-const CATEGORY_LABEL: Record<string, string> = {
-  communication: 'Communication',
-  technicalAccuracy: 'Technical Accuracy',
-  problemSolving: 'Problem Solving',
-  codeQuality: 'Code Quality',
-  confidence: 'Confidence',
-};
 
 function ScoreBar({ score, passingScore }: { score: number; passingScore: number }) {
   const clampedScore = Math.min(100, Math.max(0, score));
@@ -66,33 +59,6 @@ function ScoreBar({ score, passingScore }: { score: number; passingScore: number
   );
 }
 
-function CategoryBars({ categoryScores }: { categoryScores: CompanyAssessment['categoryScores'] }) {
-  if (!categoryScores) return null;
-  const entries = Object.entries(categoryScores).filter(([, v]) => v && v.score !== undefined);
-  if (entries.length === 0) return null;
-
-  return (
-    <div className="space-y-2">
-      {entries.map(([key, val]) => (
-        <div key={key}>
-          <div className="flex items-center justify-between text-xs mb-0.5">
-            <span className="font-semibold text-black dark:text-white">{CATEGORY_LABEL[key] ?? key}</span>
-            <span className="text-primary font-bold">{val!.score}%</span>
-          </div>
-          <div className="h-2 rounded-full bg-gray-200 dark:bg-dark">
-            <div
-              className="h-2 rounded-full bg-primary transition-all"
-              style={{ width: `${Math.min(100, val!.score)}%` }}
-            />
-          </div>
-          {val!.feedback && (
-            <p className="text-[11px] text-white-dark mt-0.5 leading-snug">{val!.feedback}</p>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
 
 function IdentityVerificationCard({ iv }: { iv: CompanyAssessment['identityVerification'] }) {
   if (!iv || iv.status === 'not_required') return null;
@@ -489,15 +455,6 @@ const CompanyAssessmentsPage = () => {
                   </div>
                 )}
 
-                {/* Category Scores */}
-                {detail.categoryScores && (
-                  <div>
-                    <p className="text-xs font-bold text-white-dark uppercase mb-2">Skill Category Breakdown</p>
-                    <div className="rounded-lg border border-white-light dark:border-white-light/10 p-4">
-                      <CategoryBars categoryScores={detail.categoryScores} />
-                    </div>
-                  </div>
-                )}
 
                 {/* Executive Summary */}
                 {(detail.summaryNotes || detail.detailedFeedback) && (

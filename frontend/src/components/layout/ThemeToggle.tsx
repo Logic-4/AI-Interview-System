@@ -16,8 +16,8 @@ export default function ThemeToggle() {
       onClick={() => dispatch(toggleTheme(isDark ? 'light' : 'dark'))}
       className={cn(
         "relative w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300",
-        "bg-white-light/30 dark:bg-[#1a2941]/50 border border-white-light dark:border-[#1b2e4b] overflow-hidden group",
-        "hover:scale-105 active:scale-95 hover:shadow-lg"
+        "bg-primary/10 dark:bg-[#1a2941]/50 border border-primary/30 dark:border-[#1b2e4b] overflow-hidden group",
+        "hover:bg-primary/20 hover:scale-105 active:scale-95 hover:shadow-lg"
       )}
       aria-label="Toggle theme"
     >

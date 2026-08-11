@@ -81,14 +81,11 @@ const generateFeedback = async (req, res, next) => {
     const substantiveAnswers = (interview.questions || []).filter((question) =>
       question.isAnswered && question.userAnswer && question.userAnswer.trim() && !isPlaceholderAnswer(question.userAnswer)
     );
-    const incompleteEvaluations = substantiveAnswers.filter((q) => !isScorable(q));
     if (!substantiveAnswers.length) {
       return next(ApiError.badRequest('No evaluated answers are available for feedback'));
     }
-    if (incompleteEvaluations.length) {
-      return next(new ApiError(409,
-        `${incompleteEvaluations.length} answer evaluation(s) must be retried before generating feedback`
-      ));
+    if (!substantiveAnswers.some(isScorable)) {
+      return next(new ApiError(409, 'No answers could be scored. Please retry the interview.'));
     }
 
     // Check if feedback already exists
