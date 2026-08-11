@@ -17,6 +17,12 @@ const dateTimeShort = (value?: string) =>
 const statusBadge = (status: string) =>
   ({ completed: 'success', scheduled: 'warning', 'in-progress': 'primary', cancelled: 'danger' }[status] || 'secondary');
 
+const getMinDateTime = () => {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  return now.toISOString().slice(0, 16);
+};
+
 const VIOLATION_LABEL: Record<string, string> = {
   tab_switch: 'Tab switch',
   window_blur: 'Window unfocused',
@@ -70,14 +76,18 @@ const CompanyInterviewsPage = () => {
   const handleRescheduleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!rescheduleModal || !newDate) return;
+    if (new Date(newDate).getTime() < Date.now() - 60000) {
+      toast.error('Interview date cannot be in the past');
+      return;
+    }
     try {
       await companyService.rescheduleInterview(rescheduleModal._id, newDate);
       toast.success('Interview rescheduled!');
       setRescheduleModal(null);
       setNewDate('');
       await load();
-    } catch {
-      toast.error('Failed to reschedule interview');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to reschedule interview');
     }
   };
 
@@ -214,7 +224,7 @@ const CompanyInterviewsPage = () => {
             <form onSubmit={(e) => void handleRescheduleSubmit(e)} className="space-y-4">
               <div>
                 <label htmlFor="newScheduledDate">New Date &amp; Time (Somalia time)</label>
-                <input id="newScheduledDate" type="datetime-local" className="form-input" value={newDate} onChange={(e) => setNewDate(e.target.value)} required />
+                <input id="newScheduledDate" type="datetime-local" min={getMinDateTime()} className="form-input" value={newDate} onChange={(e) => setNewDate(e.target.value)} required />
               </div>
               <div className="flex justify-end gap-3 pt-3">
                 <button type="button" className="btn btn-outline-secondary" onClick={() => setRescheduleModal(null)}>Cancel</button>

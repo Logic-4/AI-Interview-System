@@ -518,6 +518,9 @@ const scheduleInterview = async (req, res, next) => {
     const { applicationId, jobRole, type, difficulty, domain, language, duration, scheduledAt } = req.body;
     const scheduledDate = scheduledAt ? parseScheduledAt(scheduledAt, req.company?.timezone) : new Date();
     if (!scheduledDate) return next(ApiError.badRequest('Scheduled date must be a valid date and time'));
+    if (scheduledDate.getTime() < Date.now() - 60000) {
+      return next(ApiError.badRequest('Scheduled date cannot be in the past'));
+    }
     let candidateId = req.body.candidateId;
 
     let candidate = null;
@@ -637,6 +640,9 @@ const rescheduleInterview = async (req, res, next) => {
     const { scheduledAt } = req.body;
     const scheduledDate = parseScheduledAt(scheduledAt, req.company?.timezone);
     if (!scheduledDate) return next(ApiError.badRequest('Scheduled date must be a valid date and time'));
+    if (scheduledDate.getTime() < Date.now() - 60000) {
+      return next(ApiError.badRequest('Scheduled date cannot be in the past'));
+    }
     const interview = await Interview.findOne({ _id: req.params.id, company: req.companyId }).populate(
       'user',
       'name email'

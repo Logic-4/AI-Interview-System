@@ -90,7 +90,7 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    lastLogin: {
+    lastLogin: {  
       type: Date,
     },
     bio: {

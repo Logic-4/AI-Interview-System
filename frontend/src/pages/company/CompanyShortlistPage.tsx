@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import {
   Star, Eye, Calendar, Trash2, CheckCircle2, XCircle, UserCheck,
-  Mail, Briefcase, Award, X, AlertTriangle, MoreVertical, MoreHorizontal, ChevronDown,
+  Mail, Phone, Briefcase, Award, X, AlertTriangle, MoreVertical, MoreHorizontal, ChevronDown,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { setPageTitle } from '@/store/themeConfigSlice';
@@ -16,6 +16,12 @@ const approvalBadge = (s: CandidateSummary['approvalStatus']) =>
 
 const dateShort = (v?: string) =>
   v ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(v)) : 'N/A';
+
+const getMinDateTime = () => {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  return now.toISOString().slice(0, 16);
+};
 
 function Avatar({ src, name, size = 'md' }: { src?: string; name: string; size?: 'sm' | 'md' | 'lg' }) {
   const [err, setErr] = useState(false);
@@ -344,6 +350,10 @@ const CompanyShortlistPage = () => {
   const handleScheduleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!scheduleModal || !scheduledAtDate) return;
+    if (new Date(scheduledAtDate).getTime() < Date.now() - 60000) {
+      toast.error('Interview date cannot be in the past');
+      return;
+    }
     try {
       await companyService.scheduleInterview({
         applicationId: scheduleModal._id,
@@ -356,8 +366,8 @@ const CompanyShortlistPage = () => {
       setScheduledAtDate('');
       setProfileModal(null);
       await load();
-    } catch {
-      toast.error('Failed to schedule interview');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to schedule interview');
     }
   };
 
@@ -558,7 +568,7 @@ const CompanyShortlistPage = () => {
             <form onSubmit={(e) => void handleScheduleSubmit(e)} className="space-y-4">
               <div>
                 <label htmlFor="scheduledAtSl">Date &amp; Time (Somalia time)</label>
-                <input id="scheduledAtSl" type="datetime-local" className="form-input" value={scheduledAtDate} onChange={(e) => setScheduledAtDate(e.target.value)} required />
+                <input id="scheduledAtSl" type="datetime-local" min={getMinDateTime()} className="form-input" value={scheduledAtDate} onChange={(e) => setScheduledAtDate(e.target.value)} required />
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" className="btn btn-outline-secondary" onClick={() => setScheduleModal(null)}>Cancel</button>
