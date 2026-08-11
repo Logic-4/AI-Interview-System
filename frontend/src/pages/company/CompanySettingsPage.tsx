@@ -47,6 +47,23 @@ const CompanySettingsPage = () => {
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmedName = (profile.name || '').trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      toast.error('Company name must be at least 2 characters');
+      return;
+    }
+    if (!profile.contactEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.contactEmail.trim())) {
+      toast.error('Please enter a valid contact email address');
+      return;
+    }
+    if (profile.phone && profile.phone.replace(/\D/g, '').length < 7) {
+      toast.error('Phone number must have at least 7 digits');
+      return;
+    }
+    if (profile.website && !/^https?:\/\/.+/.test(profile.website.trim())) {
+      toast.error('Website must start with http:// or https://');
+      return;
+    }
     setSavingProfile(true);
     try {
       await companyService.updateCompanyProfile(profile);
@@ -62,6 +79,10 @@ const CompanySettingsPage = () => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
       toast.error('New passwords do not match');
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast.error('New password must be at least 8 characters');
       return;
     }
     setSavingPassword(true);

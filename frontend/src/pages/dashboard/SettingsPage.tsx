@@ -27,8 +27,13 @@ const SettingsPage = () => {
 
     const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
+        e.target.value = '';
         if (!file) return;
-
+        const ext = '.' + (file.name.split('.').pop() ?? '').toLowerCase();
+        if (!['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext)) {
+            toast.error('Avatar must be JPG, PNG, WEBP, or GIF');
+            return;
+        }
         if (file.size > 5 * 1024 * 1024) {
             toast.error('Image size must be less than 5MB.');
             return;
@@ -76,6 +81,10 @@ const SettingsPage = () => {
 
     const handleSaveProfile = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!name.trim() || name.trim().length < 2) {
+            toast.error('Full name must be at least 2 characters');
+            return;
+        }
         setSaving(true);
         try {
             const updated = await userService.updateProfile({
@@ -206,7 +215,7 @@ const SettingsPage = () => {
                                         <input
                                             id="avatar-upload"
                                             type="file"
-                                            accept="image/*"
+                                            accept=".jpg,.jpeg,.png,.webp,.gif"
                                             className="hidden"
                                             onChange={handleAvatarChange}
                                             disabled={uploadingAvatar}

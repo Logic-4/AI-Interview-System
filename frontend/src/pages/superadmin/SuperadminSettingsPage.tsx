@@ -29,13 +29,20 @@ const SuperadminSettingsPage = () => {
   }, [dispatch]);
 
   const saveProfile = async (event: FormEvent) => {
-    event.preventDefault(); setSavingProfile(true);
-    try { const user = await superadminService.updateProfile({ name, email }); setProfile(user); setUser(user); toast.success('Profile updated.'); }
+    event.preventDefault();
+    const trimmedName = name.trim();
+    if (!trimmedName || trimmedName.length < 2 || trimmedName.length > 100)
+      return toast.error('Name must be 2–100 characters');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+      return toast.error('Please enter a valid email address');
+    setSavingProfile(true);
+    try { const user = await superadminService.updateProfile({ name: trimmedName, email: email.trim() }); setProfile(user); setUser(user); toast.success('Profile updated.'); }
     catch (error) { toast.error(errorMessage(error)); } finally { setSavingProfile(false); }
   };
   const savePassword = async (event: FormEvent) => {
     event.preventDefault();
     if (newPassword !== confirmPassword) return toast.error('New passwords do not match.');
+    if (newPassword.length < 8) return toast.error('New password must be at least 8 characters');
     setSavingPassword(true);
     try { await superadminService.updatePassword(currentPassword, newPassword); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); toast.success('Password updated. Sign in again on your next session.'); }
     catch (error) { toast.error(errorMessage(error)); } finally { setSavingPassword(false); }

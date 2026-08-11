@@ -22,6 +22,13 @@ interface JobApplicationFormModalProps {
   onClose: () => void;
 }
 
+const ALLOWED_PHOTO_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+const ALLOWED_RESUME_EXTS = ['.pdf', '.doc', '.docx'];
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024;   // 5 MB
+const MAX_RESUME_BYTES = 10 * 1024 * 1024; // 10 MB
+
+const getExt = (name: string) => '.' + (name.split('.').pop() ?? '').toLowerCase();
+
 const TIME_SLOTS = ['09:00 AM', '10:30 AM', '01:00 PM', '02:30 PM', '04:00 PM'];
 
 export const JobApplicationFormModal = ({ job, isOpen, onClose }: JobApplicationFormModalProps) => {
@@ -45,17 +52,34 @@ export const JobApplicationFormModal = ({ job, isOpen, onClose }: JobApplication
   if (!isOpen) return null;
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setPhotoFile(file);
-      setPhotoPreview(URL.createObjectURL(file));
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!ALLOWED_PHOTO_EXTS.includes(getExt(file.name))) {
+      toast.error('Profile photo must be JPG, PNG, WEBP, or GIF');
+      return;
     }
+    if (file.size > MAX_PHOTO_BYTES) {
+      toast.error('Profile photo must be under 5 MB');
+      return;
+    }
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
   };
 
   const handleResumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setResumeFile(e.target.files[0]);
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!ALLOWED_RESUME_EXTS.includes(getExt(file.name))) {
+      toast.error('Resume must be a PDF, DOC, or DOCX file');
+      return;
     }
+    if (file.size > MAX_RESUME_BYTES) {
+      toast.error('Resume must be under 10 MB');
+      return;
+    }
+    setResumeFile(file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -246,7 +270,7 @@ export const JobApplicationFormModal = ({ job, isOpen, onClose }: JobApplication
                   <input
                     id="photo-upload"
                     type="file"
-                    accept="image/*"
+                    accept=".jpg,.jpeg,.png,.webp,.gif"
                     className="hidden"
                     onChange={handlePhotoChange}
                   />

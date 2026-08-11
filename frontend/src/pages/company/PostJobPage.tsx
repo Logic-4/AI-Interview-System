@@ -49,6 +49,7 @@ const PostJobPage = () => {
 
   const [reqSkillsInput, setReqSkillsInput] = useState('');
   const [focusSkillsInput, setFocusSkillsInput] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     dispatch(setPageTitle(editId ? 'Edit Job | RecruitAI' : 'Post a Job | RecruitAI'));
@@ -98,6 +99,33 @@ const PostJobPage = () => {
     const target = e.target;
     const value = target.type === 'checkbox' ? (target as HTMLInputElement).checked : target.value;
     setForm((prev) => ({ ...prev, [target.name]: value }));
+    setFieldErrors((prev) => { const n = { ...prev }; delete n[target.name]; return n; });
+  };
+
+  const validateStep = (step: number): boolean => {
+    const errors: Record<string, string> = {};
+    if (step === 1) {
+      const t = form.title.trim();
+      if (!t || t.length < 3 || t.length > 150) errors.title = 'Job title must be 3–150 characters';
+      if (!form.location.trim() || form.location.trim().length < 2) errors.location = 'Please enter a valid location';
+      if (!form.description.trim() || form.description.trim().length < 20) errors.description = 'Description must be at least 20 characters';
+    }
+    if (step === 2) {
+      if (!form.numberOfHiresNeeded || Number(form.numberOfHiresNeeded) < 1)
+        errors.numberOfHiresNeeded = 'Must be at least 1';
+      const max = form.maxApplications;
+      if (max !== undefined && String(max) !== '' && Number(max) < 1)
+        errors.maxApplications = 'Must be at least 1, or leave blank for no limit';
+    }
+    if (step === 3) {
+      if (form.durationMinutes < 5 || form.durationMinutes > 120) errors.durationMinutes = 'Must be between 5 and 120 minutes';
+      if (form.numberOfQuestions < 1 || form.numberOfQuestions > 20) errors.numberOfQuestions = 'Must be between 1 and 20';
+      if (form.passingScoreThreshold < 0 || form.passingScoreThreshold > 100) errors.passingScoreThreshold = 'Must be between 0 and 100';
+    }
+    setFieldErrors(errors);
+    const firstKey = Object.keys(errors)[0];
+    if (firstKey) { document.getElementById(firstKey)?.focus(); return false; }
+    return true;
   };
 
   const addRequiredSkill = () => {
@@ -367,7 +395,11 @@ const PostJobPage = () => {
                 <div key={step.number} className="flex items-center flex-1">
                   <button
                     type="button"
-                    onClick={() => setCurrentStep(step.number)}
+                    onClick={() => {
+                      if (step.number < currentStep) { setCurrentStep(step.number); return; }
+                      if (step.number === currentStep) return;
+                      if (validateStep(currentStep)) setCurrentStep(step.number);
+                    }}
                     className={`flex items-center gap-2 font-semibold text-sm ${
                       currentStep === step.number
                         ? 'text-primary font-bold'
@@ -414,12 +446,13 @@ const PostJobPage = () => {
                   <input
                     id="title"
                     name="title"
-                    className="form-input"
+                    className={`form-input${fieldErrors.title ? ' !border-danger' : ''}`}
                     placeholder="Enter job title (e.g. Senior Frontend Developer)"
                     value={form.title}
                     onChange={handleChange}
                     required
                   />
+                  {fieldErrors.title && <p className="mt-1 text-xs text-danger">{fieldErrors.title}</p>}
                 </div>
 
 
@@ -459,12 +492,13 @@ const PostJobPage = () => {
                   <input
                     id="location"
                     name="location"
-                    className="form-input"
+                    className={`form-input${fieldErrors.location ? ' !border-danger' : ''}`}
                     placeholder="e.g. Mogadishu, Somalia / Remote"
                     value={form.location}
                     onChange={handleChange}
                     required
                   />
+                  {fieldErrors.location && <p className="mt-1 text-xs text-danger">{fieldErrors.location}</p>}
                 </div>
 
                 <div className="sm:col-span-2">
@@ -513,13 +547,14 @@ const PostJobPage = () => {
                     id="description"
                     name="description"
                     rows={8}
-                    className="form-textarea rounded-t-none border-t-0 font-mono text-sm"
+                    className={`form-textarea rounded-t-none border-t-0 font-mono text-sm${fieldErrors.description ? ' !border-danger' : ''}`}
                     placeholder={`Write the job description here...\n\nTip: Use **text** for bold, *text* for italic, start a line with - for bullets.`}
                     value={form.description}
                     onChange={handleChange}
                     onKeyDown={handleDescKeyDown}
                     required
                   />
+                  {fieldErrors.description && <p className="mt-1 text-xs text-danger">{fieldErrors.description}</p>}
                 </div>
               </div>
 
@@ -605,10 +640,11 @@ const PostJobPage = () => {
                     name="numberOfHiresNeeded"
                     type="number"
                     min={1}
-                    className="form-input"
+                    className={`form-input${fieldErrors.numberOfHiresNeeded ? ' !border-danger' : ''}`}
                     value={form.numberOfHiresNeeded}
                     onChange={handleChange}
                   />
+                  {fieldErrors.numberOfHiresNeeded && <p className="mt-1 text-xs text-danger">{fieldErrors.numberOfHiresNeeded}</p>}
                 </div>
 
                 <div>
@@ -618,11 +654,12 @@ const PostJobPage = () => {
                     name="maxApplications"
                     type="number"
                     min={1}
-                    className="form-input"
+                    className={`form-input${fieldErrors.maxApplications ? ' !border-danger' : ''}`}
                     placeholder="No limit"
                     value={form.maxApplications || ''}
                     onChange={handleChange}
                   />
+                  {fieldErrors.maxApplications && <p className="mt-1 text-xs text-danger">{fieldErrors.maxApplications}</p>}
                 </div>
 
                 <div>
@@ -683,10 +720,11 @@ const PostJobPage = () => {
                     type="number"
                     min={5}
                     max={120}
-                    className="form-input"
+                    className={`form-input${fieldErrors.durationMinutes ? ' !border-danger' : ''}`}
                     value={form.durationMinutes}
                     onChange={handleChange}
                   />
+                  {fieldErrors.durationMinutes && <p className="mt-1 text-xs text-danger">{fieldErrors.durationMinutes}</p>}
                 </div>
 
                 {/* 7. Number of Questions */}
@@ -698,10 +736,11 @@ const PostJobPage = () => {
                     type="number"
                     min={1}
                     max={20}
-                    className="form-input"
+                    className={`form-input${fieldErrors.numberOfQuestions ? ' !border-danger' : ''}`}
                     value={form.numberOfQuestions}
                     onChange={handleChange}
                   />
+                  {fieldErrors.numberOfQuestions && <p className="mt-1 text-xs text-danger">{fieldErrors.numberOfQuestions}</p>}
                 </div>
 
                 {/* 8. Passing Score Threshold (%) */}
@@ -713,10 +752,11 @@ const PostJobPage = () => {
                     type="number"
                     min={0}
                     max={100}
-                    className="form-input"
+                    className={`form-input${fieldErrors.passingScoreThreshold ? ' !border-danger' : ''}`}
                     value={form.passingScoreThreshold}
                     onChange={handleChange}
                   />
+                  {fieldErrors.passingScoreThreshold && <p className="mt-1 text-xs text-danger">{fieldErrors.passingScoreThreshold}</p>}
                 </div>
               </div>
 
@@ -766,7 +806,7 @@ const PostJobPage = () => {
                 <button
                   type="button"
                   className="btn btn-primary"
-                  onClick={() => setCurrentStep(currentStep + 1)}
+                  onClick={() => { if (validateStep(currentStep)) setCurrentStep(currentStep + 1); }}
                 >
                   Continue
                 </button>
