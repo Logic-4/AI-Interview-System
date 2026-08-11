@@ -5,6 +5,7 @@ import { Features } from "@/components/landing/Features";
 import { Capabilities } from "@/components/landing/Capabilities";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { Companies } from "@/components/landing/Companies";
+import { JobBoard } from "@/components/landing/JobBoard";
 import { CTA } from "@/components/landing/CTA";
 import { Footer } from "@/components/landing/Footer";
 
@@ -28,6 +29,7 @@ export default function LandingPage() {
                 <Features />
                 <Capabilities />
                 <Companies />
+                <JobBoard />
                 <HowItWorks />
                 <CTA />
             </main>

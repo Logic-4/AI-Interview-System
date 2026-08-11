@@ -38,6 +38,11 @@ const publicCompanyService = {
     return response.data.data.company;
   },
 
+  async getAllPublicJobs(): Promise<Job[]> {
+    const response = await api.get<ApiResponse<PublicCompanyJobsData>>('/public/companies/jobs');
+    return response.data.data.jobs;
+  },
+
   async getPublicCompanyJobs(companyId: string): Promise<Job[]> {
     const response = await api.get<ApiResponse<PublicCompanyJobsData>>(`/public/companies/${companyId}/jobs`);
     return response.data.data.jobs;

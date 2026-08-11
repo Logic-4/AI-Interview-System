@@ -57,4 +57,20 @@ const aiLimiter = createLimiter({
   legacyHeaders: false,
 });
 
-module.exports = { generalLimiter, authLimiter, aiLimiter };
+/**
+ * Job application rate limiter
+ * 5 applications per hour per IP — blocks bulk/bot submissions across jobs
+ */
+const applyLimiter = createLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: {
+    success: false,
+    statusCode: 429,
+    message: 'Too many applications submitted. Please try again after an hour.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+module.exports = { generalLimiter, authLimiter, aiLimiter, applyLimiter };
