@@ -62,7 +62,7 @@
 
     /* Panel */
     .panel {
-        @apply relative rounded-2xl bg-white p-6 border border-[#E8ECF2] shadow-card dark:border-white-light/10 dark:bg-black;
+        @apply relative rounded-lg bg-white p-6 border border-[#E8ECF2] shadow-card dark:border-white-light/10 dark:bg-black;
     }
 
     /* Navbar */

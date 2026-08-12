@@ -697,7 +697,11 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
       requestId,
     };
 
-    if (count > 1) {
+    // ponytail: RunPod's batch endpoint (/generate-questions) doesn't respect
+    // per-item language, so Somali always fell through to English. The single
+    // /generate-question call below is proven to honor language — use it for
+    // every question when Somali instead of batching.
+    if (count > 1 && String(language).toLowerCase() !== 'somali') {
       batchRequests.push({ payload, category, absoluteIndex });
       continue;
     }

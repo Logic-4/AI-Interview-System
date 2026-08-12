@@ -165,7 +165,7 @@ const DashboardPage = () => {
             {/* Stats widgets */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
                 {/* Total Interviews */}
-                <div className="panel bg-white border border-[#E8ECF2] shadow-card rounded-2xl p-6 flex flex-col justify-between dark:bg-[#0e1726] dark:border-white-light/10">
+                <div className="panel bg-white border border-[#E8ECF2] shadow-card rounded-lg p-6 flex flex-col justify-between dark:bg-[#0e1726] dark:border-white-light/10">
                     <div className="flex justify-between items-start">
                         <div>
                             <p className="text-[10px] font-bold text-[#697386] dark:text-white-dark uppercase tracking-wider leading-none whitespace-nowrap">Total Sessions</p>
@@ -181,7 +181,7 @@ const DashboardPage = () => {
                 </div>
 
                 {/* Average Score */}
-                <div className="panel bg-white border border-[#E8ECF2] shadow-card rounded-2xl p-6 flex flex-col justify-between dark:bg-[#0e1726] dark:border-white-light/10">
+                <div className="panel bg-white border border-[#E8ECF2] shadow-card rounded-lg p-6 flex flex-col justify-between dark:bg-[#0e1726] dark:border-white-light/10">
                     <div className="flex justify-between items-start">
                         <div>
                             <p className="text-[10px] font-bold text-[#697386] dark:text-white-dark uppercase tracking-wider leading-none whitespace-nowrap">Average Score</p>
@@ -199,7 +199,7 @@ const DashboardPage = () => {
                 </div>
 
                 {/* Completed */}
-                <div className="panel bg-white border border-[#E8ECF2] shadow-card rounded-2xl p-6 flex flex-col justify-between dark:bg-[#0e1726] dark:border-white-light/10">
+                <div className="panel bg-white border border-[#E8ECF2] shadow-card rounded-lg p-6 flex flex-col justify-between dark:bg-[#0e1726] dark:border-white-light/10">
                     <div className="flex justify-between items-start">
                         <div>
                             <p className="text-[10px] font-bold text-[#697386] dark:text-white-dark uppercase tracking-wider leading-none whitespace-nowrap">Completed</p>
@@ -215,7 +215,7 @@ const DashboardPage = () => {
                 </div>
 
                 {/* Highest Score */}
-                <div className="panel bg-white border border-[#E8ECF2] shadow-card rounded-2xl p-6 flex flex-col justify-between dark:bg-[#0e1726] dark:border-white-light/10">
+                <div className="panel bg-white border border-[#E8ECF2] shadow-card rounded-lg p-6 flex flex-col justify-between dark:bg-[#0e1726] dark:border-white-light/10">
                     <div className="flex justify-between items-start">
                         <div>
                             <p className="text-[10px] font-bold text-[#697386] dark:text-white-dark uppercase tracking-wider leading-none whitespace-nowrap">Highest Score</p>
@@ -235,7 +235,7 @@ const DashboardPage = () => {
 
             {/* Visual Analytics / Scores Grid */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                <div className="panel xl:col-span-2 bg-white border border-[#E8ECF2] shadow-card rounded-2xl p-6 dark:bg-[#0e1726] dark:border-white-light/10">
+                <div className="panel xl:col-span-2 bg-white border border-[#E8ECF2] shadow-card rounded-lg p-6 dark:bg-[#0e1726] dark:border-white-light/10">
                     <div className="flex items-center justify-between mb-5">
                         <h3 className="font-bold text-lg text-[#1E2433] dark:text-white">Performance History</h3>
                         <span className="badge badge-outline-primary flex items-center gap-1.5 px-3 py-1">
@@ -252,7 +252,7 @@ const DashboardPage = () => {
                     )}
                 </div>
 
-                <div className="panel flex flex-col justify-between bg-white border border-[#E8ECF2] shadow-card rounded-2xl p-6 dark:bg-[#0e1726] dark:border-white-light/10">
+                <div className="panel flex flex-col justify-between bg-white border border-[#E8ECF2] shadow-card rounded-lg p-6 dark:bg-[#0e1726] dark:border-white-light/10">
                     <div>
                         <h3 className="font-bold text-lg text-[#1E2433] dark:text-white mb-4">Daily Interview Tip</h3>
                         <div className="bg-primary-light dark:bg-primary-dark-light border border-primary/10 p-5 rounded-xl text-primary">
@@ -273,7 +273,7 @@ const DashboardPage = () => {
             </div>
 
             {/* Recent Interviews Table */}
-            <div className="panel bg-white border border-[#E8ECF2] shadow-card rounded-2xl p-6 dark:bg-[#0e1726] dark:border-white-light/10">
+            <div className="panel bg-white border border-[#E8ECF2] shadow-card rounded-lg p-6 dark:bg-[#0e1726] dark:border-white-light/10">
                 <div className="flex items-center justify-between mb-5">
                     <h3 className="font-bold text-lg text-[#1E2433] dark:text-white">Recent Sessions</h3>
                     <Link to="/interviews" className="text-primary hover:text-primary-hover font-bold text-sm transition-colors">
