@@ -51,7 +51,7 @@ const UsersPage = () => {
 
   const onChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
   const openCreate = () => { setEditing(null); setForm(blankForm); setFormOpen(true); };
-  const openEdit = (u: SystemUser) => { setEditing(u); setForm({ name: u.name, email: u.email, password: '', role: u.role, status: u.accountStatus }); setFormOpen(true); };
+  const openEdit = (u: SystemUser) => { setEditing(u); setForm({ name: u.name, email: u.email, password: '', role: u.role !== 'admin' ? u.role : 'user', status: u.accountStatus }); setFormOpen(true); };
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setSaving(true);
     try {

@@ -91,6 +91,14 @@ function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+// ponytail: same reasoning as the recorder.stop() 15s cap below — completeInterview
+// and generateFeedback each have a 30s axios timeout, but that alone wasn't
+// enough to stop the analysis screen from hanging forever in the field. Cap
+// them explicitly so wrapUp() always reaches "done" and navigates away.
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | void> {
+  return Promise.race([promise, delay(ms)]);
+}
+
 /* Maximum listen time per question */
 const MAX_LISTEN_SEC = 120;
 const SILENCE_AUTO_REVIEW_SEC = 2.5;
@@ -567,14 +575,14 @@ export function useConversationEngine(
 
     try {
       setAnalysisStage(stages[0]);
-      await onComplete();
+      await withTimeout(onComplete(), 20000);
 
       setAnalysisStage(stages[1]);
       await delay(800);
       setAnalysisStage(stages[2]);
       await delay(600);
       setAnalysisStage(stages[3]);
-      await onGenerateFeedback();
+      await withTimeout(onGenerateFeedback(), 20000);
       setAnalysisStage(stages[4]);
       await delay(500);
       setAnalysisStage({ label: "Report ready!", progress: 100 });
