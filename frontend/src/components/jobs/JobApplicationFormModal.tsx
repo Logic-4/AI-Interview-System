@@ -153,9 +153,9 @@ export const JobApplicationFormModal = ({ job, isOpen, onClose }: JobApplication
       setSubmitted(true);
       toast.success('Application submitted successfully!');
     } catch (err: any) {
+      const status = (err as any).response?.status;
       const msg: string = (err as any).response?.data?.message || '';
-      const lowerMsg = msg.toLowerCase();
-      if (lowerMsg.includes('already applied') || lowerMsg.includes('already submitted')) {
+      if (status === 409 || msg.toLowerCase().includes('already applied')) {
         setAlreadyApplied(true);
         return;
       }

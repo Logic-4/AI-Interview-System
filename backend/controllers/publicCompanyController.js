@@ -204,39 +204,11 @@ const applyPublicJob = async (req, res, next) => {
     }
 
 
-    const normalizedEmail = email.trim().toLowerCase();
-    const normalizedPhone = phone.trim();
-
-    // Resolve or create a candidate User account. Match candidate or user roles.
-    let candidateUser = req.user || null;
-    if (!candidateUser && normalizedEmail) {
-      candidateUser = await User.findOne({ email: normalizedEmail, role: { $in: ['user', 'candidate'] } });
-    }
-
-    if (!candidateUser) {
-      const conflict = await User.findOne({ email: normalizedEmail }).select('_id role').lean();
-      if (conflict) {
-        return res.status(400).json({
-          success: false,
-          message: 'This email belongs to an employer or admin account. Please sign in or use a candidate email.',
-        });
-      }
-      candidateUser = await User.create({
-        name: fullName.trim(),
-        email: normalizedEmail,
-        role: 'candidate',
-      });
-    }
-
-    // ─── Per-Job Duplicate Application Check ─────────────────────────────────
-    const duplicateOr = [{ candidateEmail: normalizedEmail }];
-    if (candidateUser) {
-      duplicateOr.push({ candidate: candidateUser._id });
-    }
-
+    // ─── Duplicate application check ─────────────────────────────────────────
     const existingApplication = await Application.findOne({
       job: job._id,
-      $or: duplicateOr,
+      candidateEmail: email.trim().toLowerCase(),
+      candidatePhone: phone.trim(),
     });
 
     if (existingApplication) {
@@ -246,6 +218,35 @@ const applyPublicJob = async (req, res, next) => {
       });
     }
     // ─────────────────────────────────────────────────────────────────────────
+
+    // Resolve or create a candidate User account. Only match candidate-role
+    // accounts — otherwise an applicant's email that happens to match a
+    // company admin or superadmin would hijack their account and see their
+    // interviews under their history.
+    let candidateUser = req.user || null;
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!candidateUser && normalizedEmail) {
+      candidateUser = await User.findOne({ email: normalizedEmail, role: 'candidate' });
+    }
+
+    if (!candidateUser) {
+      // If the email belongs to a non-candidate user, refuse rather than
+      // silently create a duplicate — the applicant can sign in with the
+      // right account and re-apply.
+      const conflict = await User.findOne({ email: normalizedEmail }).select('_id role').lean();
+      if (conflict) {
+        return res.status(409).json({
+          success: false,
+          message: 'This email is already in use. Please sign in with your existing account before applying.',
+        });
+      }
+      candidateUser = await User.create({
+        name: fullName.trim(),
+        email: normalizedEmail,
+        role: 'candidate',
+      });
+    }
 
     // Cap the client-supplied resumeText and strip control chars — the file
     // itself is authoritative and can be re-parsed server-side. This keeps
