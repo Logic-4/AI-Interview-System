@@ -9,6 +9,7 @@ import userService from '../../services/userService';
 import authService from '../../services/authService';
 import toast from 'react-hot-toast';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { getErrorMessage } from '../../lib/utils';
 
 const SettingsPage = () => {
     const dispatch = useDispatch();
@@ -46,7 +47,7 @@ const SettingsPage = () => {
             setUser(updated);
             toast.success('Profile image updated successfully.', { id: loadingToast });
         } catch (err: any) {
-            toast.error(err.response?.data?.message || 'Failed to upload profile image.', { id: loadingToast });
+            toast.error(getErrorMessage(err, 'Failed to upload profile image.'), { id: loadingToast });
         } finally {
             setUploadingAvatar(false);
         }
@@ -81,8 +82,18 @@ const SettingsPage = () => {
 
     const handleSaveProfile = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!name.trim() || name.trim().length < 2) {
+        const trimmedName = name.trim();
+        if (!trimmedName || trimmedName.length < 2) {
             toast.error('Full name must be at least 2 characters');
+            return;
+        }
+        if (!/^[a-zA-Z\s]+$/.test(trimmedName)) {
+            toast.error('Name must contain only letters');
+            return;
+        }
+        const trimmedRole = targetRole.trim();
+        if (trimmedRole && (trimmedRole.length < 2 || !/^[a-zA-Z\s'\-./&,()]+$/.test(trimmedRole))) {
+            toast.error('Target role must be at least 2 characters and contain only valid characters');
             return;
         }
         setSaving(true);
@@ -97,7 +108,7 @@ const SettingsPage = () => {
             setUser(updated);
             toast.success('Profile updated successfully.');
         } catch (err: any) {
-            toast.error(err.response?.data?.message || 'Failed to update profile.');
+            toast.error(getErrorMessage(err, 'Failed to update profile.'));
         } finally {
             setSaving(false);
         }
@@ -113,6 +124,10 @@ const SettingsPage = () => {
             toast.error('New password must be at least 8 characters.');
             return;
         }
+        if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(newPassword)) {
+            toast.error('Password must contain uppercase, lowercase, and a number.');
+            return;
+        }
         setChangingPw(true);
         try {
             await userService.changePassword(currentPassword, newPassword);
@@ -121,7 +136,7 @@ const SettingsPage = () => {
             logout();
             navigate('/login', { replace: true });
         } catch (err: any) {
-            toast.error(err.response?.data?.message || 'Failed to change password.');
+            toast.error(getErrorMessage(err, 'Failed to change password.'));
         } finally {
             setChangingPw(false);
         }
@@ -140,7 +155,7 @@ const SettingsPage = () => {
             navigate('/', { replace: true });
             toast.success('Your account and interview data were permanently deleted.');
         } catch (err: any) {
-            toast.error(err.response?.data?.message || 'Failed to delete account.');
+            toast.error(getErrorMessage(err, 'Failed to delete account.'));
         } finally {
             setDeletingAccount(false);
         }

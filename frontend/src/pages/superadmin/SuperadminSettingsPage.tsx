@@ -2,14 +2,12 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { KeyRound, ShieldCheck, UserRound } from 'lucide-react';
 import toast from 'react-hot-toast';
-import axios from 'axios';
 import { setPageTitle } from '@/store/themeConfigSlice';
 import { useAuthStore } from '@/stores/authStore';
 import superadminService from '@/services/superadminService';
 import { User } from '@/types/user';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-
-const errorMessage = (error: unknown) => axios.isAxiosError(error) ? error.response?.data?.message || 'Something went wrong.' : 'Something went wrong.';
+import { getErrorMessage } from '@/lib/utils';
 
 const SuperadminSettingsPage = () => {
   const dispatch = useDispatch();
@@ -25,27 +23,30 @@ const SuperadminSettingsPage = () => {
 
   useEffect(() => {
     dispatch(setPageTitle('Superadmin Settings | InterviewAI'));
-    superadminService.getProfile().then((user) => { setProfile(user); setName(user.name); setEmail(user.email); }).catch((error) => toast.error(errorMessage(error)));
+    superadminService.getProfile().then((user) => { setProfile(user); setName(user.name); setEmail(user.email); }).catch((error) => toast.error(getErrorMessage(error)));
   }, [dispatch]);
 
   const saveProfile = async (event: FormEvent) => {
     event.preventDefault();
     const trimmedName = name.trim();
-    if (!trimmedName || trimmedName.length < 2 || trimmedName.length > 100)
-      return toast.error('Name must be 2–100 characters');
+    if (!trimmedName || trimmedName.length < 2 || trimmedName.length > 50)
+      return toast.error('Name must be 2–50 characters');
+    if (!/^[a-zA-Z\s]+$/.test(trimmedName))
+      return toast.error('Name must contain only letters');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
       return toast.error('Please enter a valid email address');
     setSavingProfile(true);
     try { const user = await superadminService.updateProfile({ name: trimmedName, email: email.trim() }); setProfile(user); setUser(user); toast.success('Profile updated.'); }
-    catch (error) { toast.error(errorMessage(error)); } finally { setSavingProfile(false); }
+    catch (error) { toast.error(getErrorMessage(error)); } finally { setSavingProfile(false); }
   };
   const savePassword = async (event: FormEvent) => {
     event.preventDefault();
     if (newPassword !== confirmPassword) return toast.error('New passwords do not match.');
     if (newPassword.length < 8) return toast.error('New password must be at least 8 characters');
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(newPassword)) return toast.error('Password must contain uppercase, lowercase, and a number');
     setSavingPassword(true);
     try { await superadminService.updatePassword(currentPassword, newPassword); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); toast.success('Password updated. Sign in again on your next session.'); }
-    catch (error) { toast.error(errorMessage(error)); } finally { setSavingPassword(false); }
+    catch (error) { toast.error(getErrorMessage(error)); } finally { setSavingPassword(false); }
   };
 
   if (!profile) return <div className="flex h-96 items-center justify-center"><LoadingSpinner size="lg" /></div>;

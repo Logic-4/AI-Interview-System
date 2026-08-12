@@ -7,6 +7,7 @@ import { setPageTitle } from '@/store/themeConfigSlice';
 import companyService from '@/services/companyService';
 import { CompanyInterview } from '@/types/companyPortal';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { getErrorMessage } from '@/lib/utils';
 
 const dateTime = (value?: string) =>
   value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : 'N/A';
@@ -87,7 +88,7 @@ const CompanyInterviewsPage = () => {
       setNewDate('');
       await load();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to reschedule interview');
+      toast.error(getErrorMessage(err, 'Failed to reschedule interview'));
     }
   };
 
@@ -96,8 +97,8 @@ const CompanyInterviewsPage = () => {
       await companyService.cancelInterview(inv._id);
       toast.success('Interview cancelled');
       await load();
-    } catch {
-      toast.error('Failed to cancel interview');
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to cancel interview'));
     }
   };
 
@@ -109,7 +110,7 @@ const CompanyInterviewsPage = () => {
       if (resultsModal?._id === inv._id) setResultsModal(null);
       await load();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to delete interview');
+      toast.error(getErrorMessage(err, 'Failed to delete interview'));
     }
   };
 

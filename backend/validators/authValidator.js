@@ -6,7 +6,9 @@ const registerValidator = [
     .notEmpty()
     .withMessage('Name is required')
     .isLength({ min: 2, max: 50 })
-    .withMessage('Name must be between 2 and 50 characters'),
+    .withMessage('Name must be between 2 and 50 characters')
+    .matches(/^[a-zA-Z\s]+$/)
+    .withMessage('Name must contain only letters'),
 
   body('email')
     .trim()

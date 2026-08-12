@@ -10,6 +10,7 @@ import companyService from '@/services/companyService';
 import { CandidateSummary, ApplicationStatus } from '@/types/companyPortal';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import Dropdown from '@/components/Dropdown';
+import { getErrorMessage } from '@/lib/utils';
 
 const approvalBadge = (status: CandidateSummary['approvalStatus']) =>
   ({ approved: 'success', rejected: 'danger', pending: 'warning' })[status] || 'secondary';
@@ -319,7 +320,7 @@ const CompanyCandidatesPage = () => {
       await load();
       if (profileModal?._id === cand._id) setProfileModal(prev => prev ? { ...prev, approvalStatus: 'approved' } : null);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to approve candidate');
+      toast.error(getErrorMessage(err, 'Failed to approve candidate'));
     } finally {
       setApprovingId(null);
     }
@@ -331,8 +332,8 @@ const CompanyCandidatesPage = () => {
       toast.success(cand.isShortlisted ? 'Removed from shortlist' : 'Added to shortlist');
       setProfileModal(null);
       await load();
-    } catch {
-      toast.error('Failed to update shortlist');
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to update shortlist'));
     }
   };
 
@@ -342,8 +343,8 @@ const CompanyCandidatesPage = () => {
       toast.success(`${cand.name} marked as hired!`);
       setProfileModal(null);
       await load();
-    } catch {
-      toast.error('Failed to mark as hired');
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to mark as hired'));
     }
   };
 
@@ -358,7 +359,7 @@ const CompanyCandidatesPage = () => {
       setProfileModal(null);
       await load();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to reject candidate');
+      toast.error(getErrorMessage(err, 'Failed to reject candidate'));
     }
   };
 
@@ -372,7 +373,7 @@ const CompanyCandidatesPage = () => {
       if (profileModal?._id === cand._id) setProfileModal(null);
       await load();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to delete application');
+      toast.error(getErrorMessage(err, 'Failed to delete application'));
     }
   };
 
@@ -397,7 +398,7 @@ const CompanyCandidatesPage = () => {
       setProfileModal(null);
       await load();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to schedule interview');
+      toast.error(getErrorMessage(err, 'Failed to schedule interview'));
     }
   };
 

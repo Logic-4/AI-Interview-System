@@ -7,6 +7,7 @@ import { setPageTitle } from '@/store/themeConfigSlice';
 import companyService from '@/services/companyService';
 import { Job, JobStatus } from '@/types/companyPortal';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { getErrorMessage } from '@/lib/utils';
 
 const dateTime = (value?: string) =>
   value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value)) : 'N/A';
@@ -44,7 +45,7 @@ const CompanyJobsPage = () => {
       setJobs(res.jobs);
       setTotal(res.pagination.total);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to load jobs');
+      toast.error(getErrorMessage(err, 'Failed to load jobs'));
     } finally {
       setLoading(false);
     }
@@ -74,7 +75,7 @@ const CompanyJobsPage = () => {
       toast.success(`Job status changed to ${nextStatus}`);
       await load();
     } catch (err: any) {
-      toast.error('Failed to update job status');
+      toast.error(getErrorMessage(err, 'Failed to update job status'));
     }
   };
 
@@ -86,7 +87,7 @@ const CompanyJobsPage = () => {
       setDeleteTarget(null);
       await load();
     } catch (err: any) {
-      toast.error('Failed to delete job');
+      toast.error(getErrorMessage(err, 'Failed to delete job'));
     }
   };
 

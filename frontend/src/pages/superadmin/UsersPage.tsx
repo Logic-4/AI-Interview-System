@@ -2,16 +2,16 @@ import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { Eye, EyeOff, KeyRound, Pencil, Plus, Search, Trash2, UserIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
-import axios from 'axios';
 import { setPageTitle } from '@/store/themeConfigSlice';
 import superadminService, { SystemUser, SystemUserPayload, SystemUserRole } from '@/services/superadminService';
 import { Modal } from '@/components/ui/Modal';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { getErrorMessage } from '@/lib/utils';
 
 const ROLES: SystemUserRole[] = ['user', 'company'];
 const blankForm: SystemUserPayload = { name: '', email: '', password: '', role: 'user', status: 'active' };
 const dateTime = (value?: string) => value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : 'Never';
-const errMsg = (error: unknown) => axios.isAxiosError(error) ? error.response?.data?.message || 'Something went wrong.' : 'Something went wrong.';
+const errMsg = (error: unknown) => getErrorMessage(error);
 
 const PasswordInput = ({ id, value, onChange, placeholder, required = false }: { id: string; value: string; onChange: (v: string) => void; placeholder: string; required?: boolean }) => {
   const [visible, setVisible] = useState(false);

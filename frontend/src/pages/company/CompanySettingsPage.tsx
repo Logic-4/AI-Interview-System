@@ -6,6 +6,7 @@ import { setPageTitle } from '@/store/themeConfigSlice';
 import companyService from '@/services/companyService';
 import { CompanyProfile } from '@/types/companyPortal';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { getErrorMessage } from '@/lib/utils';
 
 const CompanySettingsPage = () => {
   const dispatch = useDispatch();
@@ -69,7 +70,7 @@ const CompanySettingsPage = () => {
       await companyService.updateCompanyProfile(profile);
       toast.success('Company profile updated successfully!');
     } catch (err: any) {
-      toast.error('Failed to update company profile');
+      toast.error(getErrorMessage(err, 'Failed to update company profile'));
     } finally {
       setSavingProfile(false);
     }
@@ -85,6 +86,10 @@ const CompanySettingsPage = () => {
       toast.error('New password must be at least 8 characters');
       return;
     }
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(newPassword)) {
+      toast.error('Password must contain uppercase, lowercase, and a number');
+      return;
+    }
     setSavingPassword(true);
     try {
       await companyService.updateAccountSettings(currentPassword, newPassword);
@@ -93,7 +98,7 @@ const CompanySettingsPage = () => {
       setNewPassword('');
       setConfirmPassword('');
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to change password');
+      toast.error(getErrorMessage(err, 'Failed to change password'));
     } finally {
       setSavingPassword(false);
     }

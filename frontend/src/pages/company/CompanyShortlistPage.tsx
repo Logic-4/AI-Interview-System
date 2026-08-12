@@ -10,6 +10,7 @@ import companyService from '@/services/companyService';
 import { CandidateSummary, ApplicationStatus } from '@/types/companyPortal';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import Dropdown from '@/components/Dropdown';
+import { getErrorMessage } from '@/lib/utils';
 
 const approvalBadge = (s: CandidateSummary['approvalStatus']) =>
   ({ approved: 'success', rejected: 'danger', pending: 'warning' })[s] || 'secondary';
@@ -290,8 +291,8 @@ const CompanyShortlistPage = () => {
       toast.success('Removed from shortlist');
       setProfileModal(null);
       await load();
-    } catch {
-      toast.error('Failed to remove from shortlist');
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to remove from shortlist'));
     }
   };
 
@@ -303,7 +304,7 @@ const CompanyShortlistPage = () => {
       setProfileModal(null);
       await load();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to delete application');
+      toast.error(getErrorMessage(err, 'Failed to delete application'));
     }
   };
 
@@ -315,7 +316,7 @@ const CompanyShortlistPage = () => {
       await load();
       setProfileModal(prev => prev?._id === cand._id ? { ...prev, approvalStatus: 'approved' } : prev);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to approve');
+      toast.error(getErrorMessage(err, 'Failed to approve'));
     } finally {
       setApprovingId(null);
     }
@@ -327,8 +328,8 @@ const CompanyShortlistPage = () => {
       toast.success(`${cand.name} marked as hired!`);
       setProfileModal(null);
       await load();
-    } catch {
-      toast.error('Failed to mark as hired');
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to mark as hired'));
     }
   };
 
@@ -343,7 +344,7 @@ const CompanyShortlistPage = () => {
       setProfileModal(null);
       await load();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to reject');
+      toast.error(getErrorMessage(err, 'Failed to reject'));
     }
   };
 
@@ -367,7 +368,7 @@ const CompanyShortlistPage = () => {
       setProfileModal(null);
       await load();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to schedule interview');
+      toast.error(getErrorMessage(err, 'Failed to schedule interview'));
     }
   };
 
