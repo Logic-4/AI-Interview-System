@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import {
   FileText, Mic2, LineChart, Globe2, BarChart3,
-  Code2, Stethoscope, TrendingUp, Wrench, GraduationCap, Scale,
+  Code2, Database, Shield, Brain, Cloud, GitBranch,
 } from "lucide-react";
 
 const items = [
@@ -44,12 +44,12 @@ const items = [
 ];
 
 const domains = [
-  { icon: Code2, name: "Technology", roles: "Full Stack Dev · Cybersecurity Analyst" },
-  { icon: Stethoscope, name: "Healthcare", roles: "Registered Nurse · Hospital Admin" },
-  { icon: TrendingUp, name: "Finance", roles: "Financial Analyst · Supply Chain" },
-  { icon: Wrench, name: "Engineering", roles: "Civil Engineer · Mechanical Engineer" },
-  { icon: GraduationCap, name: "Education", roles: "Science Teacher · Admissions Officer" },
-  { icon: Scale, name: "Legal", roles: "Legal Assistant · Urban Planner" },
+  { icon: Code2, name: "Software Engineering", roles: "Full Stack Dev · Frontend · Backend" },
+  { icon: Database, name: "Data & Analytics", roles: "Data Engineer · Data Analyst · BI" },
+  { icon: Shield, name: "Cybersecurity", roles: "Security Analyst · Penetration Tester" },
+  { icon: Brain, name: "AI / Machine Learning", roles: "ML Engineer · Data Scientist" },
+  { icon: Cloud, name: "Cloud & DevOps", roles: "Cloud Architect · Site Reliability" },
+  { icon: GitBranch, name: "Product & Management", roles: "Product Manager · Scrum Master" },
 ];
 
 export function Capabilities() {
@@ -142,14 +142,14 @@ export function Capabilities() {
             <div className="max-w-xl">
               <p className="text-sm font-semibold uppercase tracking-widest text-primary">Domain coverage</p>
               <h3 className="mt-3 text-3xl md:text-4xl font-bold">
-                Trained across <span className="text-gradient">6 industries</span>
+                Built for <span className="text-gradient">technology roles</span>
               </h3>
               <p className="mt-3 text-muted-foreground">
-                Role-specific question banks and rubrics tuned for the realities of each domain.
+                Role-specific question banks and rubrics tuned for the realities of the tech industry.
               </p>
             </div>
             <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Up to 6 supported domains
+              6 tech specializations
             </span>
           </div>
 
