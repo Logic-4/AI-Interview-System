@@ -1,4 +1,3 @@
-const { registerInterviewHandlers } = require('./interviewHandler');
 const logger = require('../utils/logger');
 
 /**
@@ -19,9 +18,6 @@ const initializeSocketHandlers = (io) => {
       socket.emit('pong', { timestamp: Date.now() });
     });
   });
-
-  // Register namespace handlers
-  registerInterviewHandlers(io);
 
   logger.info('🔌 All socket handlers registered');
 };

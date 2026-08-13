@@ -66,21 +66,35 @@ export default function InterviewReportPage() {
   const [evaluationError, setEvaluationError] = useState<string | null>(null);
 
   useEffect(() => {
-    const load = async () => {
+    let cancelled = false;
+
+    // The candidate lands here right after the engine calls completeInterview()
+    // and immediately navigates — the backend write can still be in flight.
+    // Retry briefly instead of bouncing straight back to the interview page,
+    // which otherwise looks like "the redirect didn't happen".
+    const load = async (attempt = 0) => {
       try {
         const data = await interviewService.getInterview(interviewId);
+        if (cancelled) return;
         if (data.status !== "completed") {
+          if (attempt < 5) {
+            setTimeout(() => load(attempt + 1), 1000);
+            return;
+          }
           navigate(`/interviews/${interviewId}`, { replace: true });
           return;
         }
         setInterview(data);
-      } catch {
-        setError("Failed to load interview report.");
-      } finally {
         setLoading(false);
+      } catch {
+        if (!cancelled) {
+          setError("Failed to load interview report.");
+          setLoading(false);
+        }
       }
     };
     load();
+    return () => { cancelled = true; };
   }, [interviewId, navigate]);
 
   if (loading) {

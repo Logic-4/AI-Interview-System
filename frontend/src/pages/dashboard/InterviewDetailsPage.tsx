@@ -75,6 +75,7 @@ export default function InterviewDetailsPage() {
   const [isEnding, setIsEnding] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [questionsReady, setQuestionsReady] = useState(false);
+  const [allQuestionsLoaded, setAllQuestionsLoaded] = useState(false);
   const [identityCleared, setIdentityCleared] = useState(false);
   const [timeWindowForcedOpen, setTimeWindowForcedOpen] = useState(false);
   const [recordingConsent, setRecordingConsent] = useState(false);
@@ -152,6 +153,7 @@ export default function InterviewDetailsPage() {
     setIdentityCleared(false);
     setTimeWindowForcedOpen(false);
     setRecordingConsent(false);
+    setAllQuestionsLoaded(false);
     resetSession();
 
     const navInterview =
@@ -200,9 +202,18 @@ export default function InterviewDetailsPage() {
      Uses the lightweight /progress route so each poll returns only the
      fields needed to decide readiness — the heavy full-populate
      getInterview is called only ONCE, right after questionsReady flips
-     true, to feed the ready UI. */
+     true, to feed the ready UI.
+
+     A partial question set is enough to flip questionsReady (see
+     computeQuestionsReady's partialButUsable case) so the candidate isn't
+     stuck waiting on a slow/failed generation. But the live conversation
+     engine's totalQuestions is derived from however many questions are
+     loaded — if polling stopped there, any questions still generating in
+     the background would never reach the engine and the interview would
+     end early. Keep polling into the "active" phase until every expected
+     question has actually landed. */
   useEffect(() => {
-    if (questionsReady || pagePhase !== "ready") return;
+    if (allQuestionsLoaded || (pagePhase !== "ready" && pagePhase !== "active")) return;
 
     let cancelled = false;
     let timeoutId: ReturnType<typeof setTimeout>;
@@ -214,12 +225,12 @@ export default function InterviewDetailsPage() {
     };
 
     const poll = async () => {
-      if (cancelled || questionsReady) return;
+      if (cancelled) return;
       try {
         const progress = await interviewService.getInterviewProgress(interviewId);
         if (cancelled) return;
         applyInterview(progress);
-        if (computeQuestionsReady(progress)) {
+        if (!questionsReady && computeQuestionsReady(progress)) {
           // Fetch the full populated interview exactly once so the ready UI
           // has feedback, roleProfile, etc. — anything the progress route
           // deliberately omits.
@@ -231,6 +242,11 @@ export default function InterviewDetailsPage() {
             // state; anything missing will reload on interaction.
           }
           if (!cancelled) setQuestionsReady(true);
+        }
+        const expected = Number((progress as any)?.expectedQuestionCount) || 0;
+        const loadedCount = Array.isArray(progress.questions) ? progress.questions.length : 0;
+        if (expected > 0 && loadedCount >= expected) {
+          if (!cancelled) setAllQuestionsLoaded(true);
           return;
         }
       } catch {
@@ -245,7 +261,7 @@ export default function InterviewDetailsPage() {
       clearTimeout(timeoutId);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [questionsReady, pagePhase, interviewId, applyInterview]);
+  }, [allQuestionsLoaded, pagePhase, interviewId, applyInterview, questionsReady]);
 
   /* ── Callbacks for conversation engine ─────────────────── */
   const onSubmitAnswer = useCallback(
@@ -281,14 +297,29 @@ export default function InterviewDetailsPage() {
     [interviewId, recordAnswer]
   );
 
-  const onComplete = useCallback(async () => {
-    if (hasCompletedRef.current) return;
-    hasCompletedRef.current = true;
-    // Flush the last recording chunk and wait for all uploads to settle
-    // before marking complete, so the backend has every chunk to finalize.
-    await recorder.stop();
-    await interviewService.completeInterview(interviewId);
+  // Guards concurrent callers (engine wrapUp + manual End button); only
+  // latches hasCompletedRef AFTER the backend call actually succeeds. Setting
+  // it beforehand meant one transient network failure permanently disabled
+  // every future completion attempt (this ref never resets), stranding the
+  // interview as "in-progress" forever with no way to complete it from the UI.
+  const completingRef = useRef(false);
+  const ensureInterviewCompleted = useCallback(async () => {
+    if (hasCompletedRef.current || completingRef.current) return;
+    completingRef.current = true;
+    try {
+      // Flush the last recording chunk and wait for all uploads to settle
+      // before marking complete, so the backend has every chunk to finalize.
+      await recorder.stop();
+      await interviewService.completeInterview(interviewId);
+      hasCompletedRef.current = true;
+    } finally {
+      completingRef.current = false;
+    }
   }, [interviewId, recorder]);
+
+  const onComplete = useCallback(async () => {
+    await ensureInterviewCompleted();
+  }, [ensureInterviewCompleted]);
 
   const onGenerateFeedback = useCallback(async () => {
     try {
@@ -393,11 +424,7 @@ export default function InterviewDetailsPage() {
     try { engine.recognition.stopListening(); } catch { /* ignore */ }
 
     try {
-      if (!hasCompletedRef.current) {
-        hasCompletedRef.current = true;
-        await recorder.stop();
-        await interviewService.completeInterview(interviewId);
-      }
+      await ensureInterviewCompleted();
     } catch {}
     const destination = interview?.company
       ? `/interviews/${interviewId}/complete`

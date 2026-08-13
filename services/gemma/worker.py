@@ -187,6 +187,20 @@ def clamp_score(value) -> int:
     return max(0, min(100, score))
 
 
+def clamp_or_reject_score(value) -> Optional[int]:
+    """Like clamp_score, but for the per-turn evaluation score: a wildly
+    out-of-range hallucination (-1e6, 99999) must be discarded, not clamped
+    into [0, 100] — clamping would silently turn it into a legitimate-looking
+    0 or 100 and let it count as a real graded answer."""
+    try:
+        score = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not (0 <= score <= 100):
+        return None
+    return int(round(score))
+
+
 def language_instruction(language: str, mode: str = "question") -> str:
     """
     Returns the language directive injected at the top of every prompt.
@@ -239,6 +253,10 @@ def is_valid_question(text: Any) -> bool:
         return False
     question = " ".join(text.split())
     if len(question) < 8 or len(question) > 300 or not question.endswith("?"):
+        return False
+    # Enforce one question per turn — reject text that crams multiple
+    # questions together (e.g. "What is X? How does it work?").
+    if question.count("?") > 1:
         return False
     invalid_markers = (
         "return only valid json", "expected answer", "ideal answer",
@@ -399,7 +417,7 @@ def normalize_turn_response(parsed: Optional[dict], raw_text: str = "") -> dict:
     score_raw = evaluation.get("score")
     # Apply minimum score floor: any on-topic substantive answer scores at least 10
     # to distinguish from a placeholder / no-answer (which scores 0).
-    clamped_score = clamp_score(score_raw) if score_raw is not None else None
+    clamped_score = clamp_or_reject_score(score_raw) if score_raw is not None else None
     if clamped_score is not None and 1 <= clamped_score < 10:
         clamped_score = 10
     next_response = parsed.get("nextInterviewerResponse") or ""
@@ -561,7 +579,8 @@ def handle_interview_turn(data: dict) -> dict:
         f"{lang_hint}\n\n"
         f"{somali_note}"
         f"CURRENT QUESTION: {question_text}\n"
-        f"EXPECTED ANSWER RUBRIC: {expected_answer or 'Judge relevance, depth, and clarity for this question category.'}\n"
+        f"EXPECTED ANSWER RUBRIC (a guide to the key concepts, NOT a script to match word-for-word): "
+        f"{expected_answer or 'Judge relevance, depth, and clarity for this question category.'}\n"
         f"CATEGORY: {category}. {rubric}\n"
     )
     if role_context:
@@ -578,7 +597,10 @@ def handle_interview_turn(data: dict) -> dict:
         "- 25-49:  Weak — significant gaps, vague, or mostly incorrect.\n"
         "- 0-24:   Off-topic, clearly wrong, or no real attempt.\n"
         "CALIBRATION: A clear, relevant, mostly-correct answer for this difficulty level "
-        "should score 72–82. Reserve 90+ for exceptional depth and insight.\n\n"
+        "should score 72–82. Reserve 90+ for exceptional depth and insight. Judge the CONCEPT the "
+        "candidate conveys, not their exact wording — different phrasing, structure, ordering, or "
+        "examples than the rubric are NOT gaps by themselves; only score down for missing or wrong "
+        "substance.\n\n"
         "BEHAVIOR:\n"
         "1. nextInterviewerResponse: 1-2 short sentences max. Be warm and professional.\n"
         "2. Partial answer → isFollowUp=true, isTopicComplete=false, one short targeted follow-up.\n"
@@ -587,7 +609,12 @@ def handle_interview_turn(data: dict) -> dict:
         "answer it briefly and professionally in nextInterviewerResponse, set answeredCandidateQuestion=true. "
         "For outro category, always answer their questions. Stay on topic after answering.\n"
         "5. If they ask for clarification on YOUR question, rephrase briefly — do not repeat the full original question.\n"
-        "6. Never ask the same question twice verbatim; if already answered, acknowledge and move on.\n\n"
+        "6. Never ask the same question twice verbatim; if already answered, acknowledge and move on.\n"
+        "7. OUTRO ONLY — if you asked whether they have questions and the candidate merely confirms "
+        "they do ('yes', 'sure', 'I have one') WITHOUT actually asking it yet, this is NOT a complete "
+        "answer: set isFollowUp=true, isTopicComplete=false, and nextInterviewerResponse should invite "
+        "them to go ahead and ask. Only set isTopicComplete=true once they've asked their question(s) "
+        "and you've answered, or they say they have none.\n\n"
         "FEEDBACK QUALITY: Write feedback that is specific, actionable, and explains WHY the score was given. "
         "Mention what the candidate did well and what exactly was missing (if anything).\n"
         "Return ONLY raw JSON:\n"
@@ -609,7 +636,11 @@ def handle_interview_turn(data: dict) -> dict:
         else:
             messages.append({"role": mapped_role, "content": content})
 
-    instruction = "Evaluate the candidate's LAST answer only. Return strict JSON."
+    instruction = (
+        "Evaluate the candidate's answer to the CURRENT QUESTION as a whole — including anything "
+        "they said in earlier follow-up turns on this same topic, not just their most recent message. "
+        "Do not re-evaluate earlier, already-answered questions from this conversation. Return strict JSON."
+    )
     if messages[-1]["role"] == "user":
         messages[-1]["content"] += "\n\n" + instruction
     else:

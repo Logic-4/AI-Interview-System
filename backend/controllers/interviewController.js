@@ -1084,27 +1084,17 @@ const completeInterview = async (req, res, next) => {
     if (!interview.completedAt) interview.completedAt = new Date();
 
     // Reassemble the session recording, if the candidate's browser uploaded
-    // any chunks during the live interview. This never blocks or fails the
-    // interview completion itself — a recording problem is not the
-    // candidate's fault and must not stop their score from being saved.
-    if (requiresRecording(interview) && interview.recordingChunks?.length) {
+    // any chunks during the live interview. Downloading and re-uploading
+    // every chunk can be slow for a long/high-chunk-count session — that
+    // must not delay the completion response itself (the frontend races a
+    // fixed timeout against this call; a slow recording finalize made it
+    // more likely to lose that race and land the candidate on a stale
+    // "in-progress" state). Kick it off in the background after saving and
+    // responding; a recording problem is not the candidate's fault and must
+    // not stop their score from being saved or seen.
+    const needsRecordingFinalize = requiresRecording(interview) && interview.recordingChunks?.length;
+    if (needsRecordingFinalize) {
       interview.recordingStatus = 'processing';
-      try {
-        const { url, recovered, expected } = await finalizeRecording(interview);
-        if (url) {
-          interview.recordingUrl = url;
-          interview.recordingStatus = 'ready';
-          interview.recordingChunks = [];
-          if (recovered < expected) {
-            logger.warn(`Interview ${interview._id} recording finalized with ${recovered}/${expected} chunks recovered`);
-          }
-        } else {
-          interview.recordingStatus = 'failed';
-        }
-      } catch (error) {
-        logger.error(`Failed to finalize recording for interview ${interview._id}: ${error.message}`);
-        interview.recordingStatus = 'failed';
-      }
     }
 
     await interview.save();
@@ -1145,6 +1135,28 @@ const completeInterview = async (req, res, next) => {
     logger.info(`Interview completed: ${interview._id} — score: ${overallScore}`);
 
     ApiResponse.success(res, { interview }, 'Interview completed');
+
+    if (needsRecordingFinalize) {
+      finalizeRecording(interview)
+        .then(async ({ url, recovered, expected }) => {
+          if (url) {
+            if (recovered < expected) {
+              logger.warn(`Interview ${interview._id} recording finalized with ${recovered}/${expected} chunks recovered`);
+            }
+            await Interview.findByIdAndUpdate(interview._id, {
+              recordingUrl: url,
+              recordingStatus: 'ready',
+              recordingChunks: [],
+            });
+          } else {
+            await Interview.findByIdAndUpdate(interview._id, { recordingStatus: 'failed' });
+          }
+        })
+        .catch(async (error) => {
+          logger.error(`Failed to finalize recording for interview ${interview._id}: ${error.message}`);
+          await Interview.findByIdAndUpdate(interview._id, { recordingStatus: 'failed' }).catch(() => {});
+        });
+    }
   } catch (error) {
     next(error);
   }

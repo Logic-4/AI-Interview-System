@@ -166,6 +166,10 @@ function isValidGeneratedQuestion(text) {
   if (typeof text !== 'string') return false;
   const question = text.trim().replace(/\s+/g, ' ');
   if (question.length < 8 || question.length > 300 || !question.endsWith('?')) return false;
+  // The model sometimes crams several questions into one turn ("What is X?
+  // How does it differ from Y? When would you use it?") — enforce one
+  // question per turn by rejecting any text with more than one '?'.
+  if ((question.match(/\?/g) || []).length > 1) return false;
 
   return !/(return only valid json|expected answer|ideal answer|one field ["']?question|interview assessment)/i.test(question);
 }
@@ -244,7 +248,14 @@ function normalizeEvaluation(evaluation) {
       evaluationStatus: 'missing',
     };
   }
-  const score = evaluation.score != null ? clampScore(evaluation.score) : null;
+  // A hallucinated score (-1e6, 99999) must NOT be clamped into [0,100] —
+  // that would silently turn it into a legitimate-looking 0 or 100 and let
+  // it count as a real graded answer. Reject out-of-range values instead;
+  // downstream (utils/evaluation.js) treats a null score as unscored.
+  const rawScore = Number(evaluation.score);
+  const score = evaluation.score != null && Number.isFinite(rawScore) && rawScore >= 0 && rawScore <= 100
+    ? Math.round(rawScore)
+    : null;
   // Map 'ok' (Python worker success signal) to 'completed' for downstream consistency
   const rawStatus = evaluation.evaluationStatus;
   const statusIsSuccess = rawStatus === 'ok' || rawStatus === 'completed';

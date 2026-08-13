@@ -101,7 +101,14 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | void> {
 
 /* Maximum listen time per question */
 const MAX_LISTEN_SEC = 120;
-const SILENCE_AUTO_REVIEW_SEC = 2.5;
+// How long a candidate can go silent mid-answer before we assume they're
+// done and auto-stop for review. 2.5s was cutting people off mid-thought —
+// a normal "let me think about that..." pause on a technical question is
+// longer than that, and a truncated answer then gets scored as if it were
+// complete. ponytail: single global threshold, not adaptive to speech
+// cadence — raise further (or make per-question) if candidates still get
+// cut off while actively formulating an answer.
+const SILENCE_AUTO_REVIEW_SEC = 5;
 
 /* ─── Hook ──────────────────────────────────────────────── */
 /**
