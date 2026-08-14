@@ -105,8 +105,10 @@ const updateCompanyStatus = async (req, res, next) => {
     if (!company) return next(ApiError.notFound('Company not found'));
     company.status = req.body.status;
     await company.save();
-    if (company.adminUser && req.body.status === 'disabled') await User.findByIdAndUpdate(company.adminUser, { accountStatus: 'disabled', refreshTokens: [] });
-    if (company.adminUser && req.body.status === 'active') await User.findByIdAndUpdate(company.adminUser, { accountStatus: 'active' });
+    if (company.adminUser) {
+      const userStatus = req.body.status === 'active' ? 'active' : 'disabled';
+      await User.findByIdAndUpdate(company.adminUser, { accountStatus: userStatus, ...(userStatus === 'disabled' ? { refreshTokens: [] } : {}) });
+    }
     ApiResponse.success(res, { company }, `Company ${req.body.status === 'active' ? 'reactivated' : req.body.status}`);
   } catch (error) { next(error); }
 };

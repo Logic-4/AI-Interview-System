@@ -9,6 +9,7 @@ import { SuperadminDashboard } from '@/types/company';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 const formatDate = (value?: string) => value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value)) : '—';
+const STATUS_COLORS: Record<string, string> = { active: '#00ab55', suspended: '#e2a03f', disabled: '#e7515a' };
 
 const SuperadminDashboardPage = () => {
   const dispatch = useDispatch();
@@ -21,15 +22,19 @@ const SuperadminDashboardPage = () => {
     superadminService.dashboard().then(setData).catch(() => setError(true));
   }, [dispatch]);
 
-  const chart = useMemo(() => ({
-    series: data?.companyStatus.map((item) => item.count) || [],
-    options: {
-      chart: { type: 'donut', toolbar: { show: false } },
-      labels: data?.companyStatus.map((item) => item._id.replace(/^./, (letter) => letter.toUpperCase())) || [],
-      colors: ['#4361ee', '#e2a03f', '#e7515a'], dataLabels: { enabled: false }, stroke: { width: 0 },
-      legend: { position: 'bottom', labels: { colors: isDark ? '#888ea8' : '#3b3f5c' } }, plotOptions: { pie: { donut: { size: '70%' } } },
-    },
-  }), [data, isDark]);
+  const chart = useMemo(() => {
+    const sorted = [...(data?.companyStatus ?? [])].sort((a, b) => a._id.localeCompare(b._id));
+    return {
+      series: sorted.map((item) => item.count),
+      options: {
+        chart: { type: 'donut', toolbar: { show: false } },
+        labels: sorted.map((item) => item._id.replace(/^./, (l) => l.toUpperCase())),
+        colors: sorted.map((item) => STATUS_COLORS[item._id] ?? '#4361ee'),
+        dataLabels: { enabled: false }, stroke: { width: 0 },
+        legend: { position: 'bottom', labels: { colors: isDark ? '#888ea8' : '#3b3f5c' } }, plotOptions: { pie: { donut: { size: '70%' } } },
+      },
+    };
+  }, [data, isDark]);
 
   if (!data && !error) return <div className="flex h-96 items-center justify-center"><LoadingSpinner size="lg" /></div>;
   if (error) return <div className="panel text-center"><p className="text-danger">Unable to load platform statistics.</p><button className="btn btn-primary mt-4" onClick={() => window.location.reload()}>Retry</button></div>;

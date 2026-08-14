@@ -181,7 +181,7 @@ const routes = [
         layout: 'default',
     },
 
-    {
+{
         path: '/superadmin/users',
         element: <UsersPage />,
         layout: 'default',

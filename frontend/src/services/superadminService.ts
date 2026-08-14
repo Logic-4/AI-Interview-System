@@ -31,7 +31,7 @@ const superadminService = {
     await api.put('/superadmin/settings/password', { currentPassword, newPassword });
   },
 
-  async listUsers(params: { page?: number; limit?: number; search?: string; role?: string; status?: string } = {}): Promise<UsersResponse> {
+async listUsers(params: { page?: number; limit?: number; search?: string; role?: string; status?: string } = {}): Promise<UsersResponse> {
     const response = await api.get<ApiResponse<UsersResponse>>('/superadmin/users', { params });
     return response.data.data;
   },
