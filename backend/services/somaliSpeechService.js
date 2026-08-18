@@ -88,7 +88,11 @@ async function callSpeechRunPod(endpointUrl, payload, timeoutMs) {
  * dedicated RunPod/local wav2vec2 ASR worker.
  */
 async function transcribeAudio(fileBuffer, originalname = 'answer.webm', mimetype = 'audio/webm', languageCode = 'so-SO') {
-  if (normalizeLanguage(languageCode) === 'en-US') {
+  const normalizedLanguage = normalizeLanguage(languageCode);
+  const provider = normalizedLanguage === 'en-US' ? 'gemini' : 'somali-asr';
+  logger.info(`[STT] language=${languageCode} -> normalized=${normalizedLanguage} provider=${provider}`);
+
+  if (normalizedLanguage === 'en-US') {
     return normalizeText(await geminiSpeechService.transcribeAudioEnglish(fileBuffer, mimetype, originalname));
   }
 
@@ -96,6 +100,9 @@ async function transcribeAudio(fileBuffer, originalname = 'answer.webm', mimetyp
   if (!asrUrl) throw new Error('Somali ASR URL is not configured');
 
   if (isRunPodUrl(asrUrl)) {
+    if (!(process.env.RUNPOD_API_KEY || '').trim()) {
+      throw new Error('SOMALI_ASR_URL points to RunPod but RUNPOD_API_KEY is not set — check .env');
+    }
     const output = await callSpeechRunPod(asrUrl, {
       action: 'transcribe',
       audio_data: fileBuffer.toString('base64'),

@@ -40,6 +40,7 @@ const Sidebar = () => {
         { path: '/interviews/new', label: t('New Interview'), icon: PlusCircle, end: true },
         { path: '/interviews', label: t('History'), icon: History, end: true },
         { path: '/analytics', label: t('Analytics'), icon: BarChart3, end: false },
+        { path: '/jobs', label: t('Jobs'), icon: Briefcase, end: true },
     ];
     const superadminNavItems = [
         { path: '/superadmin/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },

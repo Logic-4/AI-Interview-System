@@ -11,7 +11,8 @@ const PROTECTED_PATHS = [
   '/interviews',
   '/analytics',
   '/profile',
-  '/settings'
+  '/settings',
+  '/jobs'
 ];
 
 const GUEST_PATHS = ['/login', '/register', '/forgot-password', '/reset-password'];

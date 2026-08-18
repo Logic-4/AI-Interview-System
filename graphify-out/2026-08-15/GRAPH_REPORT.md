@@ -1,12 +1,12 @@
 # Graph Report - AI-Interview-System  (2026-08-15)
 
 ## Corpus Check
-- 271 files · ~643,049 words
+- 270 files · ~642,375 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2195 nodes · 3624 edges · 309 communities (134 shown, 175 thin omitted)
-- Extraction: 85% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 208 edges (avg confidence: 0.51)
+- 2190 nodes · 3619 edges · 315 communities (141 shown, 174 thin omitted)
+- Extraction: 85% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 209 edges (avg confidence: 0.51)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
@@ -23,23 +23,23 @@
 - .success
 - useConversationEngine.ts
 - cn
-- interview.ts
+- LoadingSpinner.tsx
 - interviewController.js
-- themeConfigSlice.tsx
+- LoginPage.tsx
 - server.js
 - feedbackController.js
-- useAuthStore
+- themeConfigSlice.tsx
 - faceVerificationService.js
 - compilerOptions
-- auth.js
+- blobService.js
 - Card.tsx
 - Country flags SVG collection
 - Flag Icon Asset Pattern
-- utils.ts
+- useAuthStore
 - userController.js
 - Country and Regional Flags Asset Collection
 - International Flag Icons Collection
-- AnalyticsPage.tsx
+- InterviewReportPage.tsx
 - DashboardPage.tsx
 - authController.js
 - seedDemoData.js
@@ -57,7 +57,7 @@
 - UsersPage.tsx
 - somali-speech/worker.py
 - authRoutes.js
-- InterviewsHistoryPage.tsx
+- auth.js
 - publicCompanyController.js
 - callGemma
 - InterviewDetailsPage.tsx
@@ -69,23 +69,23 @@
 - Node.js Express Backend
 - companyController.js
 - companyPortal.ts
-- feedbackRoutes.js
+- companyService.ts
 - socket.js
 - superadminRoutes.js
 - Session.js
 - somaliSpeechProcess.js
-- InterviewReportPage.tsx
+- InterviewReviewPage.tsx
 - verificationController.js
 - userRoutes.js
-- parseScheduledAt
+- CompanyAssessmentsPage.tsx
 - logger.js
 - gemmaService.test.js
 - seedCompanyPortal.js
 - interviewWarmupService.js
 - Dark/Light Theme Variant Pattern
-- gemmaColabFallback.test.js
+- router/index.tsx
 - scripts
-- VerificationEvent.js
+- evaluation.js
 - dependencies
 - oauthController.js
 - sttController.js
@@ -101,13 +101,16 @@
 - upload.js
 - db.js
 - maintenance.test.js
+- CompanyShortlistPage.tsx
 - compilerOptions
 - AuthCallbackPage.tsx
 - rateLimiter.js
-- NewInterviewPage.tsx
+- useInterviewStore
+- somaliSpeechService.test.js
 - Knowledge Section Assets Collection
 - Feedback.js
-- LoadingSpinner.tsx
+- getErrorMessage
+- CompanyInterviewsPage.tsx
 - Question.js
 - SocketService
 - notificationStore.ts
@@ -123,11 +126,14 @@
 - Session Notes Template
 - superadminAuthRoutes.js
 - bcryptjs
+- CompanySecurityEventsPage.tsx
+- resumeParserService.js
 - interviewWarmupService.test.js
 - validate.js
 - @google/genai
 - mammoth
 - morgan
+- generateComprehensiveFeedback
 - pdf-parse
 - socket.io
 - apexcharts
@@ -358,7 +364,7 @@
 - **Gallery/Lightbox Images** — frontend/public/assets/images/lightbox2, frontend/public/assets/images/lightbox3, frontend/public/assets/images/lightbox4, frontend/public/assets/images/lightbox5, frontend/public/assets/images/lightbox6 [0.85]
 - **Theme-Aware Background Assets** — frontend/public/assets/images/map, frontend/public/assets/images/map-dark [0.9]
 
-## Communities (309 total, 175 thin omitted)
+## Communities (315 total, 174 thin omitted)
 
 ### Community 0 - "gemmaService.js"
 Cohesion: 0.10
@@ -373,44 +379,44 @@ Cohesion: 0.09
 Nodes (34): handler(), RunPod Serverless entrypoint for Gemma interview inference. IMPORTANT: Do not…, build_role_context(), _category_opening_instruction(), category_rubric(), clamp_or_reject_score(), clamp_score(), difficulty_hint() (+26 more)
 
 ### Community 4 - "companyPortalController.js"
-Cohesion: 0.07
-Nodes (38): ApiError, ApiResponse, Application, approveApplication(), approveApplicationRecord(), Assessment, { buildInterviewPayload }, Candidate (+30 more)
+Cohesion: 0.06
+Nodes (45): ApiError, ApiResponse, Application, approveApplication(), approveApplicationRecord(), Assessment, { buildInterviewPayload }, Candidate (+37 more)
 
 ### Community 5 - ".success"
-Cohesion: 0.08
-Nodes (46): resetPassword(), deleteCompany(), getCompany(), resetCompanyPassword(), updateCompany(), updateCompanyStatus(), cancelInterview(), deleteApplication() (+38 more)
+Cohesion: 0.10
+Nodes (43): resetPassword(), deleteCompany(), getCompany(), resetCompanyPassword(), updateCompany(), updateCompanyStatus(), cancelInterview(), deleteInterview() (+35 more)
 
 ### Community 6 - "useConversationEngine.ts"
-Cohesion: 0.09
-Nodes (34): SocialAuth(), AudioRecorderActions, AudioRecorderState, useAudioRecorder(), AnalysisStage, buildFarewellMessage(), buildWelcomeMessage(), ChatMessage (+26 more)
+Cohesion: 0.08
+Nodes (39): SocialAuth(), AudioRecorderActions, AudioRecorderState, useAudioRecorder(), AnalysisStage, buildFarewellMessage(), buildWelcomeMessage(), ChatMessage (+31 more)
 
 ### Community 7 - "cn"
-Cohesion: 0.12
-Nodes (27): DialogContent, DialogDescription, DialogFooter(), DialogHeader(), DialogOverlay, DialogTitle, Modal(), ModalProps (+19 more)
+Cohesion: 0.07
+Nodes (44): Avatar, AvatarProps, avatarVariants, Button, ButtonProps, EmptyState(), EmptyStateProps, Input (+36 more)
 
-### Community 8 - "interview.ts"
-Cohesion: 0.14
-Nodes (19): AnswerEvaluation, CreateInterviewPayload, IdentityVerificationOutcome, IdentityVerificationResult, IdentityVerificationStatus, Interview, InterviewDomain, InterviewListParams (+11 more)
+### Community 8 - "LoadingSpinner.tsx"
+Cohesion: 0.08
+Nodes (34): LoadingSpinner(), LoadingSpinnerProps, DOMAIN_LABELS, DOMAIN_ROLES, DOMAINS, QUESTION_CATEGORIES, TECHNOLOGY_SPECIALIZATIONS, STATUS_OPTIONS (+26 more)
 
 ### Community 9 - "interviewController.js"
 Cohesion: 0.07
-Nodes (38): activeGenerations, ApiError, ApiResponse, Application, assertInterviewStillExists(), buildFallbackFirstQuestion(), CATEGORY_CYCLES, createInterview() (+30 more)
+Nodes (35): activeGenerations, ApiError, ApiResponse, Application, assertInterviewStillExists(), buildFallbackFirstQuestion(), CATEGORY_CYCLES, DIFFICULTY_MAP (+27 more)
 
-### Community 10 - "themeConfigSlice.tsx"
-Cohesion: 0.16
-Nodes (8): ThemeToggle(), ForgotPasswordPage, ResetPasswordPage, api, defaultState, initialState, themeConfigSlice, themeConfig
+### Community 10 - "LoginPage.tsx"
+Cohesion: 0.19
+Nodes (6): ThemeToggle(), sanitizeRedirectPath(), LoginPage(), ForgotPasswordPage, LoginPage, ResetPasswordPage
 
 ### Community 11 - "server.js"
 Cohesion: 0.06
 Nodes (30): allowedOrigins, app, authRoutes, { checkMaintenance }, companyPortalRoutes, cookieParser, cors, errorHandler (+22 more)
 
 ### Community 12 - "feedbackController.js"
-Cohesion: 0.15
-Nodes (16): ApiError, ApiResponse, { calculateOverallScore, isScorable }, Feedback, { generateComprehensiveFeedback, isPlaceholderAnswer }, Interview, logger, normalizeFeedback() (+8 more)
+Cohesion: 0.14
+Nodes (16): ApiError, ApiResponse, { calculateOverallScore, isScorable }, Feedback, { generateComprehensiveFeedback, isPlaceholderAnswer }, generateFeedback(), getUserProgress(), Interview (+8 more)
 
-### Community 13 - "useAuthStore"
-Cohesion: 0.09
-Nodes (27): App(), GuestRoute(), ProtectedRoute(), RoleProtectedRoute(), BlankLayout(), DefaultLayout(), Footer(), Header() (+19 more)
+### Community 13 - "themeConfigSlice.tsx"
+Cohesion: 0.15
+Nodes (14): App(), links, Footer(), Header(), Setting(), Portals(), AppDispatch, IRootState (+6 more)
 
 ### Community 14 - "faceVerificationService.js"
 Cohesion: 0.30
@@ -420,13 +426,13 @@ Nodes (13): buildStatusPayload(), compareFaces(), compareWithAws(), compareWithF
 Cohesion: 0.07
 Nodes (27): compilerOptions, allowJs, allowSyntheticDefaultImports, esModuleInterop, forceConsistentCasingInFileNames, isolatedModules, jsx, lib (+19 more)
 
-### Community 16 - "auth.js"
-Cohesion: 0.08
-Nodes (34): deleteInterview(), resetInterview(), submitAnswer(), ApiError, ApiResponse, uploadAudioAnswer(), uploadInterviewRecording(), { uploadRecording, uploadAudio, uploadAvatar } (+26 more)
+### Community 16 - "blobService.js"
+Cohesion: 0.15
+Nodes (17): submitAnswer(), ApiError, ApiResponse, uploadAudioAnswer(), uploadInterviewRecording(), { uploadRecording, uploadAudio, uploadAvatar }, uploadUserAvatar(), express (+9 more)
 
 ### Community 17 - "Card.tsx"
-Cohesion: 0.16
-Nodes (13): formatCountdown(), InterviewWaitingRoom(), InterviewWaitingRoomProps, Card, CardContent(), CardDescription(), CardFooter(), CardHeader() (+5 more)
+Cohesion: 0.12
+Nodes (17): CamState, CheckState, InterviewLobby(), InterviewLobbyProps, formatCountdown(), InterviewWaitingRoom(), InterviewWaitingRoomProps, Card (+9 more)
 
 ### Community 18 - "Country flags SVG collection"
 Cohesion: 0.09
@@ -436,9 +442,9 @@ Nodes (23): Country flags SVG collection, Argentina flag SVG, American Samoa fla
 Cohesion: 0.08
 Nodes (26): Country Selection UI, Flag Icon Asset Pattern, TF Flag SVG (French Southern Territories), TG Flag SVG (Togo), TH Flag SVG (Thailand), TJ Flag SVG (Tajikistan), TK Flag SVG (Tokelau), TL Flag SVG (Timor-Leste) (+18 more)
 
-### Community 20 - "utils.ts"
-Cohesion: 0.11
-Nodes (16): Avatar, AvatarProps, avatarVariants, Button, ButtonProps, EmptyState(), EmptyStateProps, Input (+8 more)
+### Community 20 - "useAuthStore"
+Cohesion: 0.20
+Nodes (10): ProtectedRoute(), RoleProtectedRoute(), SuperadminEntryRoute(), Sidebar(), InterviewLinkPage(), SuperadminLoginPage(), SuperadminSettingsPage(), SuperadminLoginPage (+2 more)
 
 ### Community 21 - "userController.js"
 Cohesion: 0.20
@@ -452,13 +458,13 @@ Nodes (25): Country and Regional Flags Asset Collection, Equatorial Guinea Flag 
 Cohesion: 0.08
 Nodes (25): Italy Flag (SVG), Flag Asset JA (SVG), Jersey Flag (SVG), Jamaica Flag (SVG), Jordan Flag (SVG), Japan Flag - Nippon (SVG), Kenya Flag (SVG), Kyrgyzstan Flag (SVG) (+17 more)
 
-### Community 24 - "AnalyticsPage.tsx"
-Cohesion: 0.12
-Nodes (18): PERIOD_MAP, AnalyticsPage, feedbackService, ApiError, ApiResponse, PaginatedResponse, Pagination, ValidationError (+10 more)
+### Community 24 - "InterviewReportPage.tsx"
+Cohesion: 0.13
+Nodes (18): Progress, ProgressProps, PERIOD_MAP, formatTime(), getScoreColor(), getScoreLabel(), InterviewReportPage(), feedbackService (+10 more)
 
 ### Community 25 - "DashboardPage.tsx"
-Cohesion: 0.13
-Nodes (18): DAILY_TIPS, DashboardPage(), getDailyTip(), ProfilePage(), DashboardPage, ProfilePage, AuthData, LoginPayload (+10 more)
+Cohesion: 0.09
+Nodes (27): DAILY_TIPS, DashboardPage(), getDailyTip(), ProfilePage(), DashboardPage, ProfilePage, SettingsPage, api (+19 more)
 
 ### Community 26 - "authController.js"
 Cohesion: 0.12
@@ -478,7 +484,7 @@ Nodes (35): Black Color, Blue Color (various shades), Gold/Yellow Color, Red Col
 
 ### Community 30 - "LandingPage.tsx"
 Cohesion: 0.11
-Nodes (15): Capabilities(), domains, items, Companies(), companyFeatures, CTA(), Features, Footer() (+7 more)
+Nodes (14): Capabilities(), domains, items, Companies(), companyFeatures, CTA(), Features, Footer() (+6 more)
 
 ### Community 31 - "emailService.js"
 Cohesion: 0.27
@@ -493,8 +499,8 @@ Cohesion: 0.06
 Nodes (35): autoprefixer, devDependencies, autoprefixer, dotenv, i18next, i18next-browser-languagedetector, i18next-http-backend, postcss (+27 more)
 
 ### Community 34 - "interviewRoutes.js"
-Cohesion: 0.13
-Nodes (18): getWarmupStatus(), getIdentityStatus(), requiresVerification(), resolveReference(), verifyIdentity(), { aiLimiter }, {
+Cohesion: 0.14
+Nodes (15): getWarmupStatus(), warmInterviewServices(), { aiLimiter }, {
   createInterview,
   warmInterviewServices,
   getWarmupStatus,
@@ -511,7 +517,7 @@ Nodes (18): getWarmupStatus(), getIdentityStatus(), requiresVerification(), reso
   reevaluateAnswer,
   resetInterview,
   reportProctoringEvent,
-}, { createInterviewValidator, submitAnswerValidator, listInterviewsValidator } (+10 more)
+}, { createInterviewValidator, submitAnswerValidator, listInterviewsValidator }, express, { getIdentityStatus, verifyIdentity }, { protect } (+7 more)
 
 ### Community 35 - "Country Flag Assets Collection"
 Cohesion: 0.11
@@ -522,16 +528,16 @@ Cohesion: 0.11
 Nodes (19): dependencies, ai-interview-system-root, cookie-parser, dotenv, express-validator, ffmpeg-static, fluent-ffmpeg, jsonwebtoken (+11 more)
 
 ### Community 37 - "geminiSpeechService.js"
-Cohesion: 0.12
-Nodes (18): crypto, ffmpeg, ffmpegPath, fs, os, path, transcodeToWav(), buildNormalizePrompt() (+10 more)
+Cohesion: 0.17
+Nodes (14): crypto, ffmpeg, ffmpegPath, fs, os, path, transcodeToWav(), buildNormalizePrompt() (+6 more)
 
 ### Community 38 - "publicCompanyService.ts"
-Cohesion: 0.13
-Nodes (23): ALLOWED_PHOTO_EXTS, ALLOWED_RESUME_EXTS, getExt(), JobApplicationFormModal(), JobApplicationFormModalProps, TIME_SLOTS, formatDeadline(), JobBoard() (+15 more)
+Cohesion: 0.14
+Nodes (21): ALLOWED_PHOTO_EXTS, ALLOWED_RESUME_EXTS, getExt(), JobApplicationFormModal(), JobApplicationFormModalProps, TIME_SLOTS, formatDeadline(), JobBoard() (+13 more)
 
 ### Community 39 - "UsersPage.tsx"
-Cohesion: 0.10
-Nodes (23): formatDate(), STATUS_COLORS, SuperadminDashboardPage(), SuperadminLoginPage(), blankForm, dateTime(), errMsg(), ROLES (+15 more)
+Cohesion: 0.12
+Nodes (19): formatDate(), STATUS_COLORS, SuperadminDashboardPage(), blankForm, dateTime(), errMsg(), ROLES, UsersPage() (+11 more)
 
 ### Community 40 - "somali-speech/worker.py"
 Cohesion: 0.19
@@ -541,37 +547,37 @@ Nodes (16): Librosa, ndarray, Path, handler(), Somali Speech Service Dependencie
 Cohesion: 0.15
 Nodes (15): getMe(), { authLimiter }, express, { googleRedirect, googleCallback }, { login, refreshToken, logout, getMe, validateSession, forgotPassword, resetPassword, redeemInterviewLink }, { loginValidator, refreshTokenValidator, forgotPasswordValidator, resetPasswordValidator }, { protect }, router (+7 more)
 
-### Community 42 - "InterviewsHistoryPage.tsx"
-Cohesion: 0.18
-Nodes (9): Skeleton(), DOMAIN_LABELS, DOMAIN_ROLES, DOMAINS, QUESTION_CATEGORIES, TECHNOLOGY_SPECIALIZATIONS, InterviewsHistoryPage(), STATUS_OPTIONS (+1 more)
+### Community 42 - "auth.js"
+Cohesion: 0.07
+Nodes (26): deleteInterview(), resetInterview(), transcribe(), synthesize(), ApiError, authorize(), Company, protect() (+18 more)
 
 ### Community 43 - "publicCompanyController.js"
-Cohesion: 0.11
-Nodes (23): Application, applyPublicJob(), Company, getAllPublicJobs(), getPublicCompanyJobs(), getPublicCompanyProfile(), getPublicJobDetails(), Job (+15 more)
+Cohesion: 0.12
+Nodes (20): Application, applyPublicJob(), Company, getAllPublicJobs(), getPublicCompanyJobs(), getPublicCompanyProfile(), getPublicJobDetails(), Job (+12 more)
 
 ### Community 44 - "callGemma"
-Cohesion: 0.17
-Nodes (19): assertCircuitClosed(), callGemma(), callRunPod(), checkGemmaStatus(), generateComprehensiveFeedback(), getGemmaBaseUrl(), getRunPodApiKey(), getRunPodEndpointBase() (+11 more)
+Cohesion: 0.18
+Nodes (18): assertCircuitClosed(), callColabRunsyncFallback(), callGemma(), callRunPod(), checkGemmaStatus(), clampScore(), getGemmaBaseUrl(), getRunPodApiKey() (+10 more)
 
 ### Community 45 - "InterviewDetailsPage.tsx"
-Cohesion: 0.12
-Nodes (19): CamState, CheckState, InterviewLobby(), InterviewLobbyProps, ProctoringOverlay(), ProctoringStatusBadge(), Props, StatusBadgeProps (+11 more)
+Cohesion: 0.18
+Nodes (11): ProctoringOverlay(), ProctoringStatusBadge(), Props, StatusBadgeProps, StrikeIndicator(), pickMimeType(), RecorderStatus, useInterviewSessionRecorder() (+3 more)
 
 ### Community 46 - "CompanyCandidatesPage.tsx"
-Cohesion: 0.15
-Nodes (15): approvalBadge(), CompanyCandidatesPage(), dateShort(), getMinDateTime(), ProfileModal(), statusBadge(), approvalBadge(), CompanyShortlistPage() (+7 more)
+Cohesion: 0.29
+Nodes (7): approvalBadge(), CompanyCandidatesPage(), dateShort(), getMinDateTime(), ProfileModal(), statusBadge(), CompanyCandidatesPage
 
 ### Community 47 - "kaggleRoutes.js"
 Cohesion: 0.18
 Nodes (10): getKaggleConfig(), kaggleService, SystemConfig, updateKaggleConfig(), mongoose, systemConfigSchema, express, { getKaggleConfig, updateKaggleConfig } (+2 more)
 
 ### Community 48 - "somaliSpeechService.js"
-Cohesion: 0.23
-Nodes (15): ASR_TIMEOUT_MS, callSpeechRunPod(), geminiSpeechService, getAsrBaseUrl(), getRunPodEndpointBase(), isRunPodUrl(), logger, normalizeLanguage() (+7 more)
+Cohesion: 0.22
+Nodes (14): ASR_TIMEOUT_MS, callSpeechRunPod(), geminiSpeechService, getAsrBaseUrl(), getRunPodEndpointBase(), isRunPodUrl(), logger, normalizeLanguage() (+6 more)
 
 ### Community 49 - "routes.tsx"
 Cohesion: 0.13
-Nodes (11): SuperadminEntryRoute(), CompanySecurityEventsPage, InterviewCompletePage, InterviewDetailsPage, InterviewLinkPage, InterviewReportPage, InterviewReviewPage, InterviewsHistoryPage (+3 more)
+Nodes (11): AnalyticsPage, InterviewCompletePage, InterviewDetailsPage, InterviewLinkPage, InterviewReportPage, InterviewReviewPage, InterviewsHistoryPage, MaintenancePage (+3 more)
 
 ### Community 50 - "Interview Flow"
 Cohesion: 0.13
@@ -582,16 +588,16 @@ Cohesion: 0.21
 Nodes (13): Automatic Speech Recognition (ASR), Node.js Express Backend, Candidate-Facing Application, Docker Compose Configuration, English Speech Services (Whisper + Kokoro), Kokoro TTS, MongoDB, Node.js (+5 more)
 
 ### Community 52 - "companyController.js"
-Cohesion: 0.05
-Nodes (34): ApiError, ApiResponse, Company, createCompany(), dashboard(), Interview, listCompanies(), normalizePagination() (+26 more)
+Cohesion: 0.07
+Nodes (27): ApiError, ApiResponse, Company, createCompany(), dashboard(), Interview, listCompanies(), normalizePagination() (+19 more)
 
 ### Community 53 - "companyPortal.ts"
-Cohesion: 0.08
-Nodes (31): CompanyAssessmentsPage(), dateTime(), dateTimeShort(), ProctoringLog(), VIOLATION_LABEL, defaultForm, CompanyAssessmentsPage, PostJobPage (+23 more)
+Cohesion: 0.14
+Nodes (13): ApprovalStatus, CategoryScoreEntry, CompanyInterviewStatus, EmploymentType, ExperienceLevel, IdentityVerificationStatus, InterviewLanguage, InterviewType (+5 more)
 
-### Community 54 - "feedbackRoutes.js"
-Cohesion: 0.29
-Nodes (6): getUserProgress(), { aiLimiter }, express, { getFeedback, generateFeedback, getUserProgress }, { protect }, router
+### Community 54 - "companyService.ts"
+Cohesion: 0.18
+Nodes (13): CompanyDashboardPage(), dateTime(), defaultForm, CompanyDashboardPage, PostJobPage, CompanyDashboardData, companyService, PaginatedResponse (+5 more)
 
 ### Community 55 - "socket.js"
 Cohesion: 0.40
@@ -609,26 +615,26 @@ Nodes (3): mongoose, Session, sessionSchema
 Cohesion: 0.20
 Nodes (15): connectDB, shutdown(), startServer(), attachLogs(), { getSomaliSpeechSettings, splitPythonCommand }, isServiceHealthy(), killChild(), { spawn } (+7 more)
 
-### Community 59 - "InterviewReportPage.tsx"
-Cohesion: 0.14
-Nodes (17): Badge(), BadgeProps, Progress, ProgressProps, formatTime(), getScoreColor(), getScoreLabel(), InterviewReportPage() (+9 more)
+### Community 59 - "InterviewReviewPage.tsx"
+Cohesion: 0.18
+Nodes (13): Badge(), BadgeProps, ConversationEngineConfig, formatTime(), getScoreColor(), InterviewReviewPage(), InterviewState, PopulatedInterview (+5 more)
 
 ### Community 60 - "verificationController.js"
-Cohesion: 0.17
-Nodes (11): ApiError, ApiResponse, Application, {
+Cohesion: 0.13
+Nodes (13): ApiError, ApiResponse, Application, {
   compareFaces,
   isVerificationEnabled,
   resolveProvider,
   getMatchThreshold,
-}, Interview, logEvent(), logger, NON_PASS_SEVERITY (+3 more)
+}, Interview, logEvent(), logger, NON_PASS_SEVERITY (+5 more)
 
 ### Community 61 - "userRoutes.js"
 Cohesion: 0.18
 Nodes (10): getDashboard(), updateProfile(), { body }, express, { getProfile, updateProfile, updateAvatar, changePassword, deleteAccount, getDashboard }, profileValidator, { protect }, router (+2 more)
 
-### Community 62 - "parseScheduledAt"
-Cohesion: 0.38
-Nodes (5): assert, { parseScheduledAt }, test, parseScheduledAt(), zonedPartsAsUtc()
+### Community 62 - "CompanyAssessmentsPage.tsx"
+Cohesion: 0.18
+Nodes (9): CompanyAssessmentsPage(), dateTime(), dateTimeShort(), ProctoringLog(), VIOLATION_LABEL, CompanyAssessmentsPage, CompanyAssessment, ProctoringViolation (+1 more)
 
 ### Community 63 - "logger.js"
 Cohesion: 0.15
@@ -644,19 +650,23 @@ Nodes (12): assessmentSchema, mongoose, jobSchema, mongoose, Application, Assess
 
 ### Community 66 - "interviewWarmupService.js"
 Cohesion: 0.21
-Nodes (12): createServiceState(), expireStaleServices(), getInterviewWarmupStatus(), logger, resetForTest(), runServiceWarmup(), snapshot(), state (+4 more)
+Nodes (14): createServiceState(), expireStaleServices(), getInterviewWarmupStatus(), logger, resetForTest(), runServiceWarmup(), snapshot(), startInterviewWarmup() (+6 more)
 
 ### Community 67 - "Dark/Light Theme Variant Pattern"
 Cohesion: 0.21
 Nodes (13): HTTP 404 Not Found Error, HTTP 500 Server Error, HTTP 503 Service Unavailable, 404 Error Page (Dark Theme), 404 Error Page (Light Theme), 500 Server Error Page (Dark), 500 Server Error Page (Light), 503 Service Unavailable Page (Dark) (+5 more)
 
-### Community 68 - "gemmaColabFallback.test.js"
-Cohesion: 0.33
-Nodes (3): assert, gemma, test
+### Community 68 - "router/index.tsx"
+Cohesion: 0.21
+Nodes (8): GuestRoute(), BlankLayout(), DefaultLayout(), finalRoutes, GUEST_PATHS, PROTECTED_PATHS, router, routes
 
 ### Community 69 - "scripts"
 Cohesion: 0.07
 Nodes (29): author, description, devDependencies, eslint, nodemon, keywords, license, main (+21 more)
+
+### Community 70 - "evaluation.js"
+Cohesion: 0.33
+Nodes (7): assert, { normalizeEvaluation, calculateOverallScore }, test, calculateOverallScore(), isScorable(), normalizeEvaluation(), summarizeEvaluations()
 
 ### Community 71 - "dependencies"
 Cohesion: 0.06
@@ -718,6 +728,10 @@ Nodes (5): logger, mongoose, connectDB, run(), User
 Cohesion: 0.29
 Nodes (4): checkMaintenance(), assert, { checkMaintenance }, { test, describe, before, after }
 
+### Community 86 - "CompanyShortlistPage.tsx"
+Cohesion: 0.29
+Nodes (8): approvalBadge(), CompanyShortlistPage(), dateShort(), getMinDateTime(), ProfileModal(), CompanyShortlistPage, ApplicationStatus, CandidateSummary
+
 ### Community 87 - "compilerOptions"
 Cohesion: 0.25
 Nodes (7): compilerOptions, allowSyntheticDefaultImports, composite, module, moduleResolution, include, vite.config.ts
@@ -730,9 +744,13 @@ Nodes (7): forgetGoogleAccount(), getRememberedGoogleAccounts(), readAccounts(),
 Cohesion: 0.29
 Nodes (6): aiLimiter, applyLimiter, authLimiter, createLimiter(), generalLimiter, rateLimit
 
-### Community 90 - "NewInterviewPage.tsx"
-Cohesion: 0.16
-Nodes (15): parsePdfFile(), parseResumeFile(), parseWordFile(), SUPPORTED_EXTENSIONS, estimateQuestionCount(), isSimilarQuestionText(), normalizeQuestionText(), PLACEHOLDER_TRANSCRIPT_RE (+7 more)
+### Community 90 - "useInterviewStore"
+Cohesion: 0.32
+Nodes (7): parsePdfFile(), parseResumeFile(), parseWordFile(), SUPPORTED_EXTENSIONS, estimateQuestionCount(), NewInterviewPage(), useInterviewStore
+
+### Community 91 - "somaliSpeechService.test.js"
+Cohesion: 0.40
+Nodes (4): assert, geminiSpeechService, speech, test
 
 ### Community 92 - "Knowledge Section Assets Collection"
 Cohesion: 0.33
@@ -742,9 +760,13 @@ Nodes (6): Find Solution Icon SVG, Knowledge Section Image 1, Knowledge Section 
 Cohesion: 0.50
 Nodes (3): Feedback, feedbackSchema, mongoose
 
-### Community 94 - "LoadingSpinner.tsx"
-Cohesion: 0.10
-Nodes (27): LoadingSpinner(), LoadingSpinnerProps, getErrorMessage(), CompanyDashboardPage(), dateTime(), CompanyInterviewsPage(), dateTime(), dateTimeShort() (+19 more)
+### Community 94 - "getErrorMessage"
+Cohesion: 0.25
+Nodes (9): getErrorMessage(), CompanyJobsPage(), dateTime(), statusBadge(), CompanySettingsPage(), SettingsPage(), CompanyJobsPage, CompanySettingsPage (+1 more)
+
+### Community 95 - "CompanyInterviewsPage.tsx"
+Cohesion: 0.39
+Nodes (7): CompanyInterviewsPage(), dateTime(), dateTimeShort(), getMinDateTime(), statusBadge(), VIOLATION_LABEL, CompanyInterviewsPage
 
 ### Community 96 - "Question.js"
 Cohesion: 0.50
@@ -786,6 +808,14 @@ Nodes (3): Checked Icon SVG, Close Icon SVG, Common UI Icons
 Cohesion: 0.29
 Nodes (6): { authLimiter }, express, { login }, { loginValidator }, router, validate
 
+### Community 111 - "CompanySecurityEventsPage.tsx"
+Cohesion: 0.33
+Nodes (6): Modal(), CompanySecurityEventsPage(), dateTime(), OUTCOME_LABEL, SEVERITY_BADGE, CompanySecurityEventsPage
+
+### Community 112 - "resumeParserService.js"
+Cohesion: 0.47
+Nodes (5): logger, mammoth, normalizeText(), parseResumeBuffer(), pdfParse
+
 ### Community 113 - "interviewWarmupService.test.js"
 Cohesion: 0.33
 Nodes (3): assert, test, warmup
@@ -794,22 +824,26 @@ Nodes (3): assert, test, warmup
 Cohesion: 0.50
 Nodes (3): ApiError, validate(), { validationResult }
 
+### Community 118 - "generateComprehensiveFeedback"
+Cohesion: 0.67
+Nodes (3): generateComprehensiveFeedback(), parseJobDescription(), safeParseJSON()
+
 ## Knowledge Gaps
-- **1033 isolated node(s):** `mongoose`, `logger`, `{ Server }`, `logger`, `{ verifyAccessToken }` (+1028 more)
+- **1030 isolated node(s):** `mongoose`, `logger`, `{ Server }`, `logger`, `{ verifyAccessToken }` (+1025 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **175 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **174 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `dependencies` connect `dependencies` to `date-fns`, `@emotion/react`, `@hookform/resolvers`, `js-cookie`, `lucide-react`, `@monaco-editor/react`, `@radix-ui/react-dropdown-menu`, `@radix-ui/react-progress`, `@radix-ui/react-select`, `@radix-ui/react-switch`, `@radix-ui/react-tabs`, `@radix-ui/react-toggle`, `react-apexcharts`, `react-hot-toast`, `react-popper`, `react-router-dom`, `recharts`, `socket.io-client`, `@tanstack/react-query`, `zod`, `ai-interview-system-root`, `React Vite Frontend`, `frontend/package.json`, `apexcharts`?**
   _High betweenness centrality (0.015) - this node is a cross-community bridge._
-- **Why does `Node.js Express Backend` connect `Node.js Express Backend` to `Gemma Interview Worker`, `express`?**
+- **Why does `cn()` connect `cn` to `useConversationEngine.ts`, `LoadingSpinner.tsx`, `LoginPage.tsx`, `InterviewDetailsPage.tsx`, `Card.tsx`, `InterviewReportPage.tsx`, `useInterviewStore`, `InterviewReviewPage.tsx`?**
   _High betweenness centrality (0.013) - this node is a cross-community bridge._
-- **Why does `React Vite Frontend` connect `React Vite Frontend` to `Node.js Express Backend`?**
+- **Why does `Node.js Express Backend` connect `Node.js Express Backend` to `Gemma Interview Worker`, `express`?**
   _High betweenness centrality (0.012) - this node is a cross-community bridge._
 - **What connects `mongoose`, `logger`, `{ Server }` to the rest of the system?**
-  _1033 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _1030 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `gemmaService.js` be split into smaller, more focused modules?**
   _Cohesion score 0.09788359788359788 - nodes in this community are weakly interconnected._
 - **Should `Country Flag Icons (P-S)` be split into smaller, more focused modules?**

@@ -54,6 +54,7 @@ const InterviewReviewPage = lazyWithRetry(() => import('../pages/dashboard/Inter
 const AnalyticsPage = lazyWithRetry(() => import('../pages/dashboard/AnalyticsPage'));
 const ProfilePage = lazyWithRetry(() => import('../pages/dashboard/ProfilePage'));
 const SettingsPage = lazyWithRetry(() => import('../pages/dashboard/SettingsPage'));
+const JobsPage = lazyWithRetry(() => import('../pages/dashboard/JobsPage'));
 
 const CompanyDashboardPage = lazyWithRetry(() => import('../pages/company/CompanyDashboardPage'));
 const PostJobPage = lazyWithRetry(() => import('../pages/company/PostJobPage'));
@@ -173,6 +174,11 @@ const routes = [
     {
         path: '/settings',
         element: <SettingsPage />,
+        layout: 'default',
+    },
+    {
+        path: '/jobs',
+        element: <JobsPage />,
         layout: 'default',
     },
     {

@@ -390,6 +390,27 @@ def build_role_context(role_profile: Optional[dict]) -> str:
     experience = role_profile.get("experienceLevel") or role_profile.get("experience")
     if experience:
         parts.append(f"Experience level: {experience}.")
+
+    # Candidate-side fields (parsed from their resume) — these were present in
+    # every roleProfile payload but never read here, so scoring calibrated
+    # only to the job posting and the junior/mid/senior/lead dropdown, never
+    # to what the candidate's own resume says about their actual background.
+    candidate_skills = (role_profile.get("candidateSkills") or [])[:8]
+    candidate_experience = (role_profile.get("candidateExperience") or [])[:5]
+    candidate_education = (role_profile.get("candidateEducation") or [])[:3]
+    candidate_projects = (role_profile.get("candidateProjects") or [])[:5]
+    candidate_certifications = (role_profile.get("candidateCertifications") or [])[:5]
+    if candidate_skills:
+        parts.append(f"Candidate's stated skills: {', '.join(candidate_skills)}.")
+    if candidate_experience:
+        parts.append(f"Candidate's experience: {'; '.join(candidate_experience)}.")
+    if candidate_education:
+        parts.append(f"Candidate's education: {'; '.join(candidate_education)}.")
+    if candidate_projects:
+        parts.append(f"Candidate's projects: {'; '.join(candidate_projects)}.")
+    if candidate_certifications:
+        parts.append(f"Candidate's certifications: {', '.join(candidate_certifications)}.")
+
     return "\n".join(parts)
 
 
@@ -409,17 +430,40 @@ def normalize_turn_response(parsed: Optional[dict], raw_text: str = "") -> dict:
         }
 
     evaluation = parsed.get("evaluation") or {}
+    if not isinstance(evaluation, dict):
+        return {
+            "evaluation": {
+                "score": None,
+                "feedback": "AI evaluation returned an invalid schema. Answer recorded for retry.",
+                "strengths": [],
+                "improvements": [],
+                "suggestedAnswer": "",
+            },
+            "nextInterviewerResponse": "Thank you. Let's continue.",
+            "isFollowUp": False,
+            "evaluationStatus": "parse_failed",
+        }
     is_follow_up = bool(parsed.get("isFollowUp", False))
     is_topic_complete = parsed.get("isTopicComplete")
     if is_topic_complete is None:
         is_topic_complete = not is_follow_up
 
     score_raw = evaluation.get("score")
-    # Apply minimum score floor: any on-topic substantive answer scores at least 10
-    # to distinguish from a placeholder / no-answer (which scores 0).
     clamped_score = clamp_or_reject_score(score_raw) if score_raw is not None else None
-    if clamped_score is not None and 1 <= clamped_score < 10:
-        clamped_score = 10
+    feedback = evaluation.get("feedback")
+    if clamped_score is None or not isinstance(feedback, str) or not feedback.strip():
+        return {
+            "evaluation": {
+                "score": None,
+                "feedback": "AI evaluation returned an invalid score or explanation. Answer recorded for retry.",
+                "strengths": [],
+                "improvements": [],
+                "suggestedAnswer": "",
+            },
+            "nextInterviewerResponse": "Thank you. Let's continue.",
+            "isFollowUp": False,
+            "evaluationStatus": "parse_failed",
+        }
     next_response = parsed.get("nextInterviewerResponse") or ""
     if not is_valid_interviewer_response(next_response):
         next_response = (
@@ -427,13 +471,18 @@ def normalize_turn_response(parsed: Optional[dict], raw_text: str = "") -> dict:
             if is_follow_up and not is_topic_complete
             else "Thank you. Let's continue."
         )
+    strengths = evaluation.get("strengths")
+    improvements = evaluation.get("improvements")
     return {
         "evaluation": {
             "score": clamped_score,
-            "feedback": (evaluation.get("feedback") or "")[:350],
-            "strengths": (evaluation.get("strengths") or [])[:3],
-            "improvements": (evaluation.get("improvements") or [])[:3],
-            "suggestedAnswer": (evaluation.get("suggestedAnswer") or "")[:350],
+            "feedback": feedback.strip()[:350],
+            "strengths": [item for item in strengths if isinstance(item, str)][:3]
+            if isinstance(strengths, list) else [],
+            "improvements": [item for item in improvements if isinstance(item, str)][:3]
+            if isinstance(improvements, list) else [],
+            "suggestedAnswer": evaluation.get("suggestedAnswer", "")[:350]
+            if isinstance(evaluation.get("suggestedAnswer", ""), str) else "",
         },
         "nextInterviewerResponse": " ".join(next_response.split()),
         "isFollowUp": is_follow_up and not is_topic_complete,
@@ -584,7 +633,7 @@ def handle_interview_turn(data: dict) -> dict:
         f"CATEGORY: {category}. {rubric}\n"
     )
     if role_context:
-        system_prompt += f"\nJOB CONTEXT:\n{role_context}\n"
+        system_prompt += f"\nCONTEXT (job requirements and the candidate's own resume):\n{role_context}\n"
 
     system_prompt += (
         f"\nDIFFICULTY CALIBRATION: This is a {difficulty_level}-level question. "
@@ -595,12 +644,15 @@ def handle_interview_turn(data: dict) -> dict:
         "answer should score in this range.\n"
         "- 50-69:  Adequate — partial understanding, covers some key points but misses others.\n"
         "- 25-49:  Weak — significant gaps, vague, or mostly incorrect.\n"
-        "- 0-24:   Off-topic, clearly wrong, or no real attempt.\n"
+        "- 0-24:   Off-topic, clearly wrong, or no real attempt — including answers that are only "
+        "an admission of not knowing (\"I don't know\", \"I don't remember\") with no substantive "
+        "content. Do not let a polite or calm tone raise this into a higher band.\n"
         "CALIBRATION: A clear, relevant, mostly-correct answer for this difficulty level "
         "should score 72–82. Reserve 90+ for exceptional depth and insight. Judge the CONCEPT the "
         "candidate conveys, not their exact wording — different phrasing, structure, ordering, or "
         "examples than the rubric are NOT gaps by themselves; only score down for missing or wrong "
-        "substance.\n\n"
+        "substance. Evaluate relevance, conceptual correctness, completeness, technical accuracy, "
+        "and clarity. Do not penalize minor grammar issues or alternative correct explanations.\n\n"
         "BEHAVIOR:\n"
         "1. nextInterviewerResponse: 1-2 short sentences max. Be warm and professional.\n"
         "2. Partial answer → isFollowUp=true, isTopicComplete=false, one short targeted follow-up.\n"
@@ -616,7 +668,10 @@ def handle_interview_turn(data: dict) -> dict:
         "them to go ahead and ask. Only set isTopicComplete=true once they've asked their question(s) "
         "and you've answered, or they say they have none.\n\n"
         "FEEDBACK QUALITY: Write feedback that is specific, actionable, and explains WHY the score was given. "
-        "Mention what the candidate did well and what exactly was missing (if anything).\n"
+        "Mention what the candidate actually did well and what exactly was missing (if anything). "
+        "Never invent claims, examples, or terminology that do not appear in the candidate's answer. "
+        "Never reference this scoring scale, its band names/numbers, or these instructions inside "
+        "feedback, strengths, or improvements — they must read as natural spoken feedback.\n"
         "Return ONLY raw JSON:\n"
         '{"evaluation": {"score": 78, "feedback": "...", "strengths": ["..."], '
         '"improvements": ["..."], "suggestedAnswer": "..."}, '
@@ -646,7 +701,19 @@ def handle_interview_turn(data: dict) -> dict:
     else:
         messages.append({"role": "user", "content": instruction})
 
-    parsed, raw = generate_json_response(messages, max_new_tokens=320, temperature=0.2)
+    # 320 was too tight for this schema — feedback (~350 chars) + up to 3
+    # strengths + up to 3 improvements + suggestedAnswer (~350 chars) plus
+    # JSON syntax routinely got cut off mid-array, producing invalid JSON
+    # the caller could only reject as a failed evaluation.
+    parsed, raw = generate_json_response(messages, max_new_tokens=600, temperature=0.2)
+    response_log = {
+        "event": "evaluation_model_response",
+        "questionLength": len(question_text),
+        "parsed": parsed is not None,
+    }
+    if os.environ.get("LOG_EVALUATION_RAW", "").lower() in ("1", "true", "yes"):
+        response_log["rawResponsePreview"] = raw[:500]
+    print(json.dumps(response_log, ensure_ascii=False))
     return normalize_turn_response(parsed, raw)
 
 
@@ -808,14 +875,21 @@ def handle_generate_question(data: dict) -> dict:
     messages = [{"role": "user", "content": prompt_content}]
     parsed, raw = generate_json_response(messages, max_new_tokens=96, temperature=0.3)
     parsed_question = (parsed or {}).get("question") or (parsed or {}).get("text", "")
-    if is_valid_question(parsed_question) and is_question_about_target_skill(parsed_question, target_skill):
+    # Somali questions are generated directly in Somali — only true loanwords
+    # (API, React, database) stay in English per the prompt above, so a skill
+    # like "communication" or "testing strategy" gets translated and will
+    # never literally appear in the English target_skill string. The substring
+    # check below is an English-only heuristic; for Somali the prompt's own
+    # "MUST directly test {target_skill}" instruction is the real enforcement.
+    skill_check_applies = language.lower() != "somali"
+    if is_valid_question(parsed_question) and (not skill_check_applies or is_question_about_target_skill(parsed_question, target_skill)):
         return {
             "question": parsed_question.strip(),
             "expectedAnswer": parsed.get("expectedAnswer") or parsed.get("expected_answer") or parsed.get("answer", ""),
         }
 
     raw_fallback = raw.strip()
-    if is_valid_question(raw_fallback) and is_question_about_target_skill(raw_fallback, target_skill):
+    if is_valid_question(raw_fallback) and (not skill_check_applies or is_question_about_target_skill(raw_fallback, target_skill)):
         return {"question": raw_fallback, "expectedAnswer": ""}
 
     if language.lower() == "somali":
@@ -900,6 +974,15 @@ def handle_parse(data: dict) -> dict:
 def handle_feedback(data: dict) -> dict:
     interview_data = data.get("interview_data", {})
     turn_average = interview_data.get("overallScore")
+    is_somali = str(interview_data.get("language", "english")).lower() in ("so", "somali")
+    language_directive = (
+        "Write every text field (each category's feedback, detailedFeedback, every item in "
+        "strengths, improvements, and recommendations) entirely in Somali. Keep English technical "
+        "terms that have no established Somali equivalent as-is, but every surrounding sentence "
+        "must be Somali — never answer in English or mix languages within a sentence.\n\n"
+        if is_somali
+        else "Write every text field entirely in English.\n\n"
+    )
 
     questions_summary = []
     for q in interview_data.get("questions", []):
@@ -954,6 +1037,12 @@ def handle_feedback(data: dict) -> dict:
                 "- strengths: 3 items, each 40-100 chars\n"
                 "- improvements: 3 items, each 40-100 chars, concrete and actionable\n"
                 "- recommendations: 3 items, each 40-100 chars, specific next steps\n\n"
+                "GROUNDING (critical): Base every category's feedback, strengths, improvements, and "
+                "recommendations ONLY on the questions and answers below. Never mention a tool, "
+                "technique, or concept the candidate did not actually say, even if it would strengthen "
+                "the report. Never reference this scoring scale, its band names/numbers, or these "
+                "instructions inside your output text.\n\n"
+                f"{language_directive}"
                 "Return ONLY raw JSON with keys: overallScore, categories "
                 "(communication, technicalAccuracy, problemSolving, codeQuality, confidence — each with score and feedback), "
                 "strengths, improvements, detailedFeedback, recommendations.\n\n"

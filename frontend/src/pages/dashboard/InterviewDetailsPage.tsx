@@ -307,10 +307,13 @@ export default function InterviewDetailsPage() {
     if (hasCompletedRef.current || completingRef.current) return;
     completingRef.current = true;
     try {
-      // Flush the last recording chunk and wait for all uploads to settle
-      // before marking complete, so the backend has every chunk to finalize.
-      await recorder.stop();
-      await interviewService.completeInterview(interviewId);
+      // Run concurrently — recording finalization (up to 15s of chunk
+      // uploads) must not delay marking the interview complete, or the
+      // report page's short poll window expires before status flips.
+      await Promise.all([
+        recorder.stop(),
+        interviewService.completeInterview(interviewId),
+      ]);
       hasCompletedRef.current = true;
     } finally {
       completingRef.current = false;

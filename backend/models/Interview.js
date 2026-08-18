@@ -246,8 +246,15 @@ const interviewSchema = new mongoose.Schema(
 );
 
 // Indexes
+// Covers both getInterviews's {user, status?} filter + createdAt:-1 sort in
+// one index — makes the narrower {user:1,status:1} below redundant for that
+// query, but it's kept for now since other lookups may still rely on it.
+interviewSchema.index({ user: 1, status: 1, createdAt: -1 });
 interviewSchema.index({ user: 1, status: 1 });
 interviewSchema.index({ company: 1, createdAt: -1 });
+// Covers companyPortalController's {company, status:'scheduled'|'completed'}
+// queries, which the createdAt-sorted index above doesn't fully cover.
+interviewSchema.index({ company: 1, status: 1 });
 interviewSchema.index({ user: 1, createdAt: -1 });
 interviewSchema.index({ type: 1, difficulty: 1 });
 interviewSchema.index({ isDeleted: 1 });

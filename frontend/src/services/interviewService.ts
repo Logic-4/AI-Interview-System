@@ -98,7 +98,13 @@ const interviewService = {
     const res = await api.put<ApiResponse<SubmitAnswerResponse>>(
       `/interviews/${interviewId}/questions/${questionId}/answer`,
       formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
+      // Evaluation can take longer than the shared 30s default. The backend's
+      // own worst case is INTERVIEW_TURN_TIMEOUT_MS (45s) x 2 attempts + a
+      // 1.5s retry backoff = ~91.5s — this must stay above that, or axios
+      // times out while the server is still processing, and the client's
+      // retry-on-failure below fires a second, duplicate evaluation call for
+      // the same answer.
+      { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 100000 }
     );
     return res.data.data;
   },

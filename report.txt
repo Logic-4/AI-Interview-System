@@ -1,0 +1,47 @@
+Question 1:
+Tell me about your background in technology. How did you get started in this field?
+
+Your Answer"
+I have a background in software development and AI Technologies I got started by learning with development then gradually working on full status and AI based applications over time I doing it and practical experience by building real projects and solving technical problems
+
+AI Feedback:
+The candidate gave a vague answer and didn't address the technical aspects of their journey. They need to provide concrete details about their learning process and practical experience.
+
+Ideal Answer:
+The candidate describes their background and relevant experience.
+Score:45
+
+
+Question 2:
+
+What are pseudo-elements in CSS?
+
+Your Answer:
+pseudo Elementary in CSS let's use style specific part of an HTML element without added extra HTML for example colon colon before can add content before an element while after I discontent after it
+
+AI Feedback:
+{"score": 55, "feedback": "The candidate showed some basic understanding but missed key details about pseudo-elements. They need to define what they are and give examples.", "strengths": ["Understands basic CSS concepts", "Attempts to answer the question", "Uses correct terminology in parts of the answer"], "improvements": ["Define pseudo-elements
+
+
+
+Question 3:
+How would you apply html in a practical project?
+
+Your Answer:
+I would you send email to create the structure of our application such as hidden forms buttons navigation menus tables and Page sections then I would combine it with CSS for styling and JavaScript for functionality and interactions
+
+AI Feedback:
+The candidate missed the core purpose of HTML and provided a very superficial answer. They need to understand the role of HTML in structuring content and the importance of semantic elements.
+
+
+Question
+
+Is there anything you would like to add or ask us before we wrap up the interview?
+
+Your Answer
+
+thank you for the opportunity I would like to know more about the team the Technologies you use and what you expect from someone in this role during the first few months
+
+AI Feedback
+
+{"score": 65, "feedback": "The candidate showed good awareness of the interview process and asked a relevant question about the team's tech stack. They could have framed their closing statement more professionally.", "strengths": ["Showed awareness of the interview process", "Asked a relevant question about the team's tech stack"], "improvements":

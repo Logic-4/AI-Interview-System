@@ -1406,8 +1406,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_controllers_companyportalcontroller_deletecompanyinterviewrecord",
-      "community": 5,
-      "community_name": ".success",
+      "community": 4,
+      "community_name": "companyPortalController.js",
       "norm_label": "deletecompanyinterviewrecord()"
     },
     {
@@ -1538,8 +1538,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_controllers_companyportalcontroller_deleteapplication",
-      "community": 5,
-      "community_name": ".success",
+      "community": 4,
+      "community_name": "companyPortalController.js",
       "norm_label": "deleteapplication()"
     },
     {
@@ -1878,8 +1878,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_controllers_feedbackcontroller_generatefeedback",
-      "community": 5,
-      "community_name": ".success",
+      "community": 12,
+      "community_name": "feedbackController.js",
       "norm_label": "generatefeedback()"
     },
     {
@@ -1890,8 +1890,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_controllers_feedbackcontroller_getuserprogress",
-      "community": 54,
-      "community_name": "feedbackRoutes.js",
+      "community": 12,
+      "community_name": "feedbackController.js",
       "norm_label": "getuserprogress()"
     },
     {
@@ -2274,8 +2274,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_controllers_interviewcontroller_createinterview",
-      "community": 9,
-      "community_name": "interviewController.js",
+      "community": 52,
+      "community_name": "companyController.js",
       "norm_label": "createinterview()"
     },
     {
@@ -2286,8 +2286,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_controllers_interviewcontroller_warminterviewservices",
-      "community": 9,
-      "community_name": "interviewController.js",
+      "community": 34,
+      "community_name": "interviewRoutes.js",
       "norm_label": "warminterviewservices()"
     },
     {
@@ -2383,14 +2383,14 @@
       "_origin": "ast",
       "id": "backend_controllers_interviewcontroller_submitanswer",
       "community": 16,
-      "community_name": "auth.js",
+      "community_name": "blobService.js",
       "norm_label": "submitanswer()"
     },
     {
       "label": "completeInterview()",
       "file_type": "code",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1119",
+      "source_location": "L1105",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_controllers_interviewcontroller_completeinterview",
@@ -2402,11 +2402,11 @@
       "label": "deleteInterview()",
       "file_type": "code",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1277",
+      "source_location": "L1250",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_controllers_interviewcontroller_deleteinterview",
-      "community": 16,
+      "community": 42,
       "community_name": "auth.js",
       "norm_label": "deleteinterview()"
     },
@@ -2414,7 +2414,7 @@
       "label": "reevaluateAnswer()",
       "file_type": "code",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1317",
+      "source_location": "L1290",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_controllers_interviewcontroller_reevaluateanswer",
@@ -2426,7 +2426,7 @@
       "label": "retryEvaluate()",
       "file_type": "code",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1415",
+      "source_location": "L1388",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_controllers_interviewcontroller_retryevaluate",
@@ -2438,11 +2438,11 @@
       "label": "resetInterview()",
       "file_type": "code",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1497",
+      "source_location": "L1470",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_controllers_interviewcontroller_resetinterview",
-      "community": 16,
+      "community": 42,
       "community_name": "auth.js",
       "norm_label": "resetinterview()"
     },
@@ -2450,7 +2450,7 @@
       "label": "reportProctoringEvent()",
       "file_type": "code",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1583",
+      "source_location": "L1556",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_controllers_interviewcontroller_reportproctoringevent",
@@ -2840,8 +2840,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_controllers_sttcontroller_transcribe",
-      "community": 5,
-      "community_name": ".success",
+      "community": 42,
+      "community_name": "auth.js",
       "norm_label": "transcribe()"
     },
     {
@@ -3193,8 +3193,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_controllers_ttscontroller_synthesize",
-      "community": 5,
-      "community_name": ".success",
+      "community": 42,
+      "community_name": "auth.js",
       "norm_label": "synthesize()"
     },
     {
@@ -3205,7 +3205,7 @@
       "_origin": "ast",
       "id": "backend_controllers_uploadcontroller",
       "community": 16,
-      "community_name": "auth.js",
+      "community_name": "blobService.js",
       "norm_label": "uploadcontroller.js"
     },
     {
@@ -3216,7 +3216,7 @@
       "_origin": "ast",
       "id": "backend_controllers_uploadcontroller_apierror",
       "community": 16,
-      "community_name": "auth.js",
+      "community_name": "blobService.js",
       "norm_label": "apierror"
     },
     {
@@ -3227,7 +3227,7 @@
       "_origin": "ast",
       "id": "backend_controllers_uploadcontroller_apiresponse",
       "community": 16,
-      "community_name": "auth.js",
+      "community_name": "blobService.js",
       "norm_label": "apiresponse"
     },
     {
@@ -3238,7 +3238,7 @@
       "_origin": "ast",
       "id": "backend_controllers_uploadcontroller_uploadrecording_uploadaudio_uploadavatar",
       "community": 16,
-      "community_name": "auth.js",
+      "community_name": "blobService.js",
       "norm_label": "{ uploadrecording, uploadaudio, uploadavatar }"
     },
     {
@@ -3250,7 +3250,7 @@
       "_origin": "ast",
       "id": "backend_controllers_uploadcontroller_uploadinterviewrecording",
       "community": 16,
-      "community_name": "auth.js",
+      "community_name": "blobService.js",
       "norm_label": "uploadinterviewrecording()"
     },
     {
@@ -3262,7 +3262,7 @@
       "_origin": "ast",
       "id": "backend_controllers_uploadcontroller_uploadaudioanswer",
       "community": 16,
-      "community_name": "auth.js",
+      "community_name": "blobService.js",
       "norm_label": "uploadaudioanswer()"
     },
     {
@@ -3274,7 +3274,7 @@
       "_origin": "ast",
       "id": "backend_controllers_uploadcontroller_uploaduseravatar",
       "community": 16,
-      "community_name": "auth.js",
+      "community_name": "blobService.js",
       "norm_label": "uploaduseravatar()"
     },
     {
@@ -3577,8 +3577,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_controllers_verificationcontroller_resolvereference",
-      "community": 34,
-      "community_name": "interviewRoutes.js",
+      "community": 5,
+      "community_name": ".success",
       "norm_label": "resolvereference()"
     },
     {
@@ -3589,8 +3589,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_controllers_verificationcontroller_requiresverification",
-      "community": 34,
-      "community_name": "interviewRoutes.js",
+      "community": 5,
+      "community_name": ".success",
       "norm_label": "requiresverification()"
     },
     {
@@ -3613,8 +3613,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_controllers_verificationcontroller_getidentitystatus",
-      "community": 34,
-      "community_name": "interviewRoutes.js",
+      "community": 5,
+      "community_name": ".success",
       "norm_label": "getidentitystatus()"
     },
     {
@@ -3625,8 +3625,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_controllers_verificationcontroller_verifyidentity",
-      "community": 34,
-      "community_name": "interviewRoutes.js",
+      "community": 5,
+      "community_name": ".success",
       "norm_label": "verifyidentity()"
     },
     {
@@ -3648,7 +3648,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_middleware_auth",
-      "community": 16,
+      "community": 42,
       "community_name": "auth.js",
       "norm_label": "auth.js"
     },
@@ -3659,7 +3659,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_middleware_auth_verifyaccesstoken",
-      "community": 16,
+      "community": 42,
       "community_name": "auth.js",
       "norm_label": "{ verifyaccesstoken }"
     },
@@ -3670,7 +3670,7 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "backend_middleware_auth_user",
-      "community": 16,
+      "community": 42,
       "community_name": "auth.js",
       "norm_label": "user"
     },
@@ -3681,7 +3681,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "backend_middleware_auth_company",
-      "community": 16,
+      "community": 42,
       "community_name": "auth.js",
       "norm_label": "company"
     },
@@ -3692,7 +3692,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "backend_middleware_auth_apierror",
-      "community": 16,
+      "community": 42,
       "community_name": "auth.js",
       "norm_label": "apierror"
     },
@@ -3703,7 +3703,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "backend_middleware_auth_stagetimer",
-      "community": 16,
+      "community": 42,
       "community_name": "auth.js",
       "norm_label": "{ stagetimer }"
     },
@@ -3715,7 +3715,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_middleware_auth_protect",
-      "community": 16,
+      "community": 42,
       "community_name": "auth.js",
       "norm_label": "protect()"
     },
@@ -3727,7 +3727,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_middleware_auth_authorize",
-      "community": 16,
+      "community": 42,
       "community_name": "auth.js",
       "norm_label": "authorize()"
     },
@@ -3738,8 +3738,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_middleware_companyauthmiddleware",
-      "community": 52,
-      "community_name": "companyController.js",
+      "community": 42,
+      "community_name": "auth.js",
       "norm_label": "companyauthmiddleware.js"
     },
     {
@@ -3749,8 +3749,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_middleware_companyauthmiddleware_apierror",
-      "community": 52,
-      "community_name": "companyController.js",
+      "community": 42,
+      "community_name": "auth.js",
       "norm_label": "apierror"
     },
     {
@@ -3760,8 +3760,8 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "backend_middleware_companyauthmiddleware_company",
-      "community": 52,
-      "community_name": "companyController.js",
+      "community": 42,
+      "community_name": "auth.js",
       "norm_label": "company"
     },
     {
@@ -3772,8 +3772,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_middleware_companyauthmiddleware_requirecompanyaccess",
-      "community": 52,
-      "community_name": "companyController.js",
+      "community": 42,
+      "community_name": "auth.js",
       "norm_label": "requirecompanyaccess()"
     },
     {
@@ -3783,8 +3783,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_middleware_errorhandler",
-      "community": 52,
-      "community_name": "companyController.js",
+      "community": 42,
+      "community_name": "auth.js",
       "norm_label": "errorhandler.js"
     },
     {
@@ -3794,8 +3794,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_middleware_errorhandler_apierror",
-      "community": 52,
-      "community_name": "companyController.js",
+      "community": 42,
+      "community_name": "auth.js",
       "norm_label": "apierror"
     },
     {
@@ -3805,8 +3805,8 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "backend_middleware_errorhandler_logger",
-      "community": 52,
-      "community_name": "companyController.js",
+      "community": 42,
+      "community_name": "auth.js",
       "norm_label": "logger"
     },
     {
@@ -3817,8 +3817,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_middleware_errorhandler_errorhandler",
-      "community": 52,
-      "community_name": "companyController.js",
+      "community": 42,
+      "community_name": "auth.js",
       "norm_label": "errorhandler()"
     },
     {
@@ -3987,7 +3987,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_middleware_requestcontext_stagetimer",
-      "community": 16,
+      "community": 42,
       "community_name": "auth.js",
       "norm_label": "stagetimer()"
     },
@@ -4187,8 +4187,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_models_company",
-      "community": 52,
-      "community_name": "companyController.js",
+      "community": 42,
+      "community_name": "auth.js",
       "norm_label": "company.js"
     },
     {
@@ -4198,8 +4198,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_models_company_mongoose",
-      "community": 52,
-      "community_name": "companyController.js",
+      "community": 42,
+      "community_name": "auth.js",
       "norm_label": "mongoose"
     },
     {
@@ -4209,8 +4209,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "backend_models_company_companyschema",
-      "community": 52,
-      "community_name": "companyController.js",
+      "community": 42,
+      "community_name": "auth.js",
       "norm_label": "companyschema"
     },
     {
@@ -4517,8 +4517,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_models_verificationevent",
-      "community": 70,
-      "community_name": "VerificationEvent.js",
+      "community": 60,
+      "community_name": "verificationController.js",
       "norm_label": "verificationevent.js"
     },
     {
@@ -4528,8 +4528,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_models_verificationevent_mongoose",
-      "community": 70,
-      "community_name": "VerificationEvent.js",
+      "community": 60,
+      "community_name": "verificationController.js",
       "norm_label": "mongoose"
     },
     {
@@ -4539,8 +4539,8 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "backend_models_verificationevent_verificationeventschema",
-      "community": 70,
-      "community_name": "VerificationEvent.js",
+      "community": 60,
+      "community_name": "verificationController.js",
       "norm_label": "verificationeventschema"
     },
     {
@@ -5540,8 +5540,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_routes_feedbackroutes",
-      "community": 54,
-      "community_name": "feedbackRoutes.js",
+      "community": 12,
+      "community_name": "feedbackController.js",
       "norm_label": "feedbackroutes.js"
     },
     {
@@ -5551,8 +5551,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_routes_feedbackroutes_express",
-      "community": 54,
-      "community_name": "feedbackRoutes.js",
+      "community": 12,
+      "community_name": "feedbackController.js",
       "norm_label": "express"
     },
     {
@@ -5562,8 +5562,8 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "backend_routes_feedbackroutes_router",
-      "community": 54,
-      "community_name": "feedbackRoutes.js",
+      "community": 12,
+      "community_name": "feedbackController.js",
       "norm_label": "router"
     },
     {
@@ -5573,8 +5573,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "backend_routes_feedbackroutes_getfeedback_generatefeedback_getuserprogress",
-      "community": 54,
-      "community_name": "feedbackRoutes.js",
+      "community": 12,
+      "community_name": "feedbackController.js",
       "norm_label": "{ getfeedback, generatefeedback, getuserprogress }"
     },
     {
@@ -5584,8 +5584,8 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "backend_routes_feedbackroutes_protect",
-      "community": 54,
-      "community_name": "feedbackRoutes.js",
+      "community": 12,
+      "community_name": "feedbackController.js",
       "norm_label": "{ protect }"
     },
     {
@@ -5595,8 +5595,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "backend_routes_feedbackroutes_ailimiter",
-      "community": 54,
-      "community_name": "feedbackRoutes.js",
+      "community": 12,
+      "community_name": "feedbackController.js",
       "norm_label": "{ ailimiter }"
     },
     {
@@ -6179,7 +6179,7 @@
       "_origin": "ast",
       "id": "backend_routes_uploadroutes",
       "community": 16,
-      "community_name": "auth.js",
+      "community_name": "blobService.js",
       "norm_label": "uploadroutes.js"
     },
     {
@@ -6190,7 +6190,7 @@
       "_origin": "ast",
       "id": "backend_routes_uploadroutes_express",
       "community": 16,
-      "community_name": "auth.js",
+      "community_name": "blobService.js",
       "norm_label": "express"
     },
     {
@@ -6201,7 +6201,7 @@
       "_origin": "ast",
       "id": "backend_routes_uploadroutes_router",
       "community": 16,
-      "community_name": "auth.js",
+      "community_name": "blobService.js",
       "norm_label": "router"
     },
     {
@@ -6212,7 +6212,7 @@
       "_origin": "ast",
       "id": "backend_routes_uploadroutes_uploadinterviewrecording_uploadaudioanswer_uploaduseravatar",
       "community": 16,
-      "community_name": "auth.js",
+      "community_name": "blobService.js",
       "norm_label": "{ uploadinterviewrecording, uploadaudioanswer, uploaduseravatar }"
     },
     {
@@ -6223,7 +6223,7 @@
       "_origin": "ast",
       "id": "backend_routes_uploadroutes_protect",
       "community": 16,
-      "community_name": "auth.js",
+      "community_name": "blobService.js",
       "norm_label": "{ protect }"
     },
     {
@@ -6234,7 +6234,7 @@
       "_origin": "ast",
       "id": "backend_routes_uploadroutes_upload",
       "community": 16,
-      "community_name": "auth.js",
+      "community_name": "blobService.js",
       "norm_label": "upload"
     },
     {
@@ -7271,7 +7271,7 @@
       "_origin": "ast",
       "id": "backend_services_blobservice",
       "community": 16,
-      "community_name": "auth.js",
+      "community_name": "blobService.js",
       "norm_label": "blobservice.js"
     },
     {
@@ -7282,7 +7282,7 @@
       "_origin": "ast",
       "id": "backend_services_blobservice_put_del",
       "community": 16,
-      "community_name": "auth.js",
+      "community_name": "blobService.js",
       "norm_label": "{ put, del }"
     },
     {
@@ -7293,7 +7293,7 @@
       "_origin": "ast",
       "id": "backend_services_blobservice_logger",
       "community": 16,
-      "community_name": "auth.js",
+      "community_name": "blobService.js",
       "norm_label": "logger"
     },
     {
@@ -7305,7 +7305,7 @@
       "_origin": "ast",
       "id": "backend_services_blobservice_uploadrecording",
       "community": 16,
-      "community_name": "auth.js",
+      "community_name": "blobService.js",
       "norm_label": "uploadrecording()"
     },
     {
@@ -7317,7 +7317,7 @@
       "_origin": "ast",
       "id": "backend_services_blobservice_uploadaudio",
       "community": 16,
-      "community_name": "auth.js",
+      "community_name": "blobService.js",
       "norm_label": "uploadaudio()"
     },
     {
@@ -7329,7 +7329,7 @@
       "_origin": "ast",
       "id": "backend_services_blobservice_uploadavatar",
       "community": 16,
-      "community_name": "auth.js",
+      "community_name": "blobService.js",
       "norm_label": "uploadavatar()"
     },
     {
@@ -7340,8 +7340,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_blobservice_uploadcandidatefile",
-      "community": 16,
-      "community_name": "auth.js",
+      "community": 43,
+      "community_name": "publicCompanyController.js",
       "norm_label": "uploadcandidatefile()"
     },
     {
@@ -7352,7 +7352,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_blobservice_deletebloburls",
-      "community": 16,
+      "community": 42,
       "community_name": "auth.js",
       "norm_label": "deletebloburls()"
     },
@@ -7760,7 +7760,7 @@
       "label": "getClient()",
       "file_type": "code",
       "source_file": "backend/services/geminiSpeechService.js",
-      "source_location": "L34",
+      "source_location": "L29",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_geminispeechservice_getclient",
@@ -7772,7 +7772,7 @@
       "label": "synthesizeSpeechStream()",
       "file_type": "code",
       "source_file": "backend/services/geminiSpeechService.js",
-      "source_location": "L49",
+      "source_location": "L44",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_geminispeechservice_synthesizespeechstream",
@@ -7784,7 +7784,7 @@
       "label": "transcribeAudioEnglish()",
       "file_type": "code",
       "source_file": "backend/services/geminiSpeechService.js",
-      "source_location": "L124",
+      "source_location": "L119",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_geminispeechservice_transcribeaudioenglish",
@@ -7796,7 +7796,7 @@
       "label": "buildNormalizePrompt()",
       "file_type": "code",
       "source_file": "backend/services/geminiSpeechService.js",
-      "source_location": "L147",
+      "source_location": "L142",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_geminispeechservice_buildnormalizeprompt",
@@ -7808,7 +7808,7 @@
       "label": "normalizeSomaliTranscript()",
       "file_type": "code",
       "source_file": "backend/services/geminiSpeechService.js",
-      "source_location": "L180",
+      "source_location": "L175",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_geminispeechservice_normalizesomalitranscript",
@@ -8103,22 +8103,34 @@
       "norm_label": "todifficultylabel()"
     },
     {
-      "label": "isPlaceholderAnswer()",
+      "label": "clampScore()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
       "source_location": "L165",
       "_callable": true,
       "_origin": "ast",
+      "id": "backend_services_gemmaservice_clampscore",
+      "community": 44,
+      "community_name": "callGemma",
+      "norm_label": "clampscore()"
+    },
+    {
+      "label": "isPlaceholderAnswer()",
+      "file_type": "code",
+      "source_file": "backend/services/gemmaService.js",
+      "source_location": "L171",
+      "_callable": true,
+      "_origin": "ast",
       "id": "backend_services_gemmaservice_isplaceholderanswer",
-      "community": 5,
-      "community_name": ".success",
+      "community": 12,
+      "community_name": "feedbackController.js",
       "norm_label": "isplaceholderanswer()"
     },
     {
       "label": "isValidGeneratedQuestion()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L170",
+      "source_location": "L176",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_gemmaservice_isvalidgeneratedquestion",
@@ -8130,7 +8142,7 @@
       "label": "isValidInterviewerResponse()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L182",
+      "source_location": "L188",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_gemmaservice_isvalidinterviewerresponse",
@@ -8142,7 +8154,7 @@
       "label": "isQuestionAboutTargetSkill()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L189",
+      "source_location": "L195",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_gemmaservice_isquestionabouttargetskill",
@@ -8154,7 +8166,7 @@
       "label": "FALLBACK_TEMPLATES_EN",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L194",
+      "source_location": "L200",
       "_origin": "ast",
       "id": "backend_services_gemmaservice_fallback_templates_en",
       "community": 0,
@@ -8165,7 +8177,7 @@
       "label": "FALLBACK_TEMPLATES_SO",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L202",
+      "source_location": "L208",
       "_origin": "ast",
       "id": "backend_services_gemmaservice_fallback_templates_so",
       "community": 0,
@@ -8176,7 +8188,7 @@
       "label": "buildQuestionFallback()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L212",
+      "source_location": "L218",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_gemmaservice_buildquestionfallback",
@@ -8188,7 +8200,7 @@
       "label": "trimConversationHistory()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L219",
+      "source_location": "L225",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_gemmaservice_trimconversationhistory",
@@ -8200,7 +8212,7 @@
       "label": "compactRoleProfile()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L229",
+      "source_location": "L235",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_gemmaservice_compactroleprofile",
@@ -8212,7 +8224,7 @@
       "label": "sleep()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L245",
+      "source_location": "L251",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_gemmaservice_sleep",
@@ -8224,7 +8236,7 @@
       "label": "mapWithConcurrency()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L250",
+      "source_location": "L256",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_gemmaservice_mapwithconcurrency",
@@ -8236,7 +8248,7 @@
       "label": "logGemmaRequest()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L263",
+      "source_location": "L269",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_gemmaservice_loggemmarequest",
@@ -8248,7 +8260,7 @@
       "label": "logGemmaResponse()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L272",
+      "source_location": "L278",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_gemmaservice_loggemmaresponse",
@@ -8260,19 +8272,19 @@
       "label": "safeParseJSON()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L285",
+      "source_location": "L291",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_gemmaservice_safeparsejson",
-      "community": 44,
-      "community_name": "callGemma",
+      "community": 118,
+      "community_name": "generateComprehensiveFeedback",
       "norm_label": "safeparsejson()"
     },
     {
       "label": "callRunPod()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L349",
+      "source_location": "L355",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_gemmaservice_callrunpod",
@@ -8284,7 +8296,7 @@
       "label": "callGemma()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L433",
+      "source_location": "L439",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_gemmaservice_callgemma",
@@ -8296,19 +8308,19 @@
       "label": "callColabRunsyncFallback()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L488",
+      "source_location": "L494",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_gemmaservice_callcolabrunsyncfallback",
-      "community": 12,
-      "community_name": "feedbackController.js",
+      "community": 44,
+      "community_name": "callGemma",
       "norm_label": "callcolabrunsyncfallback()"
     },
     {
       "label": "resolveQuestionCategory()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L597",
+      "source_location": "L588",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_gemmaservice_resolvequestioncategory",
@@ -8320,7 +8332,7 @@
       "label": "generateInterviewQuestions()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L620",
+      "source_location": "L611",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_gemmaservice_generateinterviewquestions",
@@ -8332,7 +8344,7 @@
       "label": "processInterviewTurn()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L823",
+      "source_location": "L814",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_gemmaservice_processinterviewturn",
@@ -8344,31 +8356,31 @@
       "label": "parseJobDescription()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L910",
+      "source_location": "L901",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_gemmaservice_parsejobdescription",
-      "community": 44,
-      "community_name": "callGemma",
+      "community": 118,
+      "community_name": "generateComprehensiveFeedback",
       "norm_label": "parsejobdescription()"
     },
     {
       "label": "generateComprehensiveFeedback()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L933",
+      "source_location": "L924",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_gemmaservice_generatecomprehensivefeedback",
-      "community": 44,
-      "community_name": "callGemma",
+      "community": 118,
+      "community_name": "generateComprehensiveFeedback",
       "norm_label": "generatecomprehensivefeedback()"
     },
     {
       "label": "transcribeAudio()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L951",
+      "source_location": "L942",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_gemmaservice_transcribeaudio",
@@ -8380,7 +8392,7 @@
       "label": "warmGemma()",
       "file_type": "code",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L956",
+      "source_location": "L947",
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_gemmaservice_warmgemma",
@@ -8521,8 +8533,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_interviewwarmupservice_startinterviewwarmup",
-      "community": 9,
-      "community_name": "interviewController.js",
+      "community": 66,
+      "community_name": "interviewWarmupService.js",
       "norm_label": "startinterviewwarmup()"
     },
     {
@@ -8614,7 +8626,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_services_recordingservice",
-      "community": 16,
+      "community": 42,
       "community_name": "auth.js",
       "norm_label": "recordingservice.js"
     },
@@ -8625,7 +8637,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_services_recordingservice_uploadcandidatefile_deletebloburls",
-      "community": 16,
+      "community": 42,
       "community_name": "auth.js",
       "norm_label": "{ uploadcandidatefile, deletebloburls }"
     },
@@ -8636,7 +8648,7 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "backend_services_recordingservice_logger",
-      "community": 16,
+      "community": 42,
       "community_name": "auth.js",
       "norm_label": "logger"
     },
@@ -8660,8 +8672,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_recordingservice_uploadchunk",
-      "community": 16,
-      "community_name": "auth.js",
+      "community": 43,
+      "community_name": "publicCompanyController.js",
       "norm_label": "uploadchunk()"
     },
     {
@@ -8672,7 +8684,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_recordingservice_loadbufferfromurl",
-      "community": 16,
+      "community": 42,
       "community_name": "auth.js",
       "norm_label": "loadbufferfromurl()"
     },
@@ -8684,7 +8696,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_recordingservice_finalizerecording",
-      "community": 16,
+      "community": 42,
       "community_name": "auth.js",
       "norm_label": "finalizerecording()"
     },
@@ -8695,8 +8707,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_services_resumeparserservice",
-      "community": 43,
-      "community_name": "publicCompanyController.js",
+      "community": 112,
+      "community_name": "resumeParserService.js",
       "norm_label": "resumeparserservice.js"
     },
     {
@@ -8706,8 +8718,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_services_resumeparserservice_pdfparse",
-      "community": 43,
-      "community_name": "publicCompanyController.js",
+      "community": 112,
+      "community_name": "resumeParserService.js",
       "norm_label": "pdfparse"
     },
     {
@@ -8717,8 +8729,8 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "backend_services_resumeparserservice_mammoth",
-      "community": 43,
-      "community_name": "publicCompanyController.js",
+      "community": 112,
+      "community_name": "resumeParserService.js",
       "norm_label": "mammoth"
     },
     {
@@ -8728,8 +8740,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "backend_services_resumeparserservice_logger",
-      "community": 43,
-      "community_name": "publicCompanyController.js",
+      "community": 112,
+      "community_name": "resumeParserService.js",
       "norm_label": "logger"
     },
     {
@@ -8740,8 +8752,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_resumeparserservice_normalizetext",
-      "community": 43,
-      "community_name": "publicCompanyController.js",
+      "community": 112,
+      "community_name": "resumeParserService.js",
       "norm_label": "normalizetext()"
     },
     {
@@ -8752,8 +8764,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_resumeparserservice_parseresumebuffer",
-      "community": 43,
-      "community_name": "publicCompanyController.js",
+      "community": 112,
+      "community_name": "resumeParserService.js",
       "norm_label": "parseresumebuffer()"
     },
     {
@@ -8939,8 +8951,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_services_somalispeechservice_warmspeechservice",
-      "community": 48,
-      "community_name": "somaliSpeechService.js",
+      "community": 66,
+      "community_name": "interviewWarmupService.js",
       "norm_label": "warmspeechservice()"
     },
     {
@@ -9095,8 +9107,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_test_evaluation_test",
-      "community": 12,
-      "community_name": "feedbackController.js",
+      "community": 70,
+      "community_name": "evaluation.js",
       "norm_label": "evaluation.test.js"
     },
     {
@@ -9106,8 +9118,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_test_evaluation_test_test",
-      "community": 12,
-      "community_name": "feedbackController.js",
+      "community": 70,
+      "community_name": "evaluation.js",
       "norm_label": "test"
     },
     {
@@ -9117,8 +9129,8 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "backend_test_evaluation_test_assert",
-      "community": 12,
-      "community_name": "feedbackController.js",
+      "community": 70,
+      "community_name": "evaluation.js",
       "norm_label": "assert"
     },
     {
@@ -9128,77 +9140,9 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "backend_test_evaluation_test_normalizeevaluation_calculateoverallscore",
-      "community": 12,
-      "community_name": "feedbackController.js",
+      "community": 70,
+      "community_name": "evaluation.js",
       "norm_label": "{ normalizeevaluation, calculateoverallscore }"
-    },
-    {
-      "label": "gemmaColabFallback.test.js",
-      "file_type": "code",
-      "source_file": "backend/test/gemmaColabFallback.test.js",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "backend_test_gemmacolabfallback_test",
-      "community": 68,
-      "community_name": "gemmaColabFallback.test.js",
-      "norm_label": "gemmacolabfallback.test.js"
-    },
-    {
-      "label": "test",
-      "file_type": "code",
-      "source_file": "backend/test/gemmaColabFallback.test.js",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "backend_test_gemmacolabfallback_test_test",
-      "community": 68,
-      "community_name": "gemmaColabFallback.test.js",
-      "norm_label": "test"
-    },
-    {
-      "label": "assert",
-      "file_type": "code",
-      "source_file": "backend/test/gemmaColabFallback.test.js",
-      "source_location": "L2",
-      "_origin": "ast",
-      "id": "backend_test_gemmacolabfallback_test_assert",
-      "community": 68,
-      "community_name": "gemmaColabFallback.test.js",
-      "norm_label": "assert"
-    },
-    {
-      "label": "gemma",
-      "file_type": "code",
-      "source_file": "backend/test/gemmaColabFallback.test.js",
-      "source_location": "L12",
-      "_origin": "ast",
-      "id": "backend_test_gemmacolabfallback_test_gemma",
-      "community": 68,
-      "community_name": "gemmaColabFallback.test.js",
-      "norm_label": "gemma"
-    },
-    {
-      "label": "resetCircuit()",
-      "file_type": "code",
-      "source_file": "backend/test/gemmaColabFallback.test.js",
-      "source_location": "L14",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "backend_test_gemmacolabfallback_test_resetcircuit",
-      "community": 68,
-      "community_name": "gemmaColabFallback.test.js",
-      "norm_label": "resetcircuit()"
-    },
-    {
-      "label": "mockFetch()",
-      "file_type": "code",
-      "source_file": "backend/test/gemmaColabFallback.test.js",
-      "source_location": "L20",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "backend_test_gemmacolabfallback_test_mockfetch",
-      "community": 68,
-      "community_name": "gemmaColabFallback.test.js",
-      "norm_label": "mockfetch()"
     },
     {
       "label": "gemmaService.test.js",
@@ -9443,8 +9387,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_test_scheduledtime_test",
-      "community": 62,
-      "community_name": "parseScheduledAt",
+      "community": 4,
+      "community_name": "companyPortalController.js",
       "norm_label": "scheduledtime.test.js"
     },
     {
@@ -9454,8 +9398,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_test_scheduledtime_test_test",
-      "community": 62,
-      "community_name": "parseScheduledAt",
+      "community": 4,
+      "community_name": "companyPortalController.js",
       "norm_label": "test"
     },
     {
@@ -9465,8 +9409,8 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "backend_test_scheduledtime_test_assert",
-      "community": 62,
-      "community_name": "parseScheduledAt",
+      "community": 4,
+      "community_name": "companyPortalController.js",
       "norm_label": "assert"
     },
     {
@@ -9476,8 +9420,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "backend_test_scheduledtime_test_parsescheduledat",
-      "community": 62,
-      "community_name": "parseScheduledAt",
+      "community": 4,
+      "community_name": "companyPortalController.js",
       "norm_label": "{ parsescheduledat }"
     },
     {
@@ -9487,8 +9431,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_test_somalispeechservice_test",
-      "community": 37,
-      "community_name": "geminiSpeechService.js",
+      "community": 91,
+      "community_name": "somaliSpeechService.test.js",
       "norm_label": "somalispeechservice.test.js"
     },
     {
@@ -9498,8 +9442,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_test_somalispeechservice_test_test",
-      "community": 37,
-      "community_name": "geminiSpeechService.js",
+      "community": 91,
+      "community_name": "somaliSpeechService.test.js",
       "norm_label": "test"
     },
     {
@@ -9509,8 +9453,8 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "backend_test_somalispeechservice_test_assert",
-      "community": 37,
-      "community_name": "geminiSpeechService.js",
+      "community": 91,
+      "community_name": "somaliSpeechService.test.js",
       "norm_label": "assert"
     },
     {
@@ -9520,8 +9464,8 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "backend_test_somalispeechservice_test_speech",
-      "community": 37,
-      "community_name": "geminiSpeechService.js",
+      "community": 91,
+      "community_name": "somaliSpeechService.test.js",
       "norm_label": "speech"
     },
     {
@@ -9531,8 +9475,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "backend_test_somalispeechservice_test_geminispeechservice",
-      "community": 37,
-      "community_name": "geminiSpeechService.js",
+      "community": 91,
+      "community_name": "somaliSpeechService.test.js",
       "norm_label": "geminispeechservice"
     },
     {
@@ -9542,8 +9486,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_utils_apierror",
-      "community": 52,
-      "community_name": "companyController.js",
+      "community": 42,
+      "community_name": "auth.js",
       "norm_label": "apierror.js"
     },
     {
@@ -9555,8 +9499,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "backend_utils_apierror_apierror",
-      "community": 5,
-      "community_name": ".success",
+      "community": 42,
+      "community_name": "auth.js",
       "norm_label": "apierror"
     },
     {
@@ -9567,8 +9511,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_utils_apierror_apierror_constructor",
-      "community": 5,
-      "community_name": ".success",
+      "community": 42,
+      "community_name": "auth.js",
       "norm_label": ".constructor()"
     },
     {
@@ -9603,7 +9547,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_utils_apierror_apierror_forbidden",
-      "community": 16,
+      "community": 42,
       "community_name": "auth.js",
       "norm_label": ".forbidden()"
     },
@@ -9627,8 +9571,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_utils_apierror_apierror_toomanyrequests",
-      "community": 5,
-      "community_name": ".success",
+      "community": 42,
+      "community_name": "auth.js",
       "norm_label": ".toomanyrequests()"
     },
     {
@@ -9651,8 +9595,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_utils_apierror_apierror_internal",
-      "community": 5,
-      "community_name": ".success",
+      "community": 42,
+      "community_name": "auth.js",
       "norm_label": ".internal()"
     },
     {
@@ -9746,8 +9690,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_utils_evaluation",
-      "community": 12,
-      "community_name": "feedbackController.js",
+      "community": 70,
+      "community_name": "evaluation.js",
       "norm_label": "evaluation.js"
     },
     {
@@ -9758,8 +9702,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_utils_evaluation_normalizeevaluation",
-      "community": 12,
-      "community_name": "feedbackController.js",
+      "community": 70,
+      "community_name": "evaluation.js",
       "norm_label": "normalizeevaluation()"
     },
     {
@@ -9770,8 +9714,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_utils_evaluation_isscorable",
-      "community": 12,
-      "community_name": "feedbackController.js",
+      "community": 70,
+      "community_name": "evaluation.js",
       "norm_label": "isscorable()"
     },
     {
@@ -9782,8 +9726,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_utils_evaluation_calculateoverallscore",
-      "community": 12,
-      "community_name": "feedbackController.js",
+      "community": 70,
+      "community_name": "evaluation.js",
       "norm_label": "calculateoverallscore()"
     },
     {
@@ -9794,8 +9738,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_utils_evaluation_summarizeevaluations",
-      "community": 12,
-      "community_name": "feedbackController.js",
+      "community": 70,
+      "community_name": "evaluation.js",
       "norm_label": "summarizeevaluations()"
     },
     {
@@ -9930,8 +9874,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_utils_scheduledtime",
-      "community": 62,
-      "community_name": "parseScheduledAt",
+      "community": 4,
+      "community_name": "companyPortalController.js",
       "norm_label": "scheduledtime.js"
     },
     {
@@ -9942,8 +9886,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_utils_scheduledtime_zonedpartsasutc",
-      "community": 62,
-      "community_name": "parseScheduledAt",
+      "community": 4,
+      "community_name": "companyPortalController.js",
       "norm_label": "zonedpartsasutc()"
     },
     {
@@ -9954,8 +9898,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "backend_utils_scheduledtime_parsescheduledat",
-      "community": 62,
-      "community_name": "parseScheduledAt",
+      "community": 4,
+      "community_name": "companyPortalController.js",
       "norm_label": "parsescheduledat()"
     },
     {
@@ -12061,7 +12005,7 @@
       "_origin": "ast",
       "id": "frontend_src_app",
       "community": 13,
-      "community_name": "useAuthStore",
+      "community_name": "themeConfigSlice.tsx",
       "norm_label": "app.tsx"
     },
     {
@@ -12073,7 +12017,7 @@
       "_origin": "ast",
       "id": "frontend_src_app_app",
       "community": 13,
-      "community_name": "useAuthStore",
+      "community_name": "themeConfigSlice.tsx",
       "norm_label": "app()"
     },
     {
@@ -12106,8 +12050,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_components_layouts_blanklayout",
-      "community": 13,
-      "community_name": "useAuthStore",
+      "community": 68,
+      "community_name": "router/index.tsx",
       "norm_label": "blanklayout.tsx"
     },
     {
@@ -12118,8 +12062,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_components_layouts_blanklayout_blanklayout",
-      "community": 13,
-      "community_name": "useAuthStore",
+      "community": 68,
+      "community_name": "router/index.tsx",
       "norm_label": "blanklayout()"
     },
     {
@@ -12130,7 +12074,7 @@
       "_origin": "ast",
       "id": "frontend_src_components_layouts_defaultlayout",
       "community": 13,
-      "community_name": "useAuthStore",
+      "community_name": "themeConfigSlice.tsx",
       "norm_label": "defaultlayout.tsx"
     },
     {
@@ -12141,8 +12085,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_components_layouts_defaultlayout_defaultlayout",
-      "community": 13,
-      "community_name": "useAuthStore",
+      "community": 68,
+      "community_name": "router/index.tsx",
       "norm_label": "defaultlayout()"
     },
     {
@@ -12153,7 +12097,7 @@
       "_origin": "ast",
       "id": "frontend_src_components_layouts_footer",
       "community": 13,
-      "community_name": "useAuthStore",
+      "community_name": "themeConfigSlice.tsx",
       "norm_label": "layouts/footer.tsx"
     },
     {
@@ -12165,7 +12109,7 @@
       "_origin": "ast",
       "id": "frontend_src_components_layouts_footer_footer",
       "community": 13,
-      "community_name": "useAuthStore",
+      "community_name": "themeConfigSlice.tsx",
       "norm_label": "footer()"
     },
     {
@@ -12176,7 +12120,7 @@
       "_origin": "ast",
       "id": "frontend_src_components_layouts_header",
       "community": 13,
-      "community_name": "useAuthStore",
+      "community_name": "themeConfigSlice.tsx",
       "norm_label": "header.tsx"
     },
     {
@@ -12188,7 +12132,7 @@
       "_origin": "ast",
       "id": "frontend_src_components_layouts_header_header",
       "community": 13,
-      "community_name": "useAuthStore",
+      "community_name": "themeConfigSlice.tsx",
       "norm_label": "header()"
     },
     {
@@ -12199,7 +12143,7 @@
       "_origin": "ast",
       "id": "frontend_src_components_layouts_setting",
       "community": 13,
-      "community_name": "useAuthStore",
+      "community_name": "themeConfigSlice.tsx",
       "norm_label": "setting.tsx"
     },
     {
@@ -12211,7 +12155,7 @@
       "_origin": "ast",
       "id": "frontend_src_components_layouts_setting_setting",
       "community": 13,
-      "community_name": "useAuthStore",
+      "community_name": "themeConfigSlice.tsx",
       "norm_label": "setting()"
     },
     {
@@ -12221,7 +12165,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_components_layouts_sidebar",
-      "community": 13,
+      "community": 20,
       "community_name": "useAuthStore",
       "norm_label": "sidebar.tsx"
     },
@@ -12233,7 +12177,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_components_layouts_sidebar_sidebar",
-      "community": 13,
+      "community": 20,
       "community_name": "useAuthStore",
       "norm_label": "sidebar()"
     },
@@ -12245,7 +12189,7 @@
       "_origin": "ast",
       "id": "frontend_src_components_portals",
       "community": 13,
-      "community_name": "useAuthStore",
+      "community_name": "themeConfigSlice.tsx",
       "norm_label": "portals.tsx"
     },
     {
@@ -12257,7 +12201,7 @@
       "_origin": "ast",
       "id": "frontend_src_components_portals_portals",
       "community": 13,
-      "community_name": "useAuthStore",
+      "community_name": "themeConfigSlice.tsx",
       "norm_label": "portals()"
     },
     {
@@ -12290,8 +12234,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_components_auth_guestroute",
-      "community": 13,
-      "community_name": "useAuthStore",
+      "community": 68,
+      "community_name": "router/index.tsx",
       "norm_label": "guestroute.tsx"
     },
     {
@@ -12302,8 +12246,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_components_auth_guestroute_guestroute",
-      "community": 13,
-      "community_name": "useAuthStore",
+      "community": 68,
+      "community_name": "router/index.tsx",
       "norm_label": "guestroute()"
     },
     {
@@ -12336,7 +12280,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_components_auth_protectedroute",
-      "community": 13,
+      "community": 20,
       "community_name": "useAuthStore",
       "norm_label": "protectedroute.tsx"
     },
@@ -12348,7 +12292,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_components_auth_protectedroute_protectedroute",
-      "community": 13,
+      "community": 20,
       "community_name": "useAuthStore",
       "norm_label": "protectedroute()"
     },
@@ -12359,7 +12303,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_components_auth_roleprotectedroute",
-      "community": 13,
+      "community": 20,
       "community_name": "useAuthStore",
       "norm_label": "roleprotectedroute.tsx"
     },
@@ -12371,7 +12315,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_components_auth_roleprotectedroute_roleprotectedroute",
-      "community": 13,
+      "community": 20,
       "community_name": "useAuthStore",
       "norm_label": "roleprotectedroute()"
     },
@@ -12405,8 +12349,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_components_auth_superadminentryroute",
-      "community": 49,
-      "community_name": "routes.tsx",
+      "community": 20,
+      "community_name": "useAuthStore",
       "norm_label": "superadminentryroute.tsx"
     },
     {
@@ -12417,8 +12361,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_components_auth_superadminentryroute_superadminentryroute",
-      "community": 49,
-      "community_name": "routes.tsx",
+      "community": 20,
+      "community_name": "useAuthStore",
       "norm_label": "superadminentryroute()"
     },
     {
@@ -12451,8 +12395,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_components_interview_interviewlobby",
-      "community": 45,
-      "community_name": "InterviewDetailsPage.tsx",
+      "community": 17,
+      "community_name": "Card.tsx",
       "norm_label": "interviewlobby.tsx"
     },
     {
@@ -12464,8 +12408,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_components_interview_interviewlobby_camstate",
-      "community": 45,
-      "community_name": "InterviewDetailsPage.tsx",
+      "community": 17,
+      "community_name": "Card.tsx",
       "norm_label": "camstate"
     },
     {
@@ -12477,8 +12421,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_components_interview_interviewlobby_checkstate",
-      "community": 45,
-      "community_name": "InterviewDetailsPage.tsx",
+      "community": 17,
+      "community_name": "Card.tsx",
       "norm_label": "checkstate"
     },
     {
@@ -12490,8 +12434,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_components_interview_interviewlobby_interviewlobbyprops",
-      "community": 45,
-      "community_name": "InterviewDetailsPage.tsx",
+      "community": 17,
+      "community_name": "Card.tsx",
       "norm_label": "interviewlobbyprops"
     },
     {
@@ -12502,8 +12446,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_components_interview_interviewlobby_interviewlobby",
-      "community": 45,
-      "community_name": "InterviewDetailsPage.tsx",
+      "community": 17,
+      "community_name": "Card.tsx",
       "norm_label": "interviewlobby()"
     },
     {
@@ -12989,8 +12933,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_components_landing_navbar",
-      "community": 30,
-      "community_name": "LandingPage.tsx",
+      "community": 13,
+      "community_name": "themeConfigSlice.tsx",
       "norm_label": "landing/navbar.tsx"
     },
     {
@@ -13000,8 +12944,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "frontend_src_components_landing_navbar_links",
-      "community": 30,
-      "community_name": "LandingPage.tsx",
+      "community": 13,
+      "community_name": "themeConfigSlice.tsx",
       "norm_label": "links"
     },
     {
@@ -13093,7 +13037,7 @@
       "_origin": "ast",
       "id": "frontend_src_components_layout_navbar",
       "community": 10,
-      "community_name": "themeConfigSlice.tsx",
+      "community_name": "LoginPage.tsx",
       "norm_label": "layout/navbar.tsx"
     },
     {
@@ -13105,7 +13049,7 @@
       "_origin": "ast",
       "id": "frontend_src_components_layout_navbar_navbar",
       "community": 10,
-      "community_name": "themeConfigSlice.tsx",
+      "community_name": "LoginPage.tsx",
       "norm_label": "navbar()"
     },
     {
@@ -13116,7 +13060,7 @@
       "_origin": "ast",
       "id": "frontend_src_components_layout_themetoggle",
       "community": 10,
-      "community_name": "themeConfigSlice.tsx",
+      "community_name": "LoginPage.tsx",
       "norm_label": "themetoggle.tsx"
     },
     {
@@ -13128,7 +13072,7 @@
       "_origin": "ast",
       "id": "frontend_src_components_layout_themetoggle_themetoggle",
       "community": 10,
-      "community_name": "themeConfigSlice.tsx",
+      "community_name": "LoginPage.tsx",
       "norm_label": "themetoggle()"
     },
     {
@@ -13299,8 +13243,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_components_ui_avatar",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "avatar.tsx"
     },
     {
@@ -13310,8 +13254,8 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "frontend_src_components_ui_avatar_avatarvariants",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "avatarvariants"
     },
     {
@@ -13323,8 +13267,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_components_ui_avatar_avatarprops",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "avatarprops"
     },
     {
@@ -13334,8 +13278,8 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "frontend_src_components_ui_avatar_avatar",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "avatar"
     },
     {
@@ -13346,7 +13290,7 @@
       "_origin": "ast",
       "id": "frontend_src_components_ui_badge",
       "community": 59,
-      "community_name": "InterviewReportPage.tsx",
+      "community_name": "InterviewReviewPage.tsx",
       "norm_label": "badge.tsx"
     },
     {
@@ -13359,7 +13303,7 @@
       "_origin": "ast",
       "id": "frontend_src_components_ui_badge_badgeprops",
       "community": 59,
-      "community_name": "InterviewReportPage.tsx",
+      "community_name": "InterviewReviewPage.tsx",
       "norm_label": "badgeprops"
     },
     {
@@ -13371,7 +13315,7 @@
       "_origin": "ast",
       "id": "frontend_src_components_ui_badge_badge",
       "community": 59,
-      "community_name": "InterviewReportPage.tsx",
+      "community_name": "InterviewReviewPage.tsx",
       "norm_label": "badge()"
     },
     {
@@ -13381,8 +13325,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_components_ui_button",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "button.tsx"
     },
     {
@@ -13394,8 +13338,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_components_ui_button_buttonprops",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "buttonprops"
     },
     {
@@ -13405,8 +13349,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "frontend_src_components_ui_button_button",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "button"
     },
     {
@@ -13557,8 +13501,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_components_ui_emptystate",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "emptystate.tsx"
     },
     {
@@ -13570,8 +13514,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_components_ui_emptystate_emptystateprops",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "emptystateprops"
     },
     {
@@ -13582,8 +13526,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_components_ui_emptystate_emptystate",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "emptystate()"
     },
     {
@@ -13593,8 +13537,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_components_ui_input",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "input.tsx"
     },
     {
@@ -13606,8 +13550,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_components_ui_input_inputprops",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "inputprops"
     },
     {
@@ -13617,8 +13561,8 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "frontend_src_components_ui_input_input",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "input"
     },
     {
@@ -13628,7 +13572,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_components_ui_loadingspinner",
-      "community": 94,
+      "community": 8,
       "community_name": "LoadingSpinner.tsx",
       "norm_label": "loadingspinner.tsx"
     },
@@ -13641,7 +13585,7 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_components_ui_loadingspinner_loadingspinnerprops",
-      "community": 94,
+      "community": 8,
       "community_name": "LoadingSpinner.tsx",
       "norm_label": "loadingspinnerprops"
     },
@@ -13653,7 +13597,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_components_ui_loadingspinner_loadingspinner",
-      "community": 94,
+      "community": 8,
       "community_name": "LoadingSpinner.tsx",
       "norm_label": "loadingspinner()"
     },
@@ -13757,8 +13701,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_components_ui_modal_modal",
-      "community": 7,
-      "community_name": "cn",
+      "community": 111,
+      "community_name": "CompanySecurityEventsPage.tsx",
       "norm_label": "modal()"
     },
     {
@@ -13791,7 +13735,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_components_ui_progress",
-      "community": 59,
+      "community": 24,
       "community_name": "InterviewReportPage.tsx",
       "norm_label": "progress.tsx"
     },
@@ -13804,7 +13748,7 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_components_ui_progress_progressprops",
-      "community": 59,
+      "community": 24,
       "community_name": "InterviewReportPage.tsx",
       "norm_label": "progressprops"
     },
@@ -13815,7 +13759,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "frontend_src_components_ui_progress_progress",
-      "community": 59,
+      "community": 24,
       "community_name": "InterviewReportPage.tsx",
       "norm_label": "progress"
     },
@@ -13914,8 +13858,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_components_ui_skeleton",
-      "community": 42,
-      "community_name": "InterviewsHistoryPage.tsx",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "skeleton.tsx"
     },
     {
@@ -13926,8 +13870,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_components_ui_skeleton_skeleton",
-      "community": 42,
-      "community_name": "InterviewsHistoryPage.tsx",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "skeleton()"
     },
     {
@@ -13937,8 +13881,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_components_ui_slider",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "slider.tsx"
     },
     {
@@ -13948,8 +13892,8 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "frontend_src_components_ui_slider_slider",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "slider"
     },
     {
@@ -14149,8 +14093,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_components_ui_toast",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "toast.tsx"
     },
     {
@@ -14162,8 +14106,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_components_ui_toast_toastprops",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "toastprops"
     },
     {
@@ -14173,8 +14117,8 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "frontend_src_components_ui_toast_icons",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "icons"
     },
     {
@@ -14185,8 +14129,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_components_ui_toast_toast",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "toast()"
     },
     {
@@ -14196,8 +14140,8 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "frontend_src_components_ui_toast_showtoast",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "showtoast"
     },
     {
@@ -14207,8 +14151,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_components_ui_toggle",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "toggle.tsx"
     },
     {
@@ -14218,8 +14162,8 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "frontend_src_components_ui_toggle_toggle",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "toggle"
     },
     {
@@ -14229,8 +14173,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_components_ui_tooltip",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "tooltip.tsx"
     },
     {
@@ -14240,8 +14184,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "frontend_src_components_ui_tooltip_tooltipcontent",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "tooltipcontent"
     },
     {
@@ -14251,8 +14195,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_components_ui_index",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "index.ts"
     },
     {
@@ -14396,8 +14340,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_hooks_useconversationengine_conversationengineconfig",
-      "community": 6,
-      "community_name": "useConversationEngine.ts",
+      "community": 59,
+      "community_name": "InterviewReviewPage.tsx",
       "norm_label": "conversationengineconfig"
     },
     {
@@ -15087,7 +15031,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_i18n",
-      "community": 10,
+      "community": 13,
       "community_name": "themeConfigSlice.tsx",
       "norm_label": "i18n.tsx"
     },
@@ -15133,8 +15077,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_lib_authredirect",
-      "community": 13,
-      "community_name": "useAuthStore",
+      "community": 10,
+      "community_name": "LoginPage.tsx",
       "norm_label": "authredirect.ts"
     },
     {
@@ -15145,8 +15089,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_lib_authredirect_sanitizeredirectpath",
-      "community": 13,
-      "community_name": "useAuthStore",
+      "community": 10,
+      "community_name": "LoginPage.tsx",
       "norm_label": "sanitizeredirectpath()"
     },
     {
@@ -15156,8 +15100,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_lib_constants",
-      "community": 42,
-      "community_name": "InterviewsHistoryPage.tsx",
+      "community": 8,
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "constants.ts"
     },
     {
@@ -15167,8 +15111,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_lib_constants_technology_specializations",
-      "community": 42,
-      "community_name": "InterviewsHistoryPage.tsx",
+      "community": 8,
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "technology_specializations"
     },
     {
@@ -15178,8 +15122,8 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "frontend_src_lib_constants_domain_roles",
-      "community": 42,
-      "community_name": "InterviewsHistoryPage.tsx",
+      "community": 8,
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "domain_roles"
     },
     {
@@ -15189,8 +15133,8 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "frontend_src_lib_constants_domain_labels",
-      "community": 42,
-      "community_name": "InterviewsHistoryPage.tsx",
+      "community": 8,
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "domain_labels"
     },
     {
@@ -15200,8 +15144,8 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "frontend_src_lib_constants_question_categories",
-      "community": 42,
-      "community_name": "InterviewsHistoryPage.tsx",
+      "community": 8,
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "question_categories"
     },
     {
@@ -15211,8 +15155,8 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "frontend_src_lib_constants_domains",
-      "community": 42,
-      "community_name": "InterviewsHistoryPage.tsx",
+      "community": 8,
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "domains"
     },
     {
@@ -15223,7 +15167,7 @@
       "_origin": "ast",
       "id": "frontend_src_lib_fileparser",
       "community": 90,
-      "community_name": "NewInterviewPage.tsx",
+      "community_name": "useInterviewStore",
       "norm_label": "fileparser.ts"
     },
     {
@@ -15234,7 +15178,7 @@
       "_origin": "ast",
       "id": "frontend_src_lib_fileparser_supported_extensions",
       "community": 90,
-      "community_name": "NewInterviewPage.tsx",
+      "community_name": "useInterviewStore",
       "norm_label": "supported_extensions"
     },
     {
@@ -15246,7 +15190,7 @@
       "_origin": "ast",
       "id": "frontend_src_lib_fileparser_parseresumefile",
       "community": 90,
-      "community_name": "NewInterviewPage.tsx",
+      "community_name": "useInterviewStore",
       "norm_label": "parseresumefile()"
     },
     {
@@ -15258,7 +15202,7 @@
       "_origin": "ast",
       "id": "frontend_src_lib_fileparser_parsepdffile",
       "community": 90,
-      "community_name": "NewInterviewPage.tsx",
+      "community_name": "useInterviewStore",
       "norm_label": "parsepdffile()"
     },
     {
@@ -15270,7 +15214,7 @@
       "_origin": "ast",
       "id": "frontend_src_lib_fileparser_parsewordfile",
       "community": 90,
-      "community_name": "NewInterviewPage.tsx",
+      "community_name": "useInterviewStore",
       "norm_label": "parsewordfile()"
     },
     {
@@ -15291,8 +15235,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_lib_interviewhelpers",
-      "community": 90,
-      "community_name": "NewInterviewPage.tsx",
+      "community": 6,
+      "community_name": "useConversationEngine.ts",
       "norm_label": "interviewhelpers.ts"
     },
     {
@@ -15304,7 +15248,7 @@
       "_origin": "ast",
       "id": "frontend_src_lib_interviewhelpers_estimatequestioncount",
       "community": 90,
-      "community_name": "NewInterviewPage.tsx",
+      "community_name": "useInterviewStore",
       "norm_label": "estimatequestioncount()"
     },
     {
@@ -15315,8 +15259,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_lib_interviewhelpers_computequestionsready",
-      "community": 45,
-      "community_name": "InterviewDetailsPage.tsx",
+      "community": 6,
+      "community_name": "useConversationEngine.ts",
       "norm_label": "computequestionsready()"
     },
     {
@@ -15326,8 +15270,8 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "frontend_src_lib_interviewhelpers_placeholder_transcript_re",
-      "community": 90,
-      "community_name": "NewInterviewPage.tsx",
+      "community": 6,
+      "community_name": "useConversationEngine.ts",
       "norm_label": "placeholder_transcript_re"
     },
     {
@@ -15374,8 +15318,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_lib_interviewhelpers_normalizequestiontext",
-      "community": 90,
-      "community_name": "NewInterviewPage.tsx",
+      "community": 6,
+      "community_name": "useConversationEngine.ts",
       "norm_label": "normalizequestiontext()"
     },
     {
@@ -15386,8 +15330,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_lib_interviewhelpers_issimilarquestiontext",
-      "community": 90,
-      "community_name": "NewInterviewPage.tsx",
+      "community": 6,
+      "community_name": "useConversationEngine.ts",
       "norm_label": "issimilarquestiontext()"
     },
     {
@@ -15469,8 +15413,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_lib_utils",
-      "community": 20,
-      "community_name": "utils.ts",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "utils.ts"
     },
     {
@@ -15494,7 +15438,7 @@
       "_origin": "ast",
       "id": "frontend_src_lib_utils_geterrormessage",
       "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community_name": "getErrorMessage",
       "norm_label": "geterrormessage()"
     },
     {
@@ -15515,8 +15459,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_main",
-      "community": 13,
-      "community_name": "useAuthStore",
+      "community": 68,
+      "community_name": "router/index.tsx",
       "norm_label": "main.tsx"
     },
     {
@@ -15596,7 +15540,7 @@
       "_origin": "ast",
       "id": "frontend_src_pages_auth_forgotpasswordpage",
       "community": 10,
-      "community_name": "themeConfigSlice.tsx",
+      "community_name": "LoginPage.tsx",
       "norm_label": "forgotpasswordpage.tsx"
     },
     {
@@ -15608,7 +15552,7 @@
       "_origin": "ast",
       "id": "frontend_src_pages_auth_forgotpasswordpage_forgotpasswordpage",
       "community": 10,
-      "community_name": "themeConfigSlice.tsx",
+      "community_name": "LoginPage.tsx",
       "norm_label": "forgotpasswordpage()"
     },
     {
@@ -15618,7 +15562,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_pages_auth_interviewlinkpage",
-      "community": 13,
+      "community": 20,
       "community_name": "useAuthStore",
       "norm_label": "interviewlinkpage.tsx"
     },
@@ -15630,7 +15574,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_auth_interviewlinkpage_interviewlinkpage",
-      "community": 13,
+      "community": 20,
       "community_name": "useAuthStore",
       "norm_label": "interviewlinkpage()"
     },
@@ -15641,8 +15585,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_pages_auth_loginpage",
-      "community": 13,
-      "community_name": "useAuthStore",
+      "community": 10,
+      "community_name": "LoginPage.tsx",
       "norm_label": "loginpage.tsx"
     },
     {
@@ -15653,8 +15597,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_auth_loginpage_loginpage",
-      "community": 13,
-      "community_name": "useAuthStore",
+      "community": 10,
+      "community_name": "LoginPage.tsx",
       "norm_label": "loginpage()"
     },
     {
@@ -15665,7 +15609,7 @@
       "_origin": "ast",
       "id": "frontend_src_pages_auth_resetpasswordpage",
       "community": 10,
-      "community_name": "themeConfigSlice.tsx",
+      "community_name": "LoginPage.tsx",
       "norm_label": "resetpasswordpage.tsx"
     },
     {
@@ -15677,7 +15621,7 @@
       "_origin": "ast",
       "id": "frontend_src_pages_auth_resetpasswordpage_resetpasswordpage",
       "community": 10,
-      "community_name": "themeConfigSlice.tsx",
+      "community_name": "LoginPage.tsx",
       "norm_label": "resetpasswordpage()"
     },
     {
@@ -15687,8 +15631,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyassessmentspage",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 62,
+      "community_name": "CompanyAssessmentsPage.tsx",
       "norm_label": "companyassessmentspage.tsx"
     },
     {
@@ -15699,8 +15643,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyassessmentspage_datetime",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 62,
+      "community_name": "CompanyAssessmentsPage.tsx",
       "norm_label": "datetime()"
     },
     {
@@ -15711,8 +15655,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyassessmentspage_datetimeshort",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 62,
+      "community_name": "CompanyAssessmentsPage.tsx",
       "norm_label": "datetimeshort()"
     },
     {
@@ -15722,8 +15666,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyassessmentspage_violation_label",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 62,
+      "community_name": "CompanyAssessmentsPage.tsx",
       "norm_label": "violation_label"
     },
     {
@@ -15734,8 +15678,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyassessmentspage_scorebar",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 62,
+      "community_name": "CompanyAssessmentsPage.tsx",
       "norm_label": "scorebar()"
     },
     {
@@ -15746,8 +15690,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyassessmentspage_identityverificationcard",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 62,
+      "community_name": "CompanyAssessmentsPage.tsx",
       "norm_label": "identityverificationcard()"
     },
     {
@@ -15758,8 +15702,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyassessmentspage_questioncard",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 62,
+      "community_name": "CompanyAssessmentsPage.tsx",
       "norm_label": "questioncard()"
     },
     {
@@ -15770,8 +15714,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyassessmentspage_proctoringlog",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 62,
+      "community_name": "CompanyAssessmentsPage.tsx",
       "norm_label": "proctoringlog()"
     },
     {
@@ -15782,8 +15726,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyassessmentspage_companyassessmentspage",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 62,
+      "community_name": "CompanyAssessmentsPage.tsx",
       "norm_label": "companyassessmentspage()"
     },
     {
@@ -15888,8 +15832,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_pages_company_companydashboardpage",
-      "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community": 54,
+      "community_name": "companyService.ts",
       "norm_label": "companydashboardpage.tsx"
     },
     {
@@ -15900,8 +15844,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companydashboardpage_datetime",
-      "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community": 54,
+      "community_name": "companyService.ts",
       "norm_label": "datetime()"
     },
     {
@@ -15912,8 +15856,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companydashboardpage_companydashboardpage",
-      "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community": 54,
+      "community_name": "companyService.ts",
       "norm_label": "companydashboardpage()"
     },
     {
@@ -15923,8 +15867,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyinterviewspage",
-      "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community": 95,
+      "community_name": "CompanyInterviewsPage.tsx",
       "norm_label": "companyinterviewspage.tsx"
     },
     {
@@ -15935,8 +15879,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyinterviewspage_datetime",
-      "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community": 95,
+      "community_name": "CompanyInterviewsPage.tsx",
       "norm_label": "datetime()"
     },
     {
@@ -15947,8 +15891,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyinterviewspage_datetimeshort",
-      "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community": 95,
+      "community_name": "CompanyInterviewsPage.tsx",
       "norm_label": "datetimeshort()"
     },
     {
@@ -15959,8 +15903,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyinterviewspage_statusbadge",
-      "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community": 95,
+      "community_name": "CompanyInterviewsPage.tsx",
       "norm_label": "statusbadge()"
     },
     {
@@ -15971,8 +15915,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyinterviewspage_getmindatetime",
-      "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community": 95,
+      "community_name": "CompanyInterviewsPage.tsx",
       "norm_label": "getmindatetime()"
     },
     {
@@ -15982,8 +15926,8 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyinterviewspage_violation_label",
-      "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community": 95,
+      "community_name": "CompanyInterviewsPage.tsx",
       "norm_label": "violation_label"
     },
     {
@@ -15994,8 +15938,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyinterviewspage_companyinterviewspage",
-      "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community": 95,
+      "community_name": "CompanyInterviewsPage.tsx",
       "norm_label": "companyinterviewspage()"
     },
     {
@@ -16006,7 +15950,7 @@
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyjobspage",
       "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community_name": "getErrorMessage",
       "norm_label": "companyjobspage.tsx"
     },
     {
@@ -16018,7 +15962,7 @@
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyjobspage_datetime",
       "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community_name": "getErrorMessage",
       "norm_label": "datetime()"
     },
     {
@@ -16030,7 +15974,7 @@
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyjobspage_statusbadge",
       "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community_name": "getErrorMessage",
       "norm_label": "statusbadge()"
     },
     {
@@ -16042,7 +15986,7 @@
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyjobspage_companyjobspage",
       "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community_name": "getErrorMessage",
       "norm_label": "companyjobspage()"
     },
     {
@@ -16052,8 +15996,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_pages_company_companysecurityeventspage",
-      "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community": 111,
+      "community_name": "CompanySecurityEventsPage.tsx",
       "norm_label": "companysecurityeventspage.tsx"
     },
     {
@@ -16063,8 +16007,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "frontend_src_pages_company_companysecurityeventspage_outcome_label",
-      "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community": 111,
+      "community_name": "CompanySecurityEventsPage.tsx",
       "norm_label": "outcome_label"
     },
     {
@@ -16074,8 +16018,8 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "frontend_src_pages_company_companysecurityeventspage_severity_badge",
-      "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community": 111,
+      "community_name": "CompanySecurityEventsPage.tsx",
       "norm_label": "severity_badge"
     },
     {
@@ -16086,8 +16030,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companysecurityeventspage_datetime",
-      "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community": 111,
+      "community_name": "CompanySecurityEventsPage.tsx",
       "norm_label": "datetime()"
     },
     {
@@ -16098,8 +16042,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companysecurityeventspage_companysecurityeventspage",
-      "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community": 111,
+      "community_name": "CompanySecurityEventsPage.tsx",
       "norm_label": "companysecurityeventspage()"
     },
     {
@@ -16110,7 +16054,7 @@
       "_origin": "ast",
       "id": "frontend_src_pages_company_companysettingspage",
       "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community_name": "getErrorMessage",
       "norm_label": "companysettingspage.tsx"
     },
     {
@@ -16122,7 +16066,7 @@
       "_origin": "ast",
       "id": "frontend_src_pages_company_companysettingspage_companysettingspage",
       "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community_name": "getErrorMessage",
       "norm_label": "companysettingspage()"
     },
     {
@@ -16132,8 +16076,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyshortlistpage",
-      "community": 46,
-      "community_name": "CompanyCandidatesPage.tsx",
+      "community": 86,
+      "community_name": "CompanyShortlistPage.tsx",
       "norm_label": "companyshortlistpage.tsx"
     },
     {
@@ -16144,8 +16088,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyshortlistpage_approvalbadge",
-      "community": 46,
-      "community_name": "CompanyCandidatesPage.tsx",
+      "community": 86,
+      "community_name": "CompanyShortlistPage.tsx",
       "norm_label": "approvalbadge()"
     },
     {
@@ -16156,8 +16100,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyshortlistpage_dateshort",
-      "community": 46,
-      "community_name": "CompanyCandidatesPage.tsx",
+      "community": 86,
+      "community_name": "CompanyShortlistPage.tsx",
       "norm_label": "dateshort()"
     },
     {
@@ -16168,8 +16112,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyshortlistpage_getmindatetime",
-      "community": 46,
-      "community_name": "CompanyCandidatesPage.tsx",
+      "community": 86,
+      "community_name": "CompanyShortlistPage.tsx",
       "norm_label": "getmindatetime()"
     },
     {
@@ -16180,8 +16124,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyshortlistpage_avatar",
-      "community": 46,
-      "community_name": "CompanyCandidatesPage.tsx",
+      "community": 86,
+      "community_name": "CompanyShortlistPage.tsx",
       "norm_label": "avatar()"
     },
     {
@@ -16192,8 +16136,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyshortlistpage_profilemodal",
-      "community": 46,
-      "community_name": "CompanyCandidatesPage.tsx",
+      "community": 86,
+      "community_name": "CompanyShortlistPage.tsx",
       "norm_label": "profilemodal()"
     },
     {
@@ -16204,8 +16148,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_companyshortlistpage_companyshortlistpage",
-      "community": 46,
-      "community_name": "CompanyCandidatesPage.tsx",
+      "community": 86,
+      "community_name": "CompanyShortlistPage.tsx",
       "norm_label": "companyshortlistpage()"
     },
     {
@@ -16215,8 +16159,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_pages_company_postjobpage",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 54,
+      "community_name": "companyService.ts",
       "norm_label": "postjobpage.tsx"
     },
     {
@@ -16226,8 +16170,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "frontend_src_pages_company_postjobpage_defaultform",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 54,
+      "community_name": "companyService.ts",
       "norm_label": "defaultform"
     },
     {
@@ -16238,8 +16182,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_company_postjobpage_postjobpage",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 54,
+      "community_name": "companyService.ts",
       "norm_label": "postjobpage()"
     },
     {
@@ -16250,7 +16194,7 @@
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_analyticspage",
       "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community_name": "InterviewReportPage.tsx",
       "norm_label": "analyticspage.tsx"
     },
     {
@@ -16261,7 +16205,7 @@
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_analyticspage_period_map",
       "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community_name": "InterviewReportPage.tsx",
       "norm_label": "period_map"
     },
     {
@@ -16273,7 +16217,7 @@
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_analyticspage_analyticspage",
       "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community_name": "InterviewReportPage.tsx",
       "norm_label": "analyticspage()"
     },
     {
@@ -16330,7 +16274,7 @@
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_interviewcompletepage",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "interviewcompletepage.tsx"
     },
     {
@@ -16342,7 +16286,7 @@
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_interviewcompletepage_interviewcompletepage",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "interviewcompletepage()"
     },
     {
@@ -16364,8 +16308,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_interviewdetailspage_formattime",
-      "community": 45,
-      "community_name": "InterviewDetailsPage.tsx",
+      "community": 6,
+      "community_name": "useConversationEngine.ts",
       "norm_label": "formattime()"
     },
     {
@@ -16389,8 +16333,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_interviewdetailspage_interviewdetailspage",
-      "community": 45,
-      "community_name": "InterviewDetailsPage.tsx",
+      "community": 6,
+      "community_name": "useConversationEngine.ts",
       "norm_label": "interviewdetailspage()"
     },
     {
@@ -16424,7 +16368,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_interviewreportpage",
-      "community": 59,
+      "community": 24,
       "community_name": "InterviewReportPage.tsx",
       "norm_label": "interviewreportpage.tsx"
     },
@@ -16436,7 +16380,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_interviewreportpage_formattime",
-      "community": 59,
+      "community": 24,
       "community_name": "InterviewReportPage.tsx",
       "norm_label": "formattime()"
     },
@@ -16448,7 +16392,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_interviewreportpage_getscorecolor",
-      "community": 59,
+      "community": 24,
       "community_name": "InterviewReportPage.tsx",
       "norm_label": "getscorecolor()"
     },
@@ -16460,7 +16404,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_interviewreportpage_getscorelabel",
-      "community": 59,
+      "community": 24,
       "community_name": "InterviewReportPage.tsx",
       "norm_label": "getscorelabel()"
     },
@@ -16472,7 +16416,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_interviewreportpage_interviewreportpage",
-      "community": 59,
+      "community": 24,
       "community_name": "InterviewReportPage.tsx",
       "norm_label": "interviewreportpage()"
     },
@@ -16484,7 +16428,7 @@
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_interviewreviewpage",
       "community": 59,
-      "community_name": "InterviewReportPage.tsx",
+      "community_name": "InterviewReviewPage.tsx",
       "norm_label": "interviewreviewpage.tsx"
     },
     {
@@ -16496,7 +16440,7 @@
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_interviewreviewpage_formattime",
       "community": 59,
-      "community_name": "InterviewReportPage.tsx",
+      "community_name": "InterviewReviewPage.tsx",
       "norm_label": "formattime()"
     },
     {
@@ -16508,7 +16452,7 @@
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_interviewreviewpage_getscorecolor",
       "community": 59,
-      "community_name": "InterviewReportPage.tsx",
+      "community_name": "InterviewReviewPage.tsx",
       "norm_label": "getscorecolor()"
     },
     {
@@ -16520,7 +16464,7 @@
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_interviewreviewpage_interviewreviewpage",
       "community": 59,
-      "community_name": "InterviewReportPage.tsx",
+      "community_name": "InterviewReviewPage.tsx",
       "norm_label": "interviewreviewpage()"
     },
     {
@@ -16530,8 +16474,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_interviewshistorypage",
-      "community": 42,
-      "community_name": "InterviewsHistoryPage.tsx",
+      "community": 8,
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "interviewshistorypage.tsx"
     },
     {
@@ -16541,8 +16485,8 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_interviewshistorypage_status_options",
-      "community": 42,
-      "community_name": "InterviewsHistoryPage.tsx",
+      "community": 8,
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "status_options"
     },
     {
@@ -16553,8 +16497,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_interviewshistorypage_statusbadge",
-      "community": 42,
-      "community_name": "InterviewsHistoryPage.tsx",
+      "community": 8,
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "statusbadge()"
     },
     {
@@ -16565,8 +16509,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_interviewshistorypage_interviewshistorypage",
-      "community": 42,
-      "community_name": "InterviewsHistoryPage.tsx",
+      "community": 7,
+      "community_name": "cn",
       "norm_label": "interviewshistorypage()"
     },
     {
@@ -16576,8 +16520,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_newinterviewpage",
-      "community": 90,
-      "community_name": "NewInterviewPage.tsx",
+      "community": 8,
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "newinterviewpage.tsx"
     },
     {
@@ -16587,8 +16531,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_newinterviewpage_difficulty_levels",
-      "community": 90,
-      "community_name": "NewInterviewPage.tsx",
+      "community": 8,
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "difficulty_levels"
     },
     {
@@ -16598,8 +16542,8 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_newinterviewpage_duration_options",
-      "community": 90,
-      "community_name": "NewInterviewPage.tsx",
+      "community": 8,
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "duration_options"
     },
     {
@@ -16611,7 +16555,7 @@
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_newinterviewpage_newinterviewpage",
       "community": 90,
-      "community_name": "NewInterviewPage.tsx",
+      "community_name": "useInterviewStore",
       "norm_label": "newinterviewpage()"
     },
     {
@@ -16644,8 +16588,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_settingspage",
-      "community": 13,
-      "community_name": "useAuthStore",
+      "community": 25,
+      "community_name": "DashboardPage.tsx",
       "norm_label": "settingspage.tsx"
     },
     {
@@ -16656,8 +16600,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_dashboard_settingspage_settingspage",
-      "community": 13,
-      "community_name": "useAuthStore",
+      "community": 94,
+      "community_name": "getErrorMessage",
       "norm_label": "settingspage()"
     },
     {
@@ -16783,8 +16727,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_pages_superadmin_superadminloginpage",
-      "community": 39,
-      "community_name": "UsersPage.tsx",
+      "community": 20,
+      "community_name": "useAuthStore",
       "norm_label": "superadminloginpage.tsx"
     },
     {
@@ -16795,8 +16739,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_superadmin_superadminloginpage_superadminloginpage",
-      "community": 39,
-      "community_name": "UsersPage.tsx",
+      "community": 20,
+      "community_name": "useAuthStore",
       "norm_label": "superadminloginpage()"
     },
     {
@@ -16806,8 +16750,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_pages_superadmin_superadminsettingspage",
-      "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community": 20,
+      "community_name": "useAuthStore",
       "norm_label": "superadminsettingspage.tsx"
     },
     {
@@ -16818,8 +16762,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "frontend_src_pages_superadmin_superadminsettingspage_superadminsettingspage",
-      "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community": 20,
+      "community_name": "useAuthStore",
       "norm_label": "superadminsettingspage()"
     },
     {
@@ -16910,8 +16854,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_router_index",
-      "community": 13,
-      "community_name": "useAuthStore",
+      "community": 68,
+      "community_name": "router/index.tsx",
       "norm_label": "router/index.tsx"
     },
     {
@@ -16921,8 +16865,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "frontend_src_router_index_protected_paths",
-      "community": 13,
-      "community_name": "useAuthStore",
+      "community": 68,
+      "community_name": "router/index.tsx",
       "norm_label": "protected_paths"
     },
     {
@@ -16932,8 +16876,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "frontend_src_router_index_guest_paths",
-      "community": 13,
-      "community_name": "useAuthStore",
+      "community": 68,
+      "community_name": "router/index.tsx",
       "norm_label": "guest_paths"
     },
     {
@@ -16943,8 +16887,8 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "frontend_src_router_index_finalroutes",
-      "community": 13,
-      "community_name": "useAuthStore",
+      "community": 68,
+      "community_name": "router/index.tsx",
       "norm_label": "finalroutes"
     },
     {
@@ -16954,8 +16898,8 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "frontend_src_router_index_router",
-      "community": 13,
-      "community_name": "useAuthStore",
+      "community": 68,
+      "community_name": "router/index.tsx",
       "norm_label": "router"
     },
     {
@@ -16999,8 +16943,8 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "frontend_src_router_routes_loginpage",
-      "community": 13,
-      "community_name": "useAuthStore",
+      "community": 10,
+      "community_name": "LoginPage.tsx",
       "norm_label": "loginpage"
     },
     {
@@ -17011,7 +16955,7 @@
       "_origin": "ast",
       "id": "frontend_src_router_routes_forgotpasswordpage",
       "community": 10,
-      "community_name": "themeConfigSlice.tsx",
+      "community_name": "LoginPage.tsx",
       "norm_label": "forgotpasswordpage"
     },
     {
@@ -17022,7 +16966,7 @@
       "_origin": "ast",
       "id": "frontend_src_router_routes_resetpasswordpage",
       "community": 10,
-      "community_name": "themeConfigSlice.tsx",
+      "community_name": "LoginPage.tsx",
       "norm_label": "resetpasswordpage"
     },
     {
@@ -17065,8 +17009,8 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "frontend_src_router_routes_superadminloginpage",
-      "community": 39,
-      "community_name": "UsersPage.tsx",
+      "community": 20,
+      "community_name": "useAuthStore",
       "norm_label": "superadminloginpage"
     },
     {
@@ -17087,8 +17031,8 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "frontend_src_router_routes_userspage",
-      "community": 39,
-      "community_name": "UsersPage.tsx",
+      "community": 49,
+      "community_name": "routes.tsx",
       "norm_label": "userspage"
     },
     {
@@ -17098,8 +17042,8 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "frontend_src_router_routes_superadminsettingspage",
-      "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community": 20,
+      "community_name": "useAuthStore",
       "norm_label": "superadminsettingspage"
     },
     {
@@ -17109,8 +17053,8 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "frontend_src_router_routes_publiccompanyprofilepage",
-      "community": 38,
-      "community_name": "publicCompanyService.ts",
+      "community": 49,
+      "community_name": "routes.tsx",
       "norm_label": "publiccompanyprofilepage"
     },
     {
@@ -17120,8 +17064,8 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "frontend_src_router_routes_publicjobdetailspage",
-      "community": 38,
-      "community_name": "publicCompanyService.ts",
+      "community": 49,
+      "community_name": "routes.tsx",
       "norm_label": "publicjobdetailspage"
     },
     {
@@ -17153,8 +17097,8 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "frontend_src_router_routes_newinterviewpage",
-      "community": 49,
-      "community_name": "routes.tsx",
+      "community": 8,
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "newinterviewpage"
     },
     {
@@ -17208,8 +17152,8 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "frontend_src_router_routes_analyticspage",
-      "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community": 49,
+      "community_name": "routes.tsx",
       "norm_label": "analyticspage"
     },
     {
@@ -17230,8 +17174,8 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "frontend_src_router_routes_settingspage",
-      "community": 49,
-      "community_name": "routes.tsx",
+      "community": 25,
+      "community_name": "DashboardPage.tsx",
       "norm_label": "settingspage"
     },
     {
@@ -17241,8 +17185,8 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "frontend_src_router_routes_companydashboardpage",
-      "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community": 54,
+      "community_name": "companyService.ts",
       "norm_label": "companydashboardpage"
     },
     {
@@ -17252,8 +17196,8 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "frontend_src_router_routes_postjobpage",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 54,
+      "community_name": "companyService.ts",
       "norm_label": "postjobpage"
     },
     {
@@ -17264,7 +17208,7 @@
       "_origin": "ast",
       "id": "frontend_src_router_routes_companyjobspage",
       "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community_name": "getErrorMessage",
       "norm_label": "companyjobspage"
     },
     {
@@ -17285,8 +17229,8 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "frontend_src_router_routes_companyshortlistpage",
-      "community": 46,
-      "community_name": "CompanyCandidatesPage.tsx",
+      "community": 86,
+      "community_name": "CompanyShortlistPage.tsx",
       "norm_label": "companyshortlistpage"
     },
     {
@@ -17296,8 +17240,8 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "frontend_src_router_routes_companyinterviewspage",
-      "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community": 95,
+      "community_name": "CompanyInterviewsPage.tsx",
       "norm_label": "companyinterviewspage"
     },
     {
@@ -17307,8 +17251,8 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "frontend_src_router_routes_companyassessmentspage",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 62,
+      "community_name": "CompanyAssessmentsPage.tsx",
       "norm_label": "companyassessmentspage"
     },
     {
@@ -17319,7 +17263,7 @@
       "_origin": "ast",
       "id": "frontend_src_router_routes_companysettingspage",
       "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community_name": "getErrorMessage",
       "norm_label": "companysettingspage"
     },
     {
@@ -17329,8 +17273,8 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "frontend_src_router_routes_companysecurityeventspage",
-      "community": 49,
-      "community_name": "routes.tsx",
+      "community": 111,
+      "community_name": "CompanySecurityEventsPage.tsx",
       "norm_label": "companysecurityeventspage"
     },
     {
@@ -17340,8 +17284,8 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "frontend_src_router_routes_routes",
-      "community": 13,
-      "community_name": "useAuthStore",
+      "community": 68,
+      "community_name": "router/index.tsx",
       "norm_label": "routes"
     },
     {
@@ -17351,8 +17295,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_services_api",
-      "community": 10,
-      "community_name": "themeConfigSlice.tsx",
+      "community": 25,
+      "community_name": "DashboardPage.tsx",
       "norm_label": "services/api.ts"
     },
     {
@@ -17362,8 +17306,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "frontend_src_services_api_api",
-      "community": 10,
-      "community_name": "themeConfigSlice.tsx",
+      "community": 25,
+      "community_name": "DashboardPage.tsx",
       "norm_label": "api"
     },
     {
@@ -17423,8 +17367,8 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "frontend_src_services_authservice_authservice",
-      "community": 13,
-      "community_name": "useAuthStore",
+      "community": 25,
+      "community_name": "DashboardPage.tsx",
       "norm_label": "authservice"
     },
     {
@@ -17434,8 +17378,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_services_companyservice",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 54,
+      "community_name": "companyService.ts",
       "norm_label": "companyservice.ts"
     },
     {
@@ -17447,8 +17391,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_services_companyservice_paginatedresponse",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 54,
+      "community_name": "companyService.ts",
       "norm_label": "paginatedresponse"
     },
     {
@@ -17460,8 +17404,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_services_companyservice_companydashboarddata",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 54,
+      "community_name": "companyService.ts",
       "norm_label": "companydashboarddata"
     },
     {
@@ -17471,8 +17415,8 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "frontend_src_services_companyservice_companyservice",
-      "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community": 54,
+      "community_name": "companyService.ts",
       "norm_label": "companyservice"
     },
     {
@@ -17483,7 +17427,7 @@
       "_origin": "ast",
       "id": "frontend_src_services_feedbackservice",
       "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community_name": "InterviewReportPage.tsx",
       "norm_label": "feedbackservice.ts"
     },
     {
@@ -17494,7 +17438,7 @@
       "_origin": "ast",
       "id": "frontend_src_services_feedbackservice_feedbackservice",
       "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community_name": "InterviewReportPage.tsx",
       "norm_label": "feedbackservice"
     },
     {
@@ -17505,7 +17449,7 @@
       "_origin": "ast",
       "id": "frontend_src_services_interviewservice",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "interviewservice.ts"
     },
     {
@@ -17515,8 +17459,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "frontend_src_services_interviewservice_interviewservice",
-      "community": 45,
-      "community_name": "InterviewDetailsPage.tsx",
+      "community": 8,
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "interviewservice"
     },
     {
@@ -17709,8 +17653,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_services_superadminservice_authdata",
-      "community": 39,
-      "community_name": "UsersPage.tsx",
+      "community": 25,
+      "community_name": "DashboardPage.tsx",
       "norm_label": "authdata"
     },
     {
@@ -17806,7 +17750,7 @@
       "_origin": "ast",
       "id": "frontend_src_store_index",
       "community": 13,
-      "community_name": "useAuthStore",
+      "community_name": "themeConfigSlice.tsx",
       "norm_label": "store/index.tsx"
     },
     {
@@ -17817,7 +17761,7 @@
       "_origin": "ast",
       "id": "frontend_src_store_index_rootreducer",
       "community": 13,
-      "community_name": "useAuthStore",
+      "community_name": "themeConfigSlice.tsx",
       "norm_label": "rootreducer"
     },
     {
@@ -17828,7 +17772,7 @@
       "_origin": "ast",
       "id": "frontend_src_store_index_store",
       "community": 13,
-      "community_name": "useAuthStore",
+      "community_name": "themeConfigSlice.tsx",
       "norm_label": "store"
     },
     {
@@ -17841,7 +17785,7 @@
       "_origin": "ast",
       "id": "frontend_src_store_index_irootstate",
       "community": 13,
-      "community_name": "useAuthStore",
+      "community_name": "themeConfigSlice.tsx",
       "norm_label": "irootstate"
     },
     {
@@ -17854,7 +17798,7 @@
       "_origin": "ast",
       "id": "frontend_src_store_index_appdispatch",
       "community": 13,
-      "community_name": "useAuthStore",
+      "community_name": "themeConfigSlice.tsx",
       "norm_label": "appdispatch"
     },
     {
@@ -17864,7 +17808,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_store_themeconfigslice",
-      "community": 10,
+      "community": 13,
       "community_name": "themeConfigSlice.tsx",
       "norm_label": "themeconfigslice.tsx"
     },
@@ -17875,7 +17819,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "frontend_src_store_themeconfigslice_defaultstate",
-      "community": 10,
+      "community": 13,
       "community_name": "themeConfigSlice.tsx",
       "norm_label": "defaultstate"
     },
@@ -17886,7 +17830,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "frontend_src_store_themeconfigslice_initialstate",
-      "community": 10,
+      "community": 13,
       "community_name": "themeConfigSlice.tsx",
       "norm_label": "initialstate"
     },
@@ -17897,7 +17841,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "frontend_src_store_themeconfigslice_themeconfigslice",
-      "community": 10,
+      "community": 13,
       "community_name": "themeConfigSlice.tsx",
       "norm_label": "themeconfigslice"
     },
@@ -17908,7 +17852,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_stores_authstore",
-      "community": 13,
+      "community": 20,
       "community_name": "useAuthStore",
       "norm_label": "authstore.ts"
     },
@@ -17932,7 +17876,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "frontend_src_stores_authstore_useauthstore",
-      "community": 13,
+      "community": 20,
       "community_name": "useAuthStore",
       "norm_label": "useauthstore"
     },
@@ -17944,7 +17888,7 @@
       "_origin": "ast",
       "id": "frontend_src_stores_interviewstore",
       "community": 59,
-      "community_name": "InterviewReportPage.tsx",
+      "community_name": "InterviewReviewPage.tsx",
       "norm_label": "interviewstore.ts"
     },
     {
@@ -17957,7 +17901,7 @@
       "_origin": "ast",
       "id": "frontend_src_stores_interviewstore_interviewstate",
       "community": 59,
-      "community_name": "InterviewReportPage.tsx",
+      "community_name": "InterviewReviewPage.tsx",
       "norm_label": "interviewstate"
     },
     {
@@ -17968,7 +17912,7 @@
       "_origin": "ast",
       "id": "frontend_src_stores_interviewstore_useinterviewstore",
       "community": 90,
-      "community_name": "NewInterviewPage.tsx",
+      "community_name": "useInterviewStore",
       "norm_label": "useinterviewstore"
     },
     {
@@ -18074,7 +18018,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_theme_config",
-      "community": 10,
+      "community": 13,
       "community_name": "themeConfigSlice.tsx",
       "norm_label": "theme.config.tsx"
     },
@@ -18085,7 +18029,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_theme_config_themeconfig",
-      "community": 10,
+      "community": 13,
       "community_name": "themeConfigSlice.tsx",
       "norm_label": "themeconfig"
     },
@@ -18096,8 +18040,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontend_src_types_api",
-      "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community": 25,
+      "community_name": "DashboardPage.tsx",
       "norm_label": "types/api.ts"
     },
     {
@@ -18109,8 +18053,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_types_api_apiresponse",
-      "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community": 25,
+      "community_name": "DashboardPage.tsx",
       "norm_label": "apiresponse"
     },
     {
@@ -18122,8 +18066,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_types_api_paginatedresponse",
-      "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community": 25,
+      "community_name": "DashboardPage.tsx",
       "norm_label": "paginatedresponse"
     },
     {
@@ -18135,8 +18079,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_types_api_pagination",
-      "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community": 25,
+      "community_name": "DashboardPage.tsx",
       "norm_label": "pagination"
     },
     {
@@ -18148,8 +18092,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_types_api_apierror",
-      "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community": 25,
+      "community_name": "DashboardPage.tsx",
       "norm_label": "apierror"
     },
     {
@@ -18161,8 +18105,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_types_api_validationerror",
-      "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community": 25,
+      "community_name": "DashboardPage.tsx",
       "norm_label": "validationerror"
     },
     {
@@ -18301,7 +18245,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_companyportal_jobstatus",
       "community": 94,
-      "community_name": "LoadingSpinner.tsx",
+      "community_name": "getErrorMessage",
       "norm_label": "jobstatus"
     },
     {
@@ -18339,8 +18283,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_types_companyportal_applicationstatus",
-      "community": 46,
-      "community_name": "CompanyCandidatesPage.tsx",
+      "community": 86,
+      "community_name": "CompanyShortlistPage.tsx",
       "norm_label": "applicationstatus"
     },
     {
@@ -18417,8 +18361,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_types_companyportal_jobpayload",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 54,
+      "community_name": "companyService.ts",
       "norm_label": "jobpayload"
     },
     {
@@ -18430,8 +18374,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_types_companyportal_application",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 54,
+      "community_name": "companyService.ts",
       "norm_label": "application"
     },
     {
@@ -18443,8 +18387,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_types_companyportal_candidatesummary",
-      "community": 46,
-      "community_name": "CompanyCandidatesPage.tsx",
+      "community": 86,
+      "community_name": "CompanyShortlistPage.tsx",
       "norm_label": "candidatesummary"
     },
     {
@@ -18456,8 +18400,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_types_companyportal_companyinterview",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 54,
+      "community_name": "companyService.ts",
       "norm_label": "companyinterview"
     },
     {
@@ -18495,8 +18439,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_types_companyportal_questionevaluation",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 62,
+      "community_name": "CompanyAssessmentsPage.tsx",
       "norm_label": "questionevaluation"
     },
     {
@@ -18521,8 +18465,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_types_companyportal_proctoringviolation",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 62,
+      "community_name": "CompanyAssessmentsPage.tsx",
       "norm_label": "proctoringviolation"
     },
     {
@@ -18534,8 +18478,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_types_companyportal_companyassessment",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 62,
+      "community_name": "CompanyAssessmentsPage.tsx",
       "norm_label": "companyassessment"
     },
     {
@@ -18560,8 +18504,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_types_companyportal_companydashboardmetrics",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 54,
+      "community_name": "companyService.ts",
       "norm_label": "companydashboardmetrics"
     },
     {
@@ -18586,8 +18530,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_types_companyportal_securityevent",
-      "community": 53,
-      "community_name": "companyPortal.ts",
+      "community": 54,
+      "community_name": "companyService.ts",
       "norm_label": "securityevent"
     },
     {
@@ -18598,7 +18542,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_feedback",
       "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community_name": "InterviewReportPage.tsx",
       "norm_label": "feedback.ts"
     },
     {
@@ -18611,7 +18555,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_feedback_categoryscore",
       "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community_name": "InterviewReportPage.tsx",
       "norm_label": "categoryscore"
     },
     {
@@ -18624,7 +18568,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_feedback_feedbackcategories",
       "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community_name": "InterviewReportPage.tsx",
       "norm_label": "feedbackcategories"
     },
     {
@@ -18637,7 +18581,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_feedback_feedback",
       "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community_name": "InterviewReportPage.tsx",
       "norm_label": "feedback"
     },
     {
@@ -18650,7 +18594,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_feedback_progressperiod",
       "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community_name": "InterviewReportPage.tsx",
       "norm_label": "progressperiod"
     },
     {
@@ -18663,7 +18607,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_feedback_progressaverages",
       "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community_name": "InterviewReportPage.tsx",
       "norm_label": "progressaverages"
     },
     {
@@ -18676,7 +18620,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_feedback_progresstimelineitem",
       "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community_name": "InterviewReportPage.tsx",
       "norm_label": "progresstimelineitem"
     },
     {
@@ -18689,7 +18633,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_feedback_recentinsightinterview",
       "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community_name": "InterviewReportPage.tsx",
       "norm_label": "recentinsightinterview"
     },
     {
@@ -18702,7 +18646,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_feedback_recentinsight",
       "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community_name": "InterviewReportPage.tsx",
       "norm_label": "recentinsight"
     },
     {
@@ -18715,7 +18659,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_feedback_domainactivityitem",
       "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community_name": "InterviewReportPage.tsx",
       "norm_label": "domainactivityitem"
     },
     {
@@ -18728,7 +18672,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_feedback_userprogress",
       "community": 24,
-      "community_name": "AnalyticsPage.tsx",
+      "community_name": "InterviewReportPage.tsx",
       "norm_label": "userprogress"
     },
     {
@@ -18739,7 +18683,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_interview",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "interview.ts"
     },
     {
@@ -18751,8 +18695,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_types_interview_interviewtype",
-      "community": 90,
-      "community_name": "NewInterviewPage.tsx",
+      "community": 8,
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "interviewtype"
     },
     {
@@ -18764,8 +18708,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_types_interview_interviewdifficulty",
-      "community": 90,
-      "community_name": "NewInterviewPage.tsx",
+      "community": 8,
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "interviewdifficulty"
     },
     {
@@ -18778,7 +18722,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_interview_interviewdomain",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "interviewdomain"
     },
     {
@@ -18790,8 +18734,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_types_interview_interviewstatus",
-      "community": 42,
-      "community_name": "InterviewsHistoryPage.tsx",
+      "community": 8,
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "interviewstatus"
     },
     {
@@ -18804,7 +18748,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_interview_interviewwarmupphase",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "interviewwarmupphase"
     },
     {
@@ -18817,7 +18761,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_interview_interviewwarmupservicestate",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "interviewwarmupservicestate"
     },
     {
@@ -18830,7 +18774,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_interview_interviewwarmupstatus",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "interviewwarmupstatus"
     },
     {
@@ -18843,7 +18787,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_interview_interview",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "interview"
     },
     {
@@ -18855,8 +18799,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_types_interview_populatedinterview",
-      "community": 8,
-      "community_name": "interview.ts",
+      "community": 59,
+      "community_name": "InterviewReviewPage.tsx",
       "norm_label": "populatedinterview"
     },
     {
@@ -18868,8 +18812,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "frontend_src_types_interview_interviewlanguage",
-      "community": 90,
-      "community_name": "NewInterviewPage.tsx",
+      "community": 8,
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "interviewlanguage"
     },
     {
@@ -18882,7 +18826,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_interview_identityverificationoutcome",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "identityverificationoutcome"
     },
     {
@@ -18895,7 +18839,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_interview_identityverificationstatus",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "identityverificationstatus"
     },
     {
@@ -18908,7 +18852,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_interview_identityverificationresult",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "identityverificationresult"
     },
     {
@@ -18921,7 +18865,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_interview_createinterviewpayload",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "createinterviewpayload"
     },
     {
@@ -18934,7 +18878,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_interview_submitanswerpayload",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "submitanswerpayload"
     },
     {
@@ -18947,7 +18891,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_interview_answerevaluation",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "answerevaluation"
     },
     {
@@ -18960,7 +18904,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_interview_submitanswerresponse",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "submitanswerresponse"
     },
     {
@@ -18973,7 +18917,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_interview_proctoringviolationtype",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "proctoringviolationtype"
     },
     {
@@ -18986,7 +18930,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_interview_proctoringviolationrecord",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "proctoringviolationrecord"
     },
     {
@@ -18999,7 +18943,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_interview_interviewproctoring",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "interviewproctoring"
     },
     {
@@ -19012,7 +18956,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_interview_reportproctoringeventpayload",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "reportproctoringeventpayload"
     },
     {
@@ -19025,7 +18969,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_interview_reportproctoringeventresponse",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "reportproctoringeventresponse"
     },
     {
@@ -19038,7 +18982,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_interview_interviewlistparams",
       "community": 8,
-      "community_name": "interview.ts",
+      "community_name": "LoadingSpinner.tsx",
       "norm_label": "interviewlistparams"
     },
     {
@@ -19049,7 +18993,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_question",
       "community": 59,
-      "community_name": "InterviewReportPage.tsx",
+      "community_name": "InterviewReviewPage.tsx",
       "norm_label": "question.ts"
     },
     {
@@ -19062,7 +19006,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_question_questiondifficulty",
       "community": 59,
-      "community_name": "InterviewReportPage.tsx",
+      "community_name": "InterviewReviewPage.tsx",
       "norm_label": "questiondifficulty"
     },
     {
@@ -19075,7 +19019,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_question_questioncategory",
       "community": 59,
-      "community_name": "InterviewReportPage.tsx",
+      "community_name": "InterviewReviewPage.tsx",
       "norm_label": "questioncategory"
     },
     {
@@ -19088,7 +19032,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_question_evaluationstatus",
       "community": 59,
-      "community_name": "InterviewReportPage.tsx",
+      "community_name": "InterviewReviewPage.tsx",
       "norm_label": "evaluationstatus"
     },
     {
@@ -19101,7 +19045,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_question_retryattempt",
       "community": 59,
-      "community_name": "InterviewReportPage.tsx",
+      "community_name": "InterviewReviewPage.tsx",
       "norm_label": "retryattempt"
     },
     {
@@ -19114,7 +19058,7 @@
       "_origin": "ast",
       "id": "frontend_src_types_question_question",
       "community": 59,
-      "community_name": "InterviewReportPage.tsx",
+      "community_name": "InterviewReviewPage.tsx",
       "norm_label": "question"
     },
     {
@@ -30734,7 +30678,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1662",
+      "source_location": "L1635",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -30746,7 +30690,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1652",
+      "source_location": "L1625",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -30758,7 +30702,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1663",
+      "source_location": "L1636",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -30792,7 +30736,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1670",
+      "source_location": "L1643",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -30848,7 +30792,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1656",
+      "source_location": "L1629",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -30860,7 +30804,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1657",
+      "source_location": "L1630",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -30872,7 +30816,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1655",
+      "source_location": "L1628",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -30884,7 +30828,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1654",
+      "source_location": "L1627",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -30973,7 +30917,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1665",
+      "source_location": "L1638",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -30985,7 +30929,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1667",
+      "source_location": "L1640",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -31019,7 +30963,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1666",
+      "source_location": "L1639",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -31031,7 +30975,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1664",
+      "source_location": "L1637",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -31043,7 +30987,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1658",
+      "source_location": "L1631",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -31088,7 +31032,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1659",
+      "source_location": "L1632",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -31111,7 +31055,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1661",
+      "source_location": "L1634",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -31156,7 +31100,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1660",
+      "source_location": "L1633",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -31179,7 +31123,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1653",
+      "source_location": "L1626",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -32417,7 +32361,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1101",
+      "source_location": "L1087",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_submitanswer",
@@ -32465,7 +32409,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1247",
+      "source_location": "L1220",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_completeinterview",
@@ -32477,7 +32421,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1202",
+      "source_location": "L1175",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_completeinterview",
@@ -32489,7 +32433,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1142",
+      "source_location": "L1128",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_completeinterview",
@@ -32501,7 +32445,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1130",
+      "source_location": "L1116",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_completeinterview",
@@ -32513,7 +32457,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1138",
+      "source_location": "L1124",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_completeinterview",
@@ -32525,7 +32469,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1164",
+      "source_location": "L1150",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_completeinterview",
@@ -32549,7 +32493,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1296",
+      "source_location": "L1269",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_deleteinterview",
@@ -32561,7 +32505,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1291",
+      "source_location": "L1264",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_deleteinterview",
@@ -32573,7 +32517,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1285",
+      "source_location": "L1258",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_deleteinterview",
@@ -32585,7 +32529,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1306",
+      "source_location": "L1279",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_deleteinterview",
@@ -32609,7 +32553,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1325",
+      "source_location": "L1298",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_reevaluateanswer",
@@ -32621,7 +32565,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1334",
+      "source_location": "L1307",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_reevaluateanswer",
@@ -32633,7 +32577,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1329",
+      "source_location": "L1302",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_reevaluateanswer",
@@ -32645,7 +32589,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1321",
+      "source_location": "L1294",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_reevaluateanswer",
@@ -32657,7 +32601,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1360",
+      "source_location": "L1333",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_reevaluateanswer",
@@ -32669,7 +32613,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1394",
+      "source_location": "L1367",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_reevaluateanswer",
@@ -32681,7 +32625,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1385",
+      "source_location": "L1358",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_reevaluateanswer",
@@ -32705,7 +32649,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1453",
+      "source_location": "L1426",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_retryevaluate",
@@ -32717,7 +32661,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1421",
+      "source_location": "L1394",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_retryevaluate",
@@ -32729,7 +32673,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1436",
+      "source_location": "L1409",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_retryevaluate",
@@ -32741,7 +32685,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1430",
+      "source_location": "L1403",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_retryevaluate",
@@ -32753,7 +32697,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1486",
+      "source_location": "L1459",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_retryevaluate",
@@ -32777,7 +32721,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1518",
+      "source_location": "L1491",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_resetinterview",
@@ -32789,7 +32733,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1511",
+      "source_location": "L1484",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_resetinterview",
@@ -32801,7 +32745,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1505",
+      "source_location": "L1478",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_resetinterview",
@@ -32813,7 +32757,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1572",
+      "source_location": "L1545",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_resetinterview",
@@ -32837,7 +32781,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1599",
+      "source_location": "L1572",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_reportproctoringevent",
@@ -32849,7 +32793,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1592",
+      "source_location": "L1565",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_reportproctoringevent",
@@ -32861,7 +32805,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/controllers/interviewController.js",
-      "source_location": "L1641",
+      "source_location": "L1614",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_controllers_interviewcontroller_reportproctoringevent",
@@ -41079,7 +41023,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/services/geminiSpeechService.js",
-      "source_location": "L126",
+      "source_location": "L121",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_geminispeechservice_transcribeaudioenglish",
@@ -42253,7 +42197,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/geminiSpeechService.js",
-      "source_location": "L147",
+      "source_location": "L142",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_geminispeechservice",
@@ -42264,7 +42208,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/geminiSpeechService.js",
-      "source_location": "L34",
+      "source_location": "L29",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_geminispeechservice",
@@ -42297,7 +42241,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/services/geminiSpeechService.js",
-      "source_location": "L199",
+      "source_location": "L194",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -42309,7 +42253,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/services/geminiSpeechService.js",
-      "source_location": "L197",
+      "source_location": "L192",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -42332,7 +42276,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/services/geminiSpeechService.js",
-      "source_location": "L198",
+      "source_location": "L193",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -42381,7 +42325,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/geminiSpeechService.js",
-      "source_location": "L184",
+      "source_location": "L179",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_geminispeechservice_normalizesomalitranscript",
@@ -42393,7 +42337,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/geminiSpeechService.js",
-      "source_location": "L69",
+      "source_location": "L64",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_geminispeechservice_synthesizespeechstream",
@@ -42405,7 +42349,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/geminiSpeechService.js",
-      "source_location": "L128",
+      "source_location": "L123",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_geminispeechservice_transcribeaudioenglish",
@@ -42429,7 +42373,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/geminiSpeechService.js",
-      "source_location": "L188",
+      "source_location": "L183",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_geminispeechservice_normalizesomalitranscript",
@@ -42451,7 +42395,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L212",
+      "source_location": "L218",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice",
@@ -42462,7 +42406,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L488",
+      "source_location": "L494",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice",
@@ -42473,7 +42417,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L433",
+      "source_location": "L439",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice",
@@ -42484,7 +42428,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L349",
+      "source_location": "L355",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice",
@@ -42495,7 +42439,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L1010",
+      "source_location": "L1002",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -42529,7 +42473,19 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L1005",
+      "source_location": "L994",
+      "weight": 1.0,
+      "_origin": "ast",
+      "context": "collection",
+      "source": "backend_services_gemmaservice",
+      "target": "backend_services_gemmaservice_clampscore",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "indirect_call",
+      "confidence": "INFERRED",
+      "source_file": "backend/services/gemmaService.js",
+      "source_location": "L997",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -42563,7 +42519,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L194",
+      "source_location": "L200",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice",
@@ -42574,7 +42530,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L202",
+      "source_location": "L208",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice",
@@ -42585,7 +42541,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L1000",
+      "source_location": "L991",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -42597,7 +42553,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L998",
+      "source_location": "L989",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -42609,7 +42565,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L1002",
+      "source_location": "L993",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -42665,7 +42621,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L1003",
+      "source_location": "L995",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -42677,7 +42633,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L1008",
+      "source_location": "L1000",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -42711,7 +42667,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L1007",
+      "source_location": "L999",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -42723,7 +42679,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L1009",
+      "source_location": "L1001",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -42735,7 +42691,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L263",
+      "source_location": "L269",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice",
@@ -42746,7 +42702,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L272",
+      "source_location": "L278",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice",
@@ -42768,7 +42724,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L250",
+      "source_location": "L256",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice",
@@ -42801,7 +42757,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L997",
+      "source_location": "L988",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -42813,7 +42769,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L999",
+      "source_location": "L990",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -42847,7 +42803,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L597",
+      "source_location": "L588",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice",
@@ -42880,7 +42836,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L285",
+      "source_location": "L291",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice",
@@ -42891,7 +42847,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L245",
+      "source_location": "L251",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice",
@@ -42946,7 +42902,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L1001",
+      "source_location": "L992",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -42958,7 +42914,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L1004",
+      "source_location": "L996",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -42970,7 +42926,7 @@
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L1011",
+      "source_location": "L1003",
       "weight": 1.0,
       "_origin": "ast",
       "context": "collection",
@@ -43054,18 +43010,6 @@
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
-      "source_file": "backend/test/gemmaColabFallback.test.js",
-      "source_location": "L12",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "backend_test_gemmacolabfallback_test",
-      "target": "backend_services_gemmaservice",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "imports_from",
-      "context": "import",
-      "confidence": "EXTRACTED",
       "source_file": "backend/test/gemmaService.test.js",
       "source_location": "L8",
       "weight": 1.0,
@@ -43079,7 +43023,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L434",
+      "source_location": "L440",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_callgemma",
@@ -43091,7 +43035,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L351",
+      "source_location": "L357",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_callrunpod",
@@ -43115,7 +43059,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L958",
+      "source_location": "L949",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_warmgemma",
@@ -43163,7 +43107,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L525",
+      "source_location": "L531",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_callcolabrunsyncfallback",
@@ -43175,7 +43119,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L449",
+      "source_location": "L455",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_callgemma",
@@ -43187,7 +43131,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L976",
+      "source_location": "L967",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_warmgemma",
@@ -43199,7 +43143,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L439",
+      "source_location": "L445",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_callgemma",
@@ -43211,7 +43155,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L966",
+      "source_location": "L957",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_warmgemma",
@@ -43235,7 +43179,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L362",
+      "source_location": "L368",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_callrunpod",
@@ -43247,7 +43191,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L352",
+      "source_location": "L358",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_callrunpod",
@@ -43259,7 +43203,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L350",
+      "source_location": "L356",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_callrunpod",
@@ -43271,7 +43215,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L380",
+      "source_location": "L386",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_callrunpod",
@@ -43283,7 +43227,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L421",
+      "source_location": "L427",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_callrunpod",
@@ -43295,7 +43239,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L693",
+      "source_location": "L684",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_generateinterviewquestions",
@@ -43307,7 +43251,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L863",
+      "source_location": "L854",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_processinterviewturn",
@@ -43319,7 +43263,19 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L838",
+      "source_location": "L559",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "backend_services_gemmaservice_callcolabrunsyncfallback",
+      "target": "backend_services_gemmaservice_clampscore",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/gemmaService.js",
+      "source_location": "L829",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_processinterviewturn",
@@ -43331,7 +43287,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L735",
+      "source_location": "L726",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_generateinterviewquestions",
@@ -43343,7 +43299,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L883",
+      "source_location": "L874",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_processinterviewturn",
@@ -43355,7 +43311,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L736",
+      "source_location": "L727",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_generateinterviewquestions",
@@ -43367,7 +43323,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L756",
+      "source_location": "L747",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_generateinterviewquestions",
@@ -43379,7 +43335,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L857",
+      "source_location": "L848",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_processinterviewturn",
@@ -43391,7 +43347,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L872",
+      "source_location": "L863",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_processinterviewturn",
@@ -43403,7 +43359,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L465",
+      "source_location": "L471",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_callgemma",
@@ -43415,7 +43371,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L377",
+      "source_location": "L383",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_callrunpod",
@@ -43427,7 +43383,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L730",
+      "source_location": "L721",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_generateinterviewquestions",
@@ -43439,7 +43395,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L444",
+      "source_location": "L450",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_callgemma",
@@ -43451,7 +43407,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L357",
+      "source_location": "L363",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_callrunpod",
@@ -43463,7 +43419,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L472",
+      "source_location": "L478",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_callgemma",
@@ -43475,7 +43431,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L422",
+      "source_location": "L428",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_callrunpod",
@@ -43487,7 +43443,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L549",
+      "source_location": "L555",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_callcolabrunsyncfallback",
@@ -43499,7 +43455,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L943",
+      "source_location": "L934",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_generatecomprehensivefeedback",
@@ -43511,7 +43467,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L923",
+      "source_location": "L914",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_parsejobdescription",
@@ -43523,7 +43479,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L440",
+      "source_location": "L446",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_callgemma",
@@ -43535,7 +43491,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L968",
+      "source_location": "L959",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_warmgemma",
@@ -43547,7 +43503,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L457",
+      "source_location": "L463",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_callgemma",
@@ -43559,7 +43515,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L938",
+      "source_location": "L929",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_generatecomprehensivefeedback",
@@ -43571,7 +43527,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L731",
+      "source_location": "L722",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_generateinterviewquestions",
@@ -43583,7 +43539,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L918",
+      "source_location": "L909",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_parsejobdescription",
@@ -43595,7 +43551,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L875",
+      "source_location": "L866",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_processinterviewturn",
@@ -43606,20 +43562,8 @@
       "relation": "calls",
       "context": "call",
       "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L561",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "backend_services_gemmaservice_callcolabrunsyncfallback",
-      "target": "backend_utils_evaluation_normalizeevaluation"
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "backend/services/gemmaService.js",
-      "source_location": "L674",
+      "source_location": "L665",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_generateinterviewquestions",
@@ -43632,7 +43576,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L800",
+      "source_location": "L791",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_generateinterviewquestions",
@@ -43644,7 +43588,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "backend/services/gemmaService.js",
-      "source_location": "L840",
+      "source_location": "L831",
       "weight": 1.0,
       "_origin": "ast",
       "source": "backend_services_gemmaservice_processinterviewturn",
@@ -44736,61 +44680,6 @@
       "_origin": "ast",
       "source": "backend_test_evaluation_test",
       "target": "backend_utils_evaluation_normalizeevaluation",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "backend/test/gemmaColabFallback.test.js",
-      "source_location": "L2",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "backend_test_gemmacolabfallback_test",
-      "target": "backend_test_gemmacolabfallback_test_assert",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "backend/test/gemmaColabFallback.test.js",
-      "source_location": "L12",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "backend_test_gemmacolabfallback_test",
-      "target": "backend_test_gemmacolabfallback_test_gemma",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "backend/test/gemmaColabFallback.test.js",
-      "source_location": "L20",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "backend_test_gemmacolabfallback_test",
-      "target": "backend_test_gemmacolabfallback_test_mockfetch",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "backend/test/gemmaColabFallback.test.js",
-      "source_location": "L14",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "backend_test_gemmacolabfallback_test",
-      "target": "backend_test_gemmacolabfallback_test_resetcircuit",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "backend/test/gemmaColabFallback.test.js",
-      "source_location": "L1",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "backend_test_gemmacolabfallback_test",
-      "target": "backend_test_gemmacolabfallback_test_test",
       "confidence_score": 1.0
     },
     {

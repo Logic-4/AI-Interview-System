@@ -127,7 +127,9 @@ export default function InterviewReportPage() {
   const questions: Question[] = interview.questions ?? [];
   const answeredQuestions = questions.filter((q) => q.isAnswered);
   const evaluatedQuestions = answeredQuestions.filter((q) => q.evaluationStatus === 'completed' && q.score !== null);
-  const overallScoreValue = feedback?.overallScore ?? interview.overallScore;
+  // Interview.overallScore is the authoritative average of stored question
+  // evaluations. Never let an older feedback document override it.
+  const overallScoreValue = interview.overallScore;
   const overallScore = overallScoreValue ?? 0;
   const scoreColor = getScoreColor(overallScore);
   const totalTimeSpent = questions.reduce((sum, q) => sum + (q.timeSpent || 0), 0);

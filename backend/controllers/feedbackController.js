@@ -4,6 +4,7 @@ const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { generateComprehensiveFeedback, isPlaceholderAnswer } = require('../services/gemmaService');
 const { calculateOverallScore, isScorable } = require('../utils/evaluation');
+const { evaluateQuestionAnswer } = require('./interviewController');
 const logger = require('../utils/logger');
 
 /**
@@ -33,26 +34,44 @@ const getFeedback = async (req, res, next) => {
  * Handles variations in key names (summary→detailedFeedback, skillBreakdown→categories).
  */
 function normalizeFeedback(raw, interview) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error('Comprehensive feedback response must be a JSON object');
+  }
   const cats = raw.categories || raw.skillBreakdown || {};
-  const defaultCat = { score: 0, feedback: '' };
+  const normalizeCategory = (value, name) => {
+    const score = value?.score != null ? Number(value.score) : NaN;
+    const feedback = typeof value?.feedback === 'string' ? value.feedback.trim() : '';
+    if (!Number.isFinite(score) || score < 0 || score > 100 || !feedback) {
+      throw new Error(`Comprehensive feedback category '${name}' is invalid`);
+    }
+    return { score: Math.round(score), feedback };
+  };
 
   // Use the same predicate everywhere so the number in the feedback report
   // agrees with the number on the interview record and the assessment card.
   const turnAverage = calculateOverallScore(interview.questions || []);
-  const authoritativeScore = turnAverage ?? interview.overallScore ?? null;
+  const authoritativeScore = turnAverage;
+  if (authoritativeScore === null) {
+    throw new Error('Overall score is unavailable until every answered question is evaluated');
+  }
+
+  const detailedFeedback = raw.detailedFeedback || raw.summary || '';
+  if (typeof detailedFeedback !== 'string' || !detailedFeedback.trim()) {
+    throw new Error('Comprehensive feedback is missing its detailed explanation');
+  }
 
   return {
     overallScore: authoritativeScore,
     categories: {
-      communication: cats.communication || defaultCat,
-      technicalAccuracy: cats.technicalAccuracy || cats.technical_accuracy || cats.technical || defaultCat,
-      problemSolving: cats.problemSolving || cats.problem_solving || defaultCat,
-      codeQuality: cats.codeQuality || cats.code_quality || defaultCat,
-      confidence: cats.confidence || defaultCat,
+      communication: normalizeCategory(cats.communication, 'communication'),
+      technicalAccuracy: normalizeCategory(cats.technicalAccuracy || cats.technical_accuracy || cats.technical, 'technicalAccuracy'),
+      problemSolving: normalizeCategory(cats.problemSolving || cats.problem_solving, 'problemSolving'),
+      codeQuality: normalizeCategory(cats.codeQuality || cats.code_quality, 'codeQuality'),
+      confidence: normalizeCategory(cats.confidence, 'confidence'),
     },
     strengths: Array.isArray(raw.strengths) ? raw.strengths : [],
     improvements: Array.isArray(raw.improvements) ? raw.improvements : [],
-    detailedFeedback: raw.detailedFeedback || raw.summary || '',
+    detailedFeedback: detailedFeedback.trim(),
     recommendations: Array.isArray(raw.recommendations) ? raw.recommendations : [],
   };
 }
@@ -84,8 +103,17 @@ const generateFeedback = async (req, res, next) => {
     if (!substantiveAnswers.length) {
       return next(ApiError.badRequest('No evaluated answers are available for feedback'));
     }
-    if (!substantiveAnswers.some(isScorable)) {
-      return next(new ApiError(409, 'No answers could be scored. Please retry the interview.'));
+
+    // A question can be stuck 'failed' from a transient AI hiccup (a
+    // truncated/unparseable model response, a momentary worker timeout).
+    // Give each one a single automatic retry before making the candidate's
+    // report generation a dead end.
+    const unscored = substantiveAnswers.filter((question) => !isScorable(question));
+    if (unscored.length) {
+      await Promise.all(unscored.map((question) => evaluateQuestionAnswer(interview, question).catch(() => {})));
+    }
+    if (!substantiveAnswers.every(isScorable)) {
+      return next(new ApiError(409, 'Some answers are still unevaluated. Retry them before generating final feedback.'));
     }
 
     // Check if feedback already exists
@@ -101,16 +129,24 @@ const generateFeedback = async (req, res, next) => {
       logger.info(`Deleted stale feedback for interview ${interview._id} (force regenerate)`);
     }
 
-    // Generate comprehensive AI feedback
+    // Generate comprehensive AI feedback. The model occasionally omits a
+    // required field (e.g. detailedFeedback) or returns truncated JSON —
+    // one automatic retry clears most of these before failing the request.
     let aiFeedback;
-    try {
-      const rawFeedback = await generateComprehensiveFeedback(interview);
-      aiFeedback = normalizeFeedback(rawFeedback, interview);
-    } catch (aiError) {
-      logger.warn(`AI feedback generation failed: ${aiError.message}`);
+    let lastAiError;
+    for (let attempt = 0; attempt < 2 && !aiFeedback; attempt++) {
+      try {
+        const rawFeedback = await generateComprehensiveFeedback(interview);
+        aiFeedback = normalizeFeedback(rawFeedback, interview);
+      } catch (aiError) {
+        lastAiError = aiError;
+        logger.warn(`AI feedback generation failed (attempt ${attempt + 1}/2): ${aiError.message}`);
+      }
+    }
+    if (!aiFeedback) {
       // DO NOT save placeholder feedback — return error so user can retry
       return next(ApiError.badRequest(
-        'AI feedback generation failed. Please try again. Error: ' + aiError.message
+        'AI feedback generation failed. Please try again. Error: ' + lastAiError.message
       ));
     }
 

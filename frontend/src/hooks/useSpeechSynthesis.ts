@@ -12,6 +12,7 @@ export type TtsStatus = "idle" | "preparing" | "ready" | "playing" | "unavailabl
 
 export interface UseSpeechSynthesisReturn {
   speak: (text: string, onPlay?: () => void) => Promise<void>;
+  prefetch: (text: string) => void;
   cancel: () => void;
   pause: () => void;
   resume: () => void;
@@ -38,6 +39,26 @@ function authHeaders(): Record<string, string> {
   const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
   if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
+}
+
+async function* readChunks(body: ReadableStream<Uint8Array>): AsyncGenerator<Uint8Array> {
+  const reader = body.getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value?.length) yield value;
+    }
+  } finally {
+    // Runs on normal completion AND on early exit (for-await-of calls
+    // .return() on the generator when the consuming loop breaks/returns),
+    // so an aborted/superseded speak() still releases the stream reader.
+    reader.cancel().catch(() => {});
+  }
+}
+
+async function* readCached(chunks: Uint8Array[]): AsyncGenerator<Uint8Array> {
+  for (const chunk of chunks) yield chunk;
 }
 
 /** Converts a little-endian 16-bit PCM byte buffer into normalized Float32 samples. */
@@ -68,6 +89,11 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
   const languageCodeRef = useRef(languageCode);
   const operationRef = useRef(0);
   languageCodeRef.current = languageCode;
+  // Prefetched audio for upcoming text, keyed by "languageCode::text". Lets
+  // the next question's TTS finish generating while the candidate is still
+  // answering the current one, so speak() can play it back instantly instead
+  // of paying the Gemini TTS round-trip at the moment it's needed.
+  const prefetchCacheRef = useRef<Map<string, Promise<{ chunks: Uint8Array[]; provider: string | null }>>>(new Map());
 
   const getAudioContext = useCallback((): AudioContext => {
     if (!audioContextRef.current) {
@@ -89,10 +115,44 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
       operationRef.current += 1;
       abortControllerRef.current?.abort();
       stopActiveSources();
+      prefetchCacheRef.current.clear();
       audioContextRef.current?.close().catch(() => {});
       audioContextRef.current = null;
     };
   }, [stopActiveSources]);
+
+  /** Fire-and-forget: fetches and buffers TTS audio so a later speak() call for
+   *  the same text plays back instantly instead of hitting the network. */
+  const prefetch = useCallback((text: string) => {
+    const cleaned = normalizeText(text);
+    if (!cleaned) return;
+    const key = `${languageCodeRef.current}::${cleaned}`;
+    if (prefetchCacheRef.current.has(key)) return;
+
+    const isSomali = /^so/i.test(languageCodeRef.current);
+    const promise = (async () => {
+      const response = await fetch(`${API_BASE_URL}/tts`, {
+        method: "POST",
+        credentials: "include",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          text: cleaned,
+          languageCode: languageCodeRef.current,
+          language: isSomali ? "somali" : "english",
+        }),
+      });
+      if (!response.ok || !response.body) {
+        throw new Error(`TTS prefetch failed with status ${response.status}`);
+      }
+      const provider = response.headers.get("x-tts-provider");
+      const chunks: Uint8Array[] = [];
+      for await (const chunk of readChunks(response.body)) chunks.push(chunk);
+      return { chunks, provider };
+    })();
+
+    promise.catch(() => { prefetchCacheRef.current.delete(key); });
+    prefetchCacheRef.current.set(key, promise);
+  }, []);
 
   const speak = useCallback(async (text: string, onPlay?: () => void): Promise<void> => {
     const cleaned = normalizeText(text);
@@ -117,24 +177,46 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
       if (audioContext.state === "suspended") await audioContext.resume();
 
       const isSomali = /^so/i.test(languageCodeRef.current);
-      const response = await fetch(`${API_BASE_URL}/tts`, {
-        method: "POST",
-        credentials: "include",
-        headers: authHeaders(),
-        body: JSON.stringify({
-          text: cleaned,
-          languageCode: languageCodeRef.current,
-          language: isSomali ? "somali" : "english",
-        }),
-        signal: controller.signal,
-      });
+      const cacheKey = `${languageCodeRef.current}::${cleaned}`;
+      const cachedPromise = prefetchCacheRef.current.get(cacheKey);
+      prefetchCacheRef.current.delete(cacheKey);
 
-      if (!response.ok || !response.body) {
-        throw new Error(`TTS request failed with status ${response.status}`);
+      let chunkSource: AsyncGenerator<Uint8Array> | null = null;
+      let providerHeader: string | null = null;
+
+      if (cachedPromise) {
+        try {
+          const cached = await cachedPromise;
+          providerHeader = cached.provider;
+          chunkSource = readCached(cached.chunks);
+        } catch {
+          chunkSource = null; // prefetch failed — fall through to a live fetch
+        }
       }
+
+      if (!chunkSource) {
+        const response = await fetch(`${API_BASE_URL}/tts`, {
+          method: "POST",
+          credentials: "include",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            text: cleaned,
+            languageCode: languageCodeRef.current,
+            language: isSomali ? "somali" : "english",
+          }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok || !response.body) {
+          throw new Error(`TTS request failed with status ${response.status}`);
+        }
+        providerHeader = response.headers.get("x-tts-provider");
+        chunkSource = readChunks(response.body);
+      }
+
       if (operation !== operationRef.current) return;
 
-      setProvider(response.headers.get("x-tts-provider"));
+      setProvider(providerHeader);
       nextStartTimeRef.current = audioContext.currentTime + 0.05;
       let firstChunk = true;
       let lastNode: AudioBufferSourceNode | null = null;
@@ -156,11 +238,10 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
         lastNode = node;
       };
 
-      const reader = response.body.getReader();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (operation !== operationRef.current) { reader.cancel().catch(() => {}); return; }
-        if (done) break;
+      for await (const value of chunkSource) {
+        // Exiting the loop here calls chunkSource.return(), which runs
+        // readChunks' finally block and cancels the underlying stream reader.
+        if (operation !== operationRef.current) return;
         if (!value || !value.length) continue;
 
         let bytes = value;
@@ -244,7 +325,7 @@ export function useSpeechSynthesis(languageCode: string = "en-US"): UseSpeechSyn
   }, []);
 
   return {
-    speak, cancel, pause, resume,
+    speak, prefetch, cancel, pause, resume,
     isSpeaking, isPaused, isFetchingTTS, highlight,
     voiceName: /^so/i.test(languageCode) ? "Gemini TTS (Somali)" : "Gemini TTS",
     ready: status === "ready" || status === "playing",

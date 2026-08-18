@@ -13,6 +13,16 @@ function resetCircuit() {
   gemma._circuit.reason = '';
 }
 
+test('recovers a score from JSON truncated mid-array (token-limit cutoff)', () => {
+  // Captured live from the Colab worker: generation stopped right before
+  // closing the "improvements" array, leaving a mismatched trailing '}'.
+  const truncated = '{"score": 78, "feedback": "strong technical foundation.", "strengths": ["Clear background"], "improvements": ["Can elaborate on architectural decisions"}';
+  const { evaluation, error } = gemma.parseEvaluationResponse(truncated);
+  assert.equal(error, null);
+  assert.equal(evaluation.score, 78);
+  assert.equal(evaluation.evaluationStatus, 'completed');
+});
+
 test('uses one worker request for a batch of later questions', async () => {
   resetCircuit();
   const originalFetch = global.fetch;
@@ -40,6 +50,102 @@ test('uses one worker request for a batch of later questions', async () => {
     assert.equal(requests.length, 1);
     assert.equal(requests[0].input.endpoint, '/generate-questions');
     assert.deepEqual(result.map((question) => question.order), [1, 2, 3, 4]);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('generates multiple Somali questions concurrently, capped, and in order', async () => {
+  resetCircuit();
+  const originalFetch = global.fetch;
+  // SOMALI_GEN_CONCURRENCY is read once at module load (before this test can
+  // override it), so assert against gemmaService's actual default (3) rather
+  // than trying to inject a different cap here.
+  const concurrencyCap = 3;
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const requestedEndpoints = [];
+  global.fetch = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    requestedEndpoints.push(body.input.endpoint);
+    inFlight += 1;
+    maxInFlight = Math.max(maxInFlight, inFlight);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    inFlight -= 1;
+    const index = body.input.payload.questionIndex;
+    return Response.json({
+      status: 'COMPLETED',
+      output: { question: `Somali question ${index}?`, expectedAnswer: 'Expected' },
+    });
+  };
+  try {
+    const result = await gemma.generateInterviewQuestions('technical', 'technology', 'mid', 6, {
+      jobRole: 'Developer',
+      language: 'somali',
+      _startIndex: 1,
+      _forcedCount: 7,
+    });
+    // All calls go through the single-question endpoint, never the batch one
+    // (RunPod's /generate-questions ignores per-item language).
+    assert.ok(requestedEndpoints.every((e) => e === '/generate-question'));
+    assert.equal(requestedEndpoints.length, 6);
+    // Concurrency was capped, but still ran more than one at a time.
+    assert.ok(maxInFlight > 1, `expected concurrent requests, got max ${maxInFlight}`);
+    assert.ok(maxInFlight <= concurrencyCap, `expected cap of ${concurrencyCap}, got max ${maxInFlight}`);
+    // Results are ordered by question index regardless of completion order.
+    assert.deepEqual(result.map((q) => q.order), [1, 2, 3, 4, 5, 6]);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('accepts a Somali question that translates the target skill instead of quoting it in English', async () => {
+  resetCircuit();
+  const originalFetch = global.fetch;
+  global.fetch = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    // Real Somali generation: the model translates "communication" into
+    // Somali per its own prompt instructions, so the literal English skill
+    // string never appears in the question text.
+    return Response.json({
+      status: 'COMPLETED',
+      output: { question: 'Sidee ayaad ula xiriirtaa xubnaha kooxdaada?', expectedAnswer: 'Expected' },
+    });
+  };
+  try {
+    // absoluteIndex must land away from 0/totalCount-1 (intro/outro), which
+    // skip the target-skill check regardless of language — _startIndex: 1
+    // with _forcedCount: 3 puts this in the middle of the interview.
+    const result = await gemma.generateInterviewQuestions('technical', 'technology', 'mid', 1, {
+      jobRole: 'Developer',
+      language: 'somali',
+      focusSkills: ['communication'],
+      _startIndex: 1,
+      _forcedCount: 3,
+    });
+    assert.equal(result[0].text, 'Sidee ayaad ula xiriirtaa xubnaha kooxdaada?');
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('still falls back to a templated question when English generation misses the target skill', async () => {
+  resetCircuit();
+  const originalFetch = global.fetch;
+  global.fetch = async () => Response.json({
+    status: 'COMPLETED',
+    output: { question: 'What is your favorite programming language?', expectedAnswer: 'Expected' },
+  });
+  try {
+    const result = await gemma.generateInterviewQuestions('technical', 'technology', 'mid', 1, {
+      jobRole: 'Developer',
+      language: 'english',
+      focusSkills: ['communication'],
+      _startIndex: 1,
+      _forcedCount: 3,
+    });
+    assert.ok(result[0].text.toLowerCase().includes('communication'), `expected fallback to mention the skill, got: ${result[0].text}`);
+    assert.notEqual(result[0].text, 'What is your favorite programming language?');
   } finally {
     global.fetch = originalFetch;
   }

@@ -7,6 +7,7 @@ const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { parseJobDescription, generateInterviewQuestions, processInterviewTurn, isPlaceholderAnswer } = require('../services/gemmaService');
 const { transcribeAudio } = require('../services/somaliSpeechService');
+const { normalizeSomaliTranscript } = require('../services/geminiSpeechService');
 const { uploadAudio, deleteBlobUrls } = require('../services/blobService');
 const logger = require('../utils/logger');
 const { stageTimer } = require('../middleware/requestContext');
@@ -65,8 +66,13 @@ function getCategoryForIndex(i, totalCount, interviewType) {
 }
 
 function buildFallbackFirstQuestion(interview, context) {
+  // `role` (jobRole, e.g. "Backend Development") is what the candidate
+  // actually selected — `domain` is a fixed platform-wide constant
+  // ("technology") today, not a meaningful per-interview value. The
+  // templates below all use `role`; `domain` used to leak in directly and,
+  // for Somali specifically, produced a raw English word spliced into an
+  // otherwise-Somali sentence (confirmed live: "...ka taqaanno technology.")
   const role = interview.jobRole || interview.domain || 'this role';
-  const domain = interview.domain || 'this field';
   const isSomali = String(interview.language).toLowerCase() === 'somali';
   const isPractice = !interview.company;
 
@@ -77,18 +83,18 @@ function buildFallbackFirstQuestion(interview, context) {
   if (isPractice) {
     if (isSomali) {
       text = topSkill
-        ? `Noo sheeg khibraddaada la xiriirta ${topSkill} iyo sida aad ugu adeegsatay ${domain}.`
-        : `Noo sheeg khibraddaada iyo waxa aad ka taqaanno ${domain}. Sidee ayaad u bilowday xirfaddan?`;
+        ? `Noo sheeg khibraddaada la xiriirta ${topSkill} iyo sida aad ugu adeegsatay ${role}.`
+        : `Noo sheeg khibraddaada iyo waxa aad ka taqaanno ${role}. Sidee ayaad u bilowday xirfaddan?`;
     } else {
       text = topSkill
-        ? `Tell me about your experience with ${topSkill} and how you've used it in ${domain}.`
-        : `Tell me about your background in ${domain}. How did you get started in this field?`;
+        ? `Tell me about your experience with ${topSkill} and how you've used it in ${role}.`
+        : `Tell me about your background in ${role}. How did you get started in this field?`;
     }
   } else {
     if (isSomali) {
       text = topSkill
         ? `Maxaad ka garanaysaa ${topSkill} iyo sida aad u isticmaali lahayd shaqada ${role}?`
-        : `Maxaa kuu keenay inaad codsi u gudbiso xagga shaqada ${role}? Noo sheeg wax ka yar khibraddaada la xiriirta ${domain}.`;
+        : `Maxaa kuu keenay inaad codsi u gudbiso xagga shaqada ${role}? Noo sheeg wax ka yar khibraddaada la xiriirta ${role}.`;
     } else {
       text = topSkill
         ? `What has been your most hands-on experience working with ${topSkill} in a ${role} context?`
@@ -131,27 +137,32 @@ async function fillRemainingWithFallbacks(interviewId, interview, totalCount, co
     ];
     const FALLBACK_SO = [
       (i, r) => `Sidee ayaad u xallin lahayd dhibaato adag oo la xiriirta ${r}?`,
-      (i, r) => `Sharax xaaladda adag ee aad la kulantay iyo sida aad u xaltay.`,
+      (i, r) => `Ma sharixi kartaa xaalad adag oo aad la kulantay iyo sida aad u xalisay?`,
       (i, r) => `Waa maxay xirfadaha ugu muhiimsan ee aad u leedahay shaqada ${r}?`,
       (i, r) => `Sidee ayaad ula socotaa horumarka xirfaddaada?`,
-      (i, r) => `Tusaale ka bixi sida aad ugu shaqeysay xaalad waqtigu kooban yahay.`,
+      (i, r) => `Ma tusaale ka bixin kartaa sida aad ugu shaqeysay xaalad waqtigeedu kooban yahay?`,
     ];
     const templates = isSomali ? FALLBACK_SO : FALLBACK_EN;
     const outroText = isSomali
       ? 'Ma jiraan wax aad jeclaan lahayd inaad ku darto ka hor inta aanan wareysiga soo gabagabeynin?'
       : 'Is there anything you would like to add before we wrap up?';
 
+    const newlySavedIds = [];
     for (let i = 0; i < totalCount; i++) {
       if (existingOrders.has(i)) continue;
       const isOutro = i === totalCount - 1;
       const text = isOutro ? outroText : templates[i % templates.length](i, role);
-      await saveGeneratedQuestion(interviewId, {
+      const saved = await saveGeneratedQuestion(interviewId, {
         text,
         category: isOutro ? 'outro' : 'conceptual',
         difficulty: interview.difficulty || 'medium',
         expectedAnswer: '',
         order: i,
       }, i, interview.difficulty);
+      if (saved) newlySavedIds.push(saved._id);
+    }
+    if (newlySavedIds.length) {
+      await Interview.findByIdAndUpdate(interviewId, { $addToSet: { questions: { $each: newlySavedIds } } });
     }
 
     const savedCount = await Question.countDocuments({ interview: interviewId });
@@ -176,6 +187,11 @@ async function assertInterviewStillExists(interviewId) {
   }
 }
 
+// Upserts the Question doc only — does NOT link it onto Interview.questions.
+// Callers that save multiple questions in a loop should collect the
+// returned ids and link them in one batched $addToSet after the loop
+// (see fillRemainingWithFallbacks and the remaining-questions loop below)
+// instead of paying one Interview round-trip per question.
 async function saveGeneratedQuestion(interviewId, aiQuestion, order, fallbackDifficulty) {
   if (!aiQuestion?.text) return null;
   let question;
@@ -198,9 +214,7 @@ async function saveGeneratedQuestion(interviewId, aiQuestion, order, fallbackDif
     if (error.code !== 11000) throw error;
     question = await Question.findOne({ interview: interviewId, order });
   }
-  if (!question) return null;
-  await Interview.findByIdAndUpdate(interviewId, { $addToSet: { questions: question._id } });
-  return question;
+  return question || null;
 }
 
 async function runQuestionGenerationPipeline(interviewId, context) {
@@ -326,9 +340,16 @@ async function runQuestionGenerationPipeline(interviewId, context) {
           },
         }
       ),
+      // $addToSet is idempotent, so linking firstQuestion here unconditionally
+      // (whether it was just generated or already existed from a prior run)
+      // is safe and folds what used to be saveGeneratedQuestion's own
+      // Interview round-trip into this already-scheduled update.
       Interview.findByIdAndUpdate(interviewId, {
-        firstQuestionReadyAt: new Date(),
-        generationStatus: totalCount > 1 ? 'generating-remaining' : 'ready',
+        $set: {
+          firstQuestionReadyAt: new Date(),
+          generationStatus: totalCount > 1 ? 'generating-remaining' : 'ready',
+        },
+        $addToSet: { questions: firstQuestion._id },
       }),
     ]);
     logger.info(JSON.stringify({
@@ -355,19 +376,37 @@ async function runQuestionGenerationPipeline(interviewId, context) {
         ),
       ]);
       await assertInterviewStillExists(interviewId);
+      const remainingSavedIds = [];
       for (const generated of generatedRemaining) {
         if (!generated.text && generated.category === 'outro') {
           const isSomali = String(interview.language).toLowerCase() === 'somali';
-          generated.text = isSomali
-            ? 'Ma jiraan wax aad jeclaan lahayd inaad ku darto ama aad na waydiiso ka hor inta aanan wareysiga soo gabagabeynin?'
-            : 'Is there anything you would like to add or ask us before we wrap up the interview?';
-          generated.expectedAnswer = isSomali
-            ? 'Musharraxu wuxuu soo gabagabeeynayaa qodobbo muhiim ah ama wuxuu weydiin su\'aalo macquul ah.'
-            : 'The candidate wraps up with relevant points or asks thoughtful questions.';
+          // Self-practice interviews have no live interviewer to answer
+          // follow-ups, so the outro must not invite the candidate to ask
+          // us anything — only company/live sessions get that phrasing.
+          const isPractice = !interview.company;
+          if (isSomali) {
+            generated.text = isPractice
+              ? 'Ka hor inta aanan soo gabagabeyn wareysiga, wax kale ma jiraan oo aad rabto inaad ku darto jawaabahaaga?'
+              : 'Ma jiraan wax aad jeclaan lahayd inaad ku darto ama aad na weydiiso ka hor inta aanan wareysiga soo gabagabeyn?';
+            generated.expectedAnswer = isPractice
+              ? 'Musharraxu wuxuu soo gabagabeeynayaa qodobbo muhiim ah oo ku saabsan jawaabihiisii.'
+              : 'Musharraxu wuxuu soo gabagabeeynayaa qodobbo muhiim ah ama wuxuu weydiin su\'aalo macquul ah.';
+          } else {
+            generated.text = isPractice
+              ? 'Before we wrap up, is there anything you would like to add to your answers?'
+              : 'Is there anything you would like to add or ask us before we wrap up the interview?';
+            generated.expectedAnswer = isPractice
+              ? 'The candidate wraps up with any final points relevant to their answers.'
+              : 'The candidate wraps up with relevant points or asks thoughtful questions.';
+          }
         }
         if (generated.text) {
-          await saveGeneratedQuestion(interviewId, generated, generated.order, interview.difficulty);
+          const saved = await saveGeneratedQuestion(interviewId, generated, generated.order, interview.difficulty);
+          if (saved) remainingSavedIds.push(saved._id);
         }
+      }
+      if (remainingSavedIds.length) {
+        await Interview.findByIdAndUpdate(interviewId, { $addToSet: { questions: { $each: remainingSavedIds } } });
       }
     } else {
       await dbHousekeeping;
@@ -638,9 +677,14 @@ const getInterview = async (req, res, next) => {
 
 const getInterviewProgress = async (req, res, next) => {
   try {
+    // Polled repeatedly (backoff schedule) while generation is in flight —
+    // only readiness fields are needed here (see the frontend's poll
+    // consumer, InterviewDetailsPage.tsx, which reads just _id/text from
+    // each question). userAnswer/audioUrl/aiFeedback/retryAnswers etc. are
+    // pulled once via the full getInterview call after readiness flips.
     const interview = await Interview.findOne({ _id: req.params.id, user: req.user._id })
       .select('questionsReady generationStatus generationError expectedQuestionCount firstQuestionReadyAt generationCompletedAt questions')
-      .populate({ path: 'questions', options: { sort: { order: 1 } } });
+      .populate({ path: 'questions', select: 'order text category difficulty isAnswered', options: { sort: { order: 1 } } });
     if (!interview) return next(ApiError.notFound('Interview not found'));
     ApiResponse.success(res, { interview });
   } catch (error) {
@@ -818,9 +862,21 @@ const uploadRecordingChunk = async (req, res, next) => {
  * @route   PUT /api/v1/interviews/:interviewId/questions/:questionId/answer
  * @access  Private
  */
+// Guards against two concurrent submissions for the same question — the
+// frontend retries once on a client-side timeout without knowing whether
+// the first request is still being evaluated server-side, and without this
+// both requests would run a full AI evaluation and race to save the same
+// Question doc (the loser fails with a Mongoose VersionError).
+const activeAnswerSubmissions = new Map();
+
 const submitAnswer = async (req, res, next) => {
+  const { interviewId, questionId } = req.params;
+  const submissionKey = `${interviewId}:${questionId}`;
+  if (activeAnswerSubmissions.has(submissionKey)) {
+    return next(new ApiError(409, 'This answer is already being evaluated. Please wait for it to finish.'));
+  }
+  activeAnswerSubmissions.set(submissionKey, true);
   try {
-    const { interviewId, questionId } = req.params;
     const { userAnswer, timeSpent, activePromptText } = req.body;
 
     // Verify interview belongs to user
@@ -865,14 +921,25 @@ const submitAnswer = async (req, res, next) => {
     // Handle audio upload if present
     let audioUrl = '';
     let transcribedAnswer = userAnswer || '';
+    let rawTranscribedAnswer = '';
 
     let transcriptionFailed = false;
     if (req.file) {
-      try {
-        const audioResult = await uploadAudio(req.file.buffer, req.user._id.toString(), questionId);
-        audioUrl = audioResult.url;
-      } catch (uploadError) {
-        logger.warn(`Audio upload failed, continuing with transcription: ${uploadError.message}`);
+      // Upload and transcription are independent (transcription reads the
+      // buffer directly, not the upload result) — run them concurrently
+      // instead of paying both latencies back-to-back. Each keeps its own
+      // failure handling exactly as before.
+      const [uploadOutcome, transcriptionOutcome] = await Promise.allSettled([
+        uploadAudio(req.file.buffer, req.user._id.toString(), questionId),
+        !userAnswer
+          ? transcribeAudio(req.file.buffer, req.file.originalname, req.file.mimetype, interview.language)
+          : Promise.resolve(null),
+      ]);
+
+      if (uploadOutcome.status === 'fulfilled') {
+        audioUrl = uploadOutcome.value.url;
+      } else {
+        logger.warn(`Audio upload failed, continuing with transcription: ${uploadOutcome.reason.message}`);
       }
 
       // Transcribe audio if no text answer provided. STT outages must NOT
@@ -880,12 +947,44 @@ const submitAnswer = async (req, res, next) => {
       // we persist the audio and flag the turn for re-transcription rather
       // than failing the whole submission.
       if (!userAnswer) {
-        try {
-          transcribedAnswer = await transcribeAudio(req.file.buffer, req.file.originalname, req.file.mimetype, interview.language);
-        } catch (transcriptionError) {
-          logger.warn(`${interview.language} audio transcription failed: ${transcriptionError.message}`);
+        if (transcriptionOutcome.status === 'fulfilled') {
+          transcribedAnswer = transcriptionOutcome.value;
+        } else {
+          logger.warn(`${interview.language} audio transcription failed: ${transcriptionOutcome.reason.message}`);
           transcribedAnswer = '';
           transcriptionFailed = true;
+        }
+      }
+
+      // Somali ASR routinely mis-transcribes embedded English/technical terms
+      // and Somali-English suffix forms (e.g. "project-ga", "database-ka").
+      // Normalize before evaluation, keeping the raw ASR output for audit.
+      // Applies whether the transcript came from the client-side STT call
+      // above the userAnswer field or the server-side fallback just above —
+      // both are raw ASR output for an audio-backed turn.
+      if (
+        !transcriptionFailed &&
+        transcribedAnswer &&
+        !isPlaceholderAnswer(transcribedAnswer) &&
+        String(interview.language).toLowerCase() === 'somali'
+      ) {
+        rawTranscribedAnswer = transcribedAnswer;
+        const stopNormalize = stageTimer(req, 'somali_transcript_normalize');
+        try {
+          const normalized = await normalizeSomaliTranscript(transcribedAnswer, question.text);
+          if (normalized) transcribedAnswer = normalized;
+          logger.info(JSON.stringify({
+            event: 'somali_transcript_normalized',
+            requestId: req.requestId,
+            interviewId: String(interviewId),
+            questionId: String(questionId),
+            rawLength: rawTranscribedAnswer.length,
+            normalizedLength: transcribedAnswer.length,
+          }));
+        } catch (normError) {
+          logger.warn(`Somali transcript normalization failed, using raw transcript: ${normError.message}`);
+        } finally {
+          stopNormalize();
         }
       }
     }
@@ -924,6 +1023,7 @@ const submitAnswer = async (req, res, next) => {
           {
             difficulty: interview.difficulty || 'mid',
             currentQuestion: {
+              id: String(questionId),
               text: promptForAnswer || question.text,
               expectedAnswer: question.expectedAnswer || '',
               category: question.category || 'general',
@@ -938,6 +1038,20 @@ const submitAnswer = async (req, res, next) => {
           evaluation = normalizeEvaluation(turnResult.evaluation);
         }
 
+        // Lightweight, PII-free visibility into what each question actually
+        // scored — deliberately excludes the candidate's answer text and the
+        // feedback body, just the numbers/ids needed to spot a run of
+        // suspiciously identical scores across different questions.
+        logger.info(JSON.stringify({
+          event: 'answer_evaluated',
+          requestId: req.requestId,
+          interviewId: String(interviewId),
+          questionId: String(questionId),
+          score: evaluation.score,
+          evaluationStatus: evaluation.evaluationStatus,
+          isFollowUp: Boolean(turnResult.isFollowUp),
+        }));
+
         if (turnResult.nextInterviewerResponse) {
           nextInterviewerResponse = turnResult.nextInterviewerResponse;
         }
@@ -945,7 +1059,14 @@ const submitAnswer = async (req, res, next) => {
         answeredCandidateQuestion = Boolean(turnResult.answeredCandidateQuestion);
 
       } catch (aiError) {
-        logger.warn(`AI turn processing failed: ${aiError.message}`);
+        logger.warn(JSON.stringify({
+          event: 'answer_evaluation_failed',
+          requestId: req.requestId,
+          interviewId: String(interviewId),
+          questionId: String(questionId),
+          message: aiError.message,
+          code: aiError.code || null,
+        }));
         evaluation.feedback = 'AI evaluation unavailable. Answer recorded for retry.';
         evaluation.evaluationStatus = 'failed';
       }
@@ -957,8 +1078,12 @@ const submitAnswer = async (req, res, next) => {
     // Persist answer text on every turn (including follow-ups); score only when topic completes.
     if (question.userAnswer && question.userAnswer.trim()) {
       question.userAnswer = question.userAnswer + '\n\n[Follow-up answer]: ' + transcribedAnswer;
+      if (rawTranscribedAnswer) {
+        question.rawUserAnswer = (question.rawUserAnswer ? question.rawUserAnswer + '\n\n[Follow-up answer]: ' : '') + rawTranscribedAnswer;
+      }
     } else {
       question.userAnswer = transcribedAnswer;
+      if (rawTranscribedAnswer) question.rawUserAnswer = rawTranscribedAnswer;
     }
     if (audioUrl) question.audioUrl = audioUrl;
     question.timeSpent = (question.timeSpent || 0) + (timeSpent || 0);
@@ -969,6 +1094,9 @@ const submitAnswer = async (req, res, next) => {
         ? evaluation.score
         : null;
       question.aiFeedback = evaluation.feedback;
+      question.strengths = evaluation.strengths;
+      question.improvements = evaluation.improvements;
+      question.suggestedAnswer = evaluation.suggestedAnswer;
       question.isAnswered = true;
       question.evaluationStatus = evaluation.evaluationStatus;
     } else {
@@ -978,6 +1106,9 @@ const submitAnswer = async (req, res, next) => {
       if (evaluation.evaluationStatus === 'completed' && typeof evaluation.score === 'number') {
         question.score = evaluation.score;
         question.aiFeedback = evaluation.feedback;
+        question.strengths = evaluation.strengths;
+        question.improvements = evaluation.improvements;
+        question.suggestedAnswer = evaluation.suggestedAnswer;
       }
       question.evaluationStatus = 'pending';
     }
@@ -1007,13 +1138,15 @@ const submitAnswer = async (req, res, next) => {
     ApiResponse.success(res, {
       question,
       evaluation,
-      followUpText: isFollowUp ? nextInterviewerResponse : null,
+      followUpText: (isFollowUp || answeredCandidateQuestion) ? nextInterviewerResponse : null,
       isFollowUp,
       isTimeUp,
       answeredCandidateQuestion,
     }, 'Answer submitted and evaluated');
   } catch (error) {
     next(error);
+  } finally {
+    activeAnswerSubmissions.delete(submissionKey);
   }
 };
 
@@ -1069,6 +1202,19 @@ const completeInterview = async (req, res, next) => {
 
     const summary = summarizeEvaluations(interview.questions);
     const overallScore = summary.overallScore;
+
+    // Scores only (no answer text/feedback) — lets a suspicious overall
+    // score be traced back to the exact per-question scores it was averaged
+    // from, without duplicating averaging logic in the log line itself.
+    logger.info(JSON.stringify({
+      event: 'overall_score_calculated',
+      requestId: req.requestId,
+      interviewId: String(interview._id),
+      questionScores: (interview.questions || []).map((q) => ({ questionId: String(q._id), score: q.score, evaluationStatus: q.evaluationStatus })),
+      scoredCount: summary.scoredCount,
+      totalQuestions: summary.totalQuestions,
+      overallScore,
+    }));
 
     // A live company interview with no substantive evaluations at all is not
     // a "candidate scored 0" — it's a platform failure or an abandoned session.
@@ -1203,6 +1349,73 @@ const deleteInterview = async (req, res, next) => {
 };
 
 /**
+ * Re-runs AI evaluation for a question's existing stored answer, mutating
+ * and saving `question` in place. Shared by the candidate-triggered retry
+ * endpoint (reevaluateAnswer) and generateFeedback's auto-retry of failed
+ * answers before it gives up with a 409.
+ */
+async function evaluateQuestionAnswer(interview, question) {
+  if (!question.userAnswer || !question.userAnswer.trim() || isPlaceholderAnswer(question.userAnswer)) {
+    question.evaluationStatus = 'invalid';
+    question.score = null;
+    await question.save();
+    return { ok: false, reason: 'no substantive answer' };
+  }
+
+  let turnResult;
+  try {
+    turnResult = await processInterviewTurn(
+      [
+        { role: 'interviewer', content: question.text },
+        { role: 'candidate', content: question.userAnswer },
+      ],
+      interview.domain,
+      interview.jobRole,
+      interview.language,
+      interview.type,
+      {
+        difficulty: interview.difficulty || 'mid',
+        currentQuestion: {
+          id: String(question._id),
+          text: question.text,
+          expectedAnswer: question.expectedAnswer || '',
+          category: question.category || 'general',
+          difficulty: question.difficulty || interview.difficulty || 'mid',
+        },
+        roleProfile: interview.roleProfile || null,
+        candidateAnswer: question.userAnswer,
+      }
+    );
+  } catch (error) {
+    question.evaluationStatus = 'failed';
+    question.score = null;
+    question.aiFeedback = 'AI evaluation is still unavailable. Please retry shortly.';
+    await question.save();
+    return { ok: false, reason: error.message };
+  }
+
+  const evaluation = turnResult?.evaluation || {};
+  if (typeof evaluation.score !== 'number') {
+    question.evaluationStatus = 'failed';
+    question.score = null;
+    question.aiFeedback = evaluation.feedback || 'The model did not return a valid score.';
+    await question.save();
+    return { ok: false, reason: 'no valid score' };
+  }
+
+  question.score = evaluation.score;
+  question.aiFeedback = evaluation.feedback || '';
+  question.strengths = evaluation.strengths || [];
+  question.improvements = evaluation.improvements || [];
+  question.suggestedAnswer = evaluation.suggestedAnswer || '';
+  question.evaluationStatus = 'completed';
+  question.isAnswered = true;
+  await question.save();
+
+  return { ok: true, evaluation };
+}
+
+/**
  * @desc    Retry evaluation of the answer already stored for a question
  * @route   POST /api/v1/interviews/:interviewId/questions/:questionId/evaluate
  * @access  Private
@@ -1215,71 +1428,26 @@ const reevaluateAnswer = async (req, res, next) => {
 
     const question = await Question.findOne({ _id: questionId, interview: interviewId });
     if (!question) return next(ApiError.notFound('Question not found'));
-    if (!question.userAnswer || !question.userAnswer.trim() || isPlaceholderAnswer(question.userAnswer)) {
-      question.evaluationStatus = 'invalid';
-      question.score = null;
-      await question.save();
-      return next(ApiError.badRequest('This question has no substantive answer to evaluate'));
-    }
 
-    let turnResult;
-    try {
-      turnResult = await processInterviewTurn(
-        [
-          { role: 'interviewer', content: question.text },
-          { role: 'candidate', content: question.userAnswer },
-        ],
-        interview.domain,
-        interview.jobRole,
-        interview.language,
-        interview.type,
-        {
-          difficulty: interview.difficulty || 'mid',
-          currentQuestion: {
-            text: question.text,
-            expectedAnswer: question.expectedAnswer || '',
-            category: question.category || 'general',
-            difficulty: question.difficulty || interview.difficulty || 'mid',
-          },
-          roleProfile: interview.roleProfile || null,
-          candidateAnswer: question.userAnswer,
-        }
-      );
-    } catch (error) {
-      question.evaluationStatus = 'failed';
-      question.score = null;
-      question.aiFeedback = 'AI evaluation is still unavailable. Please retry shortly.';
-      await question.save();
-      return next(ApiError.serviceUnavailable('AI evaluation is unavailable. Please retry shortly.'));
+    const result = await evaluateQuestionAnswer(interview, question);
+    if (!result.ok) {
+      if (result.reason === 'no substantive answer') {
+        return next(ApiError.badRequest('This question has no substantive answer to evaluate'));
+      }
+      return next(ApiError.serviceUnavailable(
+        result.reason === 'no valid score'
+          ? 'The evaluation did not return a valid score. Please retry.'
+          : 'AI evaluation is unavailable. Please retry shortly.'
+      ));
     }
-
-    const evaluation = turnResult?.evaluation || {};
-    if (typeof evaluation.score !== 'number') {
-      question.evaluationStatus = 'failed';
-      question.score = null;
-      question.aiFeedback = evaluation.feedback || 'The model did not return a valid score.';
-      await question.save();
-      return next(ApiError.serviceUnavailable('The evaluation did not return a valid score. Please retry.'));
-    }
-
-    question.score = evaluation.score;
-    question.aiFeedback = evaluation.feedback || '';
-    question.evaluationStatus = 'completed';
-    question.isAnswered = true;
-    await question.save();
+    const { evaluation } = result;
 
     if (interview.status === 'completed') {
-      const scoredQuestions = await Question.find({
+      const answeredQuestions = await Question.find({
         interview: interview._id,
         isAnswered: true,
-        evaluationStatus: 'completed',
-        score: { $ne: null },
-      }).select('score');
-      interview.overallScore = calculateOverallScore(scoredQuestions.map((item) => ({
-        isAnswered: true,
-        evaluationStatus: 'completed',
-        score: item.score,
-      })));
+      }).select('score evaluationStatus isAnswered');
+      interview.overallScore = calculateOverallScore(answeredQuestions);
       await interview.save();
       await Feedback.deleteMany({ interview: interview._id });
     }
@@ -1352,6 +1520,7 @@ const retryEvaluate = async (req, res, next) => {
       {
         difficulty: interview.difficulty || 'mid',
         currentQuestion: {
+          id: String(questionId),
           text: question.text,
           expectedAnswer: question.expectedAnswer || '',
           category: question.category || 'general',
@@ -1556,6 +1725,7 @@ module.exports = {
   deleteInterview,
   retryEvaluate,
   reevaluateAnswer,
+  evaluateQuestionAnswer,
   resetInterview,
   reportProctoringEvent,
   // Exported for cross-controller pre-generation on the company scheduling

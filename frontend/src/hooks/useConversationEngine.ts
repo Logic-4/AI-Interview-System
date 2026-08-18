@@ -434,15 +434,27 @@ export function useConversationEngine(
 
       try {
         // When STT already produced the transcript, skip re-uploading audio
-        const result = await onSubmitAnswer(
+        const submitArgs = [
           question._id,
           transcript,
           timeSpent,
           {
             audio: audioAnswer || undefined,
             activePromptText: activePromptRef.current || question.text,
-          }
-        );
+          },
+        ] as const;
+
+        let result;
+        try {
+          result = await onSubmitAnswer(...submitArgs);
+        } catch (firstError) {
+          // A slow-but-successful evaluation can still outrun the request
+          // timeout — retry once before falling back to the outer catch's
+          // "toast + re-record" path, which would otherwise discard the
+          // answer the candidate already gave.
+          console.warn("[ConversationEngine] Submit failed, retrying once:", firstError);
+          result = await onSubmitAnswer(...submitArgs);
+        }
 
         // Time is up — wrap up the interview
         if (result.isTimeUp) {
@@ -474,6 +486,24 @@ export function useConversationEngine(
 
           setPhase("asked");
           return;
+        }
+
+        // Candidate asked a question and the topic was otherwise complete —
+        // the model's answer still needs to be spoken before we move on,
+        // instead of silently discarding it and jumping to the next question.
+        if (result.answeredCandidateQuestion && result.followUpText) {
+          setIsQuestionTextVisible(false);
+          await delay(50);
+          if (abortRef.current) return;
+          try {
+            await tts.speak(result.followUpText, () => {
+              setIsQuestionTextVisible(true);
+            });
+          } catch {
+            setIsQuestionTextVisible(true);
+          }
+          await delay(150);
+          if (abortRef.current) return;
         }
 
         // Topic complete — mark answered and advance to the next pre-generated question
@@ -541,6 +571,15 @@ export function useConversationEngine(
       if (abortRef.current) return;
 
       activePromptRef.current = q.text;
+
+      // Warm the next question's TTS now, while the candidate is about to
+      // spend tens of seconds listening/answering this one — by the time
+      // askQuestion(idx + 1) runs, its audio is likely already cached.
+      const nextQuestion = questionsRef.current[idx + 1];
+      if (nextQuestion?.text) {
+        tts.prefetch(nextQuestion.text);
+      }
+
       try {
         await tts.speak(q.text);
       } catch {
@@ -622,6 +661,13 @@ export function useConversationEngine(
     // question and the voice never desync.
     const welcome = buildWelcomeMessage(userName, interviewTitle, sessionLanguage);
     activePromptRef.current = welcome;
+    // Warm question 0's TTS now, same as askQuestion does for the *next*
+    // question — otherwise the very first question pays the full synthesis
+    // latency live, with no head start, unlike every question after it.
+    const firstQuestion = questionsRef.current[0];
+    if (firstQuestion?.text) {
+      tts.prefetch(firstQuestion.text);
+    }
     try {
       await tts.speak(welcome);
     } catch {
