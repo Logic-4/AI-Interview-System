@@ -1,6 +1,6 @@
 const multer = require('multer');
 const ApiError = require('../utils/ApiError');
-const { transcribeAudio } = require('../services/somaliSpeechService');
+const { transcribeAudio } = require('../services/geminiSpeechService');
 const logger = require('../utils/logger');
 
 // ─── In-memory multer — audio is proxied to ASR, never saved to disk ──────────
@@ -24,7 +24,7 @@ const transcribe = async (req, res, next) => {
     }
 
     const { buffer, originalname, mimetype } = req.file;
-    const languageCode = String(req.body?.languageCode || req.body?.language || 'so-SO');
+    const languageCode = String(req.body?.languageCode || req.body?.language || 'en-US');
     logger.info(`[STT] Received audio: "${originalname}" (${mimetype}, ${(buffer.length / 1024).toFixed(1)} KB)`);
 
     const transcript = await transcribeAudio(

@@ -1,6 +1,11 @@
 const logger = require('../utils/logger');
 const { warmGemma } = require('./gemmaService');
-const { warmSpeechService } = require('./somaliSpeechService');
+
+// Speech (STT/TTS) runs entirely on Gemini for both languages now — no
+// dedicated endpoint to warm, so this is a no-op kept for state-shape parity.
+async function warmSpeechService() {
+  return { status: 'skipped', reason: 'gemini_no_warmup_needed' };
+}
 
 // This is an application freshness hint, not proof that a zero-active-worker
 // RunPod endpoint is still alive. Live interviews use forced heartbeats.

@@ -18,7 +18,6 @@ const errorHandler = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
 const { requestContext } = require('./middleware/requestContext');
 const { checkMaintenance } = require('./middleware/maintenance');
-const { startSomaliSpeech, stopSomaliSpeech } = require('./utils/somaliSpeechProcess');
 
 // Routes
 const authRoutes = require('./routes/authRoutes');
@@ -127,11 +126,6 @@ const startServer = async () => {
     // Connect to MongoDB
     await connectDB();
 
-    // Somali ASR/TTS warm up in background (models can take minutes on first load)
-    void startSomaliSpeech(logger, { waitForReady: false }).catch((err) => {
-      logger.warn(`[somali-speech] Auto-start error: ${err.message}`);
-    });
-
     // Start listening
     server.listen(PORT, () => {
       logger.info(`
@@ -157,7 +151,6 @@ startServer();
 
 function shutdown(signal) {
   logger.info(`${signal} received — shutting down`);
-  stopSomaliSpeech(logger);
   server.close(() => process.exit(0));
 }
 

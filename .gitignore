@@ -28,8 +28,6 @@ __pycache__/
 .venv/
 venv/
 env/
-Models/**/outputs/*.wav
-Models/Skydheere/transcription.json
 
 # OS files
 .DS_Store

@@ -6,8 +6,7 @@ const Application = require('../models/Application');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { parseJobDescription, generateInterviewQuestions, processInterviewTurn, isPlaceholderAnswer } = require('../services/gemmaService');
-const { transcribeAudio } = require('../services/somaliSpeechService');
-const { normalizeSomaliTranscript } = require('../services/geminiSpeechService');
+const { transcribeAudio } = require('../services/geminiSpeechService');
 const { uploadAudio, deleteBlobUrls } = require('../services/blobService');
 const logger = require('../utils/logger');
 const { stageTimer } = require('../middleware/requestContext');
@@ -921,7 +920,6 @@ const submitAnswer = async (req, res, next) => {
     // Handle audio upload if present
     let audioUrl = '';
     let transcribedAnswer = userAnswer || '';
-    let rawTranscribedAnswer = '';
 
     let transcriptionFailed = false;
     if (req.file) {
@@ -953,38 +951,6 @@ const submitAnswer = async (req, res, next) => {
           logger.warn(`${interview.language} audio transcription failed: ${transcriptionOutcome.reason.message}`);
           transcribedAnswer = '';
           transcriptionFailed = true;
-        }
-      }
-
-      // Somali ASR routinely mis-transcribes embedded English/technical terms
-      // and Somali-English suffix forms (e.g. "project-ga", "database-ka").
-      // Normalize before evaluation, keeping the raw ASR output for audit.
-      // Applies whether the transcript came from the client-side STT call
-      // above the userAnswer field or the server-side fallback just above —
-      // both are raw ASR output for an audio-backed turn.
-      if (
-        !transcriptionFailed &&
-        transcribedAnswer &&
-        !isPlaceholderAnswer(transcribedAnswer) &&
-        String(interview.language).toLowerCase() === 'somali'
-      ) {
-        rawTranscribedAnswer = transcribedAnswer;
-        const stopNormalize = stageTimer(req, 'somali_transcript_normalize');
-        try {
-          const normalized = await normalizeSomaliTranscript(transcribedAnswer, question.text);
-          if (normalized) transcribedAnswer = normalized;
-          logger.info(JSON.stringify({
-            event: 'somali_transcript_normalized',
-            requestId: req.requestId,
-            interviewId: String(interviewId),
-            questionId: String(questionId),
-            rawLength: rawTranscribedAnswer.length,
-            normalizedLength: transcribedAnswer.length,
-          }));
-        } catch (normError) {
-          logger.warn(`Somali transcript normalization failed, using raw transcript: ${normError.message}`);
-        } finally {
-          stopNormalize();
         }
       }
     }
@@ -1078,12 +1044,8 @@ const submitAnswer = async (req, res, next) => {
     // Persist answer text on every turn (including follow-ups); score only when topic completes.
     if (question.userAnswer && question.userAnswer.trim()) {
       question.userAnswer = question.userAnswer + '\n\n[Follow-up answer]: ' + transcribedAnswer;
-      if (rawTranscribedAnswer) {
-        question.rawUserAnswer = (question.rawUserAnswer ? question.rawUserAnswer + '\n\n[Follow-up answer]: ' : '') + rawTranscribedAnswer;
-      }
     } else {
       question.userAnswer = transcribedAnswer;
-      if (rawTranscribedAnswer) question.rawUserAnswer = rawTranscribedAnswer;
     }
     if (audioUrl) question.audioUrl = audioUrl;
     question.timeSpent = (question.timeSpent || 0) + (timeSpent || 0);

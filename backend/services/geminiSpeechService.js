@@ -2,13 +2,16 @@ const { GoogleGenAI, Modality, createUserContent, createPartFromBase64 } = requi
 const logger = require('../utils/logger');
 const { transcodeToWav } = require('./audioTranscodeService');
 
-const TTS_MODEL = process.env.GEMINI_TTS_MODEL || 'gemini-2.5-flash-preview-tts';
-// gemini-2.5-flash (the old default here) is on Google's confirmed
-// deprecation list, shutting down 2026-10-16 — fall back to the model
-// GEMINI_STT_MODEL is actually pinned to in production instead, so an
-// environment that forgets to set the env var doesn't silently hit a dead
-// model after that date.
-const STT_MODEL = process.env.GEMINI_STT_MODEL || 'gemini-3.6-flash';
+const TTS_MODEL = process.env.GEMINI_TTS_MODEL || 'gemini-3.1-flash-tts-preview';
+// STT for both English and Somali — Gemini Flash Latest, thinking level medium.
+const STT_MODEL = process.env.GEMINI_STT_MODEL || 'gemini-flash-latest';
+const STT_THINKING_LEVEL = process.env.GEMINI_STT_THINKING_LEVEL || 'medium';
+// Gemini's audio-understanding endpoint returns transient 503 "high demand" /
+// 429 errors under normal load — measured live, not hypothetical. The SDK's
+// own retry is opt-in (disabled unless retryOptions is passed), so without
+// this every transient error failed the candidate's turn outright.
+const STT_TIMEOUT_MS = Number(process.env.GEMINI_STT_TIMEOUT_MS || 20000);
+const STT_RETRY_ATTEMPTS = Number(process.env.GEMINI_STT_RETRY_ATTEMPTS || 3);
 // Pinned to a specific prebuilt voice — do not let this fall back silently.
 // Env override is allowed for ops, but the product default is "Orus".
 const VOICE_NAME = process.env.GEMINI_TTS_VOICE || 'Orus';
@@ -23,12 +26,20 @@ const MAX_TEXT_LENGTH = 1000;
 // attempt succeeds, keeping retries safe.
 const MAX_SYNTHESIS_ATTEMPTS = 3;
 const SYNTHESIS_BACKOFF_MS = 400;
-const TRANSCRIBE_PROMPT = 'Transcribe this English audio recording exactly as spoken. '
-  + 'Return only the transcription text, with no commentary, labels, or additional formatting. '
-  + 'If nothing intelligible was said, return an empty string.';
-// Reuses the fast STT model — this is a short text-in/text-out correction
-// pass, not a generation task, so no need for a separate model config.
-const NORMALIZE_MODEL = process.env.GEMINI_NORMALIZE_MODEL || STT_MODEL;
+
+function isSomaliLanguage(languageCode) {
+  return /^so/i.test(String(languageCode || ''));
+}
+
+function buildTranscribePrompt(languageCode) {
+  return isSomaliLanguage(languageCode)
+    ? 'Transcribe this Somali audio recording exactly as spoken, including any embedded English '
+      + 'technical terms exactly as pronounced. Return only the transcription text, with no '
+      + 'commentary, labels, or additional formatting. If nothing intelligible was said, return an empty string.'
+    : 'Transcribe this English audio recording exactly as spoken. '
+      + 'Return only the transcription text, with no commentary, labels, or additional formatting. '
+      + 'If nothing intelligible was said, return an empty string.';
+}
 
 let client = null;
 
@@ -132,11 +143,12 @@ async function* synthesizeSpeechStream(text, languageCode = 'en-US') {
 }
 
 /**
- * Transcribes an English audio recording using Gemini's audio understanding.
- * The recording is transcoded to WAV first since WebM/Opus (what the browser
- * records) isn't in Gemini's officially supported input format list.
+ * Transcribes a recorded answer using Gemini's audio understanding — same
+ * model and code path for both English and Somali. The recording is
+ * transcoded to WAV first since WebM/Opus (what the browser records) isn't
+ * in Gemini's officially supported input format list.
  */
-async function transcribeAudioEnglish(fileBuffer, mimetype = 'audio/webm', originalname = 'answer.webm') {
+async function transcribeAudio(fileBuffer, originalname = 'answer.webm', mimetype = 'audio/webm', languageCode = 'en-US') {
   const suffix = originalname.includes('.') ? originalname.slice(originalname.lastIndexOf('.')) : '.webm';
   const wavBuffer = await transcodeToWav(fileBuffer, suffix);
 
@@ -145,73 +157,25 @@ async function transcribeAudioEnglish(fileBuffer, mimetype = 'audio/webm', origi
     model: STT_MODEL,
     contents: createUserContent([
       createPartFromBase64(wavBuffer.toString('base64'), 'audio/wav'),
-      TRANSCRIBE_PROMPT,
+      buildTranscribePrompt(languageCode),
     ]),
+    config: {
+      thinkingConfig: { thinkingLevel: STT_THINKING_LEVEL },
+      httpOptions: {
+        timeout: STT_TIMEOUT_MS,
+        retryOptions: { attempts: STT_RETRY_ATTEMPTS, initialDelay: 0.5, maxDelay: 4 },
+      },
+    },
   });
 
   const transcription = String(response.text || '').trim();
-  logger.info(`[geminiSpeechService] English transcription received via Gemini (${transcription.length} chars)`);
+  logger.info(`[geminiSpeechService] Transcription received via Gemini (lang=${languageCode}, ${transcription.length} chars)`);
   return transcription;
-}
-
-/**
- * Builds the correction prompt for a raw Somali ASR transcript. Grounded in
- * the current interview question so the model can restore technical terms
- * the ASR mangled, without inventing content the candidate didn't say.
- */
-function buildNormalizePrompt(rawTranscript, questionContext) {
-  return [
-    "You clean up a raw Somali speech-to-text transcript of a candidate's spoken answer in a job interview.",
-    'The ASR model often mis-transcribes English technical terms embedded in Somali speech, mangles Somali-English',
-    'suffix forms (e.g. "project ga" -> "project-ga", "API ga" -> "API-ga", "data bees" -> "database"), leaves',
-    'fragmented or ungrammatical Somali, and inserts meaningless repeated or noise words.',
-    '',
-    'Fix ONLY transcription artifacts:',
-    '- Correct obvious Somali grammar and transcription mistakes.',
-    '- Restore likely technical terminology using the interview question below as context.',
-    '- Correct Somali-English mixed terminology and suffix attachment.',
-    '- Remove meaningless STT noise, duplicated words, and obvious transcription artifacts.',
-    '- Reconstruct fragmented wording only when the intended meaning is clearly recoverable.',
-    '',
-    'Never do the following:',
-    "- Do not change the candidate's claims, technical knowledge, mistakes, or level of detail.",
-    '- Do not invent information, improve the answer, add explanations, or answer the question yourself.',
-    '- If a word cannot be corrected with confidence, leave it exactly as transcribed rather than guessing.',
-    '',
-    `Interview question: ${questionContext || '(not available)'}`,
-    '',
-    `Raw transcript: ${rawTranscript}`,
-    '',
-    'Return ONLY the corrected transcript text, in Somali, with no commentary, labels, quotes, or formatting.',
-  ].join('\n');
-}
-
-/**
- * Corrects a raw Somali ASR transcript before it is sent for evaluation.
- * Falls back to the raw transcript on empty input or empty model output —
- * callers should also catch errors and fall back, since a normalization
- * failure must never block scoring of an answer the candidate already gave.
- */
-async function normalizeSomaliTranscript(rawTranscript, questionContext = '') {
-  const cleaned = String(rawTranscript || '').trim();
-  if (!cleaned) return cleaned;
-
-  const ai = getClient();
-  const startedAt = Date.now();
-  const response = await ai.models.generateContent({
-    model: NORMALIZE_MODEL,
-    contents: buildNormalizePrompt(cleaned, questionContext),
-  });
-
-  const normalized = String(response.text || '').trim();
-  logger.info(`[geminiSpeechService] Somali transcript normalized in ${Date.now() - startedAt}ms (${cleaned.length} -> ${normalized.length} chars)`);
-  return normalized || cleaned;
 }
 
 module.exports = {
   synthesizeSpeechStream,
-  transcribeAudioEnglish,
-  normalizeSomaliTranscript,
+  transcribeAudio,
   TTS_MODEL,
   STT_MODEL,
 };

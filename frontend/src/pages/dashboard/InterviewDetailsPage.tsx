@@ -958,7 +958,7 @@ export default function InterviewDetailsPage() {
 
           {/* Mic activity — always shown while listening/reviewing. Transcription
               itself: browser Web Speech API for English (primary), Gemini
-              backend as fallback; RunPod for Somali. */}
+              backend as fallback for English and always for Somali. */}
           {(engine.phase === "listening" || engine.phase === "reviewing") && (
             <motion.div
               initial={{ opacity: 0, y: 8 }}

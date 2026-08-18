@@ -30,13 +30,6 @@ const questionSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
-    // Raw ASR output before Somali transcript normalization, kept for
-    // debugging/auditing. Empty for English (no normalization step) or
-    // whenever normalization didn't run.
-    rawUserAnswer: {
-      type: String,
-      default: '',
-    },
     audioUrl: {
       type: String,
       default: '',

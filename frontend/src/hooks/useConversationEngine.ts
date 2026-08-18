@@ -188,7 +188,7 @@ export function useConversationEngine(
   // interim text for the UI and the primary submit-time transcript. On
   // unsupported browsers or empty transcripts, submit falls back to the
   // backend STT path (Gemini). Somali always uses the audio-upload path
-  // since the browser has no Somali model.
+  // since the browser has no Somali recognition model.
   const recognitionEnabled = !isSomaliLanguage(language);
   const recognition = useSpeechRecognition(languageCode, recognitionEnabled);
   const audioRecorder = useAudioRecorder();
@@ -283,7 +283,7 @@ export function useConversationEngine(
      Single unified path for both English and Somali: mic volume from the
      MediaRecorder analyser is the only signal we watch. Browser Web Speech
      API is no longer used — transcription always goes through the backend
-     (Gemini for English, RunPod for Somali) at submit time. */
+     (Gemini, for both English and Somali) at submit time. */
   useEffect(() => {
     if (phase !== "listening" || isPaused) {
       if (listenIntervalRef.current) clearInterval(listenIntervalRef.current);
@@ -355,8 +355,8 @@ export function useConversationEngine(
       // Priority order:
       //   1) An explicit textAnswer override (e.g. review-mode edit).
       //   2) English: browser Web Speech API transcript (primary, live).
-      //   3) Backend STT: Gemini for English (fallback when browser is
-      //      unsupported or returned nothing), RunPod for Somali.
+      //   3) Backend STT: Gemini (fallback when the browser is unsupported
+      //      or returned nothing for English; always for Somali).
       let transcript: string;
       let sttErrorMessage: string | null = null;
       if (textAnswer !== undefined) {

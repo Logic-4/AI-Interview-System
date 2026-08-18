@@ -11,7 +11,7 @@ router.use(protect);
  * POST /api/v1/stt/transcribe
  *
  * Accepts a multipart audio file (field name: "audio") and returns a JSON
- * transcript produced by the local Somali ASR model.
+ * transcript produced by Gemini (English and Somali both).
  *
  * Body:   multipart/form-data  { audio: <file> }
  * Returns: { success: true, transcript: "..." }

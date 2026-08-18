@@ -2,8 +2,8 @@
  * sttService.ts
  *
  * Sends a recorded audio Blob to the backend STT endpoint
- * (POST /api/v1/stt/transcribe) which proxies it to the local
- * Somali ASR model (somaliSpeechService.transcribeAudio).
+ * (POST /api/v1/stt/transcribe) which transcribes it via Gemini
+ * (geminiSpeechService.transcribeAudio), for both English and Somali.
  *
  * Returns the plain transcript string, or throws on network / server error.
  */
