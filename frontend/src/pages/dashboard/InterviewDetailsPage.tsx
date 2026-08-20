@@ -98,6 +98,12 @@ export default function InterviewDetailsPage() {
   // when questions were pre-generated on schedule; then back off.
   const POLL_SCHEDULE_MS = [500, 500, 1000, 2000, 4000, 8000] as const;
   const pollStepRef = useRef(0);
+  // retry-generation is only ever fired here — the auto-recovery in
+  // getInterview() (backend) explicitly skips 'failed' status, and nothing
+  // else calls the /retry-generation route, so a failed pre-generation
+  // (e.g. a cold RunPod worker at company scheduling time) would otherwise
+  // strand the candidate on "Having trouble generating questions" forever.
+  const generationRetriedRef = useRef(false);
   const loadedInterviewIdRef = useRef<string | null>(null);
 
   const interviewRef = useRef<PopulatedInterview | null>(null);
@@ -149,6 +155,7 @@ export default function InterviewDetailsPage() {
     loadedInterviewIdRef.current = interviewId;
     hasCompletedRef.current = false;
     pollStepRef.current = 0;
+    generationRetriedRef.current = false;
     setIdentityCleared(false);
     setTimeWindowForcedOpen(false);
     setRecordingConsent(false);
@@ -229,6 +236,15 @@ export default function InterviewDetailsPage() {
         const progress = await interviewService.getInterviewProgress(interviewId);
         if (cancelled) return;
         applyInterview(progress);
+        if ((progress as any)?.generationStatus === 'failed' && !generationRetriedRef.current) {
+          generationRetriedRef.current = true;
+          try {
+            const retried = await interviewService.retryQuestionGeneration(interviewId);
+            if (!cancelled) applyInterview(retried);
+          } catch {
+            // Non-fatal — next poll ticks will keep showing the failed state.
+          }
+        }
         if (!questionsReady && computeQuestionsReady(progress)) {
           // Fetch the full populated interview exactly once so the ready UI
           // has feedback, roleProfile, etc. — anything the progress route
