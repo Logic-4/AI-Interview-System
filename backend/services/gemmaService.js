@@ -872,10 +872,33 @@ async function callColabRunsyncFallback(gemmaUrl, endpoint, payload, timeoutMs) 
         rejected_question: payload?.rejected_question || '',
       },
     }, timeoutMs);
-    const rawText = data?.output?.response || data?.output?.question || data?.response || data?.question || '';
+    let rawText = data?.output?.response || data?.output?.question || data?.response || data?.question || '';
+    let expectedAnswer = `Candidate explains core concepts for ${targetSkill || focusSkills[0] || payload?.jobRole || payload?.domain || 'the role'}.`;
+    // The worker sometimes ignores the "plain sentence" instruction and
+    // returns its whole tool-call shape as text instead — either the
+    // question wrapped in JSON ({"question": "...", "ideal_answer": "..."})
+    // or, worse, an echo of the request itself with no question at all
+    // ({"task": "ask_technical_question", "domain": ...}). Confirmed live:
+    // real, on-topic questions were being thrown away by isValidGeneratedQuestion
+    // purely because they arrived as `{"question": "...", ...}` instead of a
+    // bare string. Unwrap before validation; an echo with no question field
+    // falls through unchanged and is correctly rejected downstream.
+    if (rawText.trim().startsWith('{')) {
+      try {
+        const parsed = safeParseJSON(rawText);
+        const unwrapped = parsed?.question || parsed?.text;
+        if (typeof unwrapped === 'string' && unwrapped.trim()) {
+          rawText = unwrapped;
+          const idealAnswer = parsed?.ideal_answer || parsed?.expected_answer || parsed?.answer;
+          if (typeof idealAnswer === 'string' && idealAnswer.trim()) expectedAnswer = idealAnswer;
+        }
+      } catch {
+        // Not parseable JSON — leave rawText as-is, isValidGeneratedQuestion rejects it.
+      }
+    }
     return {
       question: rawText,
-      expectedAnswer: `Candidate explains core concepts for ${targetSkill || focusSkills[0] || payload?.jobRole || payload?.domain || 'the role'}.`,
+      expectedAnswer,
       category: payload?.category || 'conceptual',
       difficulty: payload?.difficulty || 'medium',
     };
