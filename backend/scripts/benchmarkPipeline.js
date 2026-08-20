@@ -51,7 +51,6 @@ async function main() {
   const ttsCode = questionLanguage === 'somali' ? 'so-SO' : 'en-US';
 
   const question = await measure('first-question', runs, (index) => generateInterviewQuestions(
-    'technical',
     'technology',
     'mid',
     1,

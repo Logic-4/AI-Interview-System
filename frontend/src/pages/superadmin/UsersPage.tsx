@@ -97,7 +97,7 @@ const UsersPage = () => {
     <div className="panel">
       <div className="mb-5 flex flex-col gap-3 md:flex-row">
         <div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white-dark" /><input className="form-input" style={{ paddingLeft: '2.25rem' }} placeholder="Search name or email" value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} /></div>
-        <select className="form-select md:w-40" value={roleFilter} onChange={(e) => { setPage(1); setRoleFilter(e.target.value); }}><option value="">All roles</option><option value="user">User</option><option value="company">Company</option><option value="admin">Admin (legacy)</option></select>
+        <select className="form-select md:w-40" value={roleFilter} onChange={(e) => { setPage(1); setRoleFilter(e.target.value); }}><option value="">All roles</option><option value="user">User</option><option value="company">Company</option></select>
         <select className="form-select md:w-40" value={statusFilter} onChange={(e) => { setPage(1); setStatusFilter(e.target.value); }}><option value="">All statuses</option><option value="active">Active</option><option value="disabled">Disabled</option></select>
       </div>
       {loading ? <div className="flex h-64 items-center justify-center"><LoadingSpinner size="lg" /></div> : <>

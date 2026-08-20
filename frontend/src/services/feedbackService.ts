@@ -12,7 +12,11 @@ const feedbackService = {
     const url = force
       ? `/feedback/${interviewId}/generate?force=true`
       : `/feedback/${interviewId}/generate`;
-    const res = await api.post<ApiResponse<{ feedback: Feedback }>>(url);
+    // This endpoint re-evaluates every unscored answer before it writes the
+    // report, so it can legitimately run for minutes on a busy model server.
+    // The shared 30s default made "Regenerate" look broken: the request was
+    // aborted client-side while the server went on to score the answers.
+    const res = await api.post<ApiResponse<{ feedback: Feedback }>>(url, undefined, { timeout: 300000 });
     return res.data.data.feedback;
   },
 

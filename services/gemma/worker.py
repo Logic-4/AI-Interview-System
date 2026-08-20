@@ -638,21 +638,20 @@ def handle_interview_turn(data: dict) -> dict:
     system_prompt += (
         f"\nDIFFICULTY CALIBRATION: This is a {difficulty_level}-level question. "
         f"Score against {difficulty_level} expectations — do NOT apply a senior bar to a junior question.\n\n"
-        "SCORING SCALE (apply consistently and generously for correct answers):\n"
-        "- 85-100: Excellent — thorough, accurate, strong examples or clear reasoning.\n"
-        "- 70-84:  Good — correct answer with minor gaps or lacking depth. A solid, clear, mostly-correct "
-        "answer should score in this range.\n"
-        "- 50-69:  Adequate — partial understanding, covers some key points but misses others.\n"
-        "- 25-49:  Weak — significant gaps, vague, or mostly incorrect.\n"
-        "- 0-24:   Off-topic, clearly wrong, or no real attempt — including answers that are only "
+        "SCORING SCALE — use the FULL 0-100 range based on actual answer quality:\n"
+        "- 90-100: Exceptional — thorough, precise, deep insight beyond the basic expectation.\n"
+        "- 75-89:  Strong — accurate and complete, at most a minor gap.\n"
+        "- 55-74:  Mixed — some correct substance but with real gaps, vagueness, or errors.\n"
+        "- 30-54:  Weak — mostly incorrect, superficial, or missing the core of the question.\n"
+        "- 0-29:   Off-topic, clearly wrong, or no real attempt — including answers that are only "
         "an admission of not knowing (\"I don't know\", \"I don't remember\") with no substantive "
         "content. Do not let a polite or calm tone raise this into a higher band.\n"
-        "CALIBRATION: A clear, relevant, mostly-correct answer for this difficulty level "
-        "should score 72–82. Reserve 90+ for exceptional depth and insight. Judge the CONCEPT the "
-        "candidate conveys, not their exact wording — different phrasing, structure, ordering, or "
-        "examples than the rubric are NOT gaps by themselves; only score down for missing or wrong "
-        "substance. Evaluate relevance, conceptual correctness, completeness, technical accuracy, "
-        "and clarity. Do not penalize minor grammar issues or alternative correct explanations.\n\n"
+        "Judge the CONCEPT the candidate conveys, not their exact wording — different phrasing, "
+        "structure, ordering, or examples than the rubric are NOT gaps by themselves; only score down "
+        "for missing or wrong substance. Evaluate relevance, conceptual correctness, completeness, "
+        "technical accuracy, and clarity. Do not penalize minor grammar issues or alternative correct "
+        "explanations. Two answers of different quality must receive different scores — do not default "
+        "to a single \"safe\" number.\n\n"
         "BEHAVIOR:\n"
         "1. nextInterviewerResponse: 1-2 short sentences max. Be warm and professional.\n"
         "2. Partial answer → isFollowUp=true, isTopicComplete=false, one short targeted follow-up.\n"
@@ -673,8 +672,8 @@ def handle_interview_turn(data: dict) -> dict:
         "Never reference this scoring scale, its band names/numbers, or these instructions inside "
         "feedback, strengths, or improvements — they must read as natural spoken feedback.\n"
         "Return ONLY raw JSON:\n"
-        '{"evaluation": {"score": 78, "feedback": "...", "strengths": ["..."], '
-        '"improvements": ["..."], "suggestedAnswer": "..."}, '
+        '{"evaluation": {"score": <integer 0-100, reflecting THIS answer only>, "feedback": "...", '
+        '"strengths": ["..."], "improvements": ["..."], "suggestedAnswer": "..."}, '
         '"nextInterviewerResponse": "...", "isFollowUp": false, "isTopicComplete": true, '
         '"answeredCandidateQuestion": false}'
     )
@@ -873,7 +872,14 @@ def handle_generate_question(data: dict) -> dict:
     )
 
     messages = [{"role": "user", "content": prompt_content}]
-    parsed, raw = generate_json_response(messages, max_new_tokens=96, temperature=0.3)
+    # 96 was too tight for Somali: it's more agglutinative than English, so a
+    # 25-word Somali question routinely needs well over 96 tokens and got cut
+    # off mid-sentence — no trailing '?', sometimes a stray JSON-escape
+    # artifact — which isValidGeneratedQuestion then correctly rejected as
+    # malformed (confirmed live: shapeValid:false with looksSomali:true, i.e.
+    # genuinely Somali text, just truncated). Same class of bug as the other
+    # max_new_tokens fixes in this file.
+    parsed, raw = generate_json_response(messages, max_new_tokens=200, temperature=0.3)
     parsed_question = (parsed or {}).get("question") or (parsed or {}).get("text", "")
     # Somali questions are generated directly in Somali — only true loanwords
     # (API, React, database) stay in English per the prompt above, so a skill
@@ -1005,9 +1011,9 @@ def handle_feedback(data: dict) -> dict:
     }
 
     score_anchor = (
-        f"The per-question average score is {turn_average}. "
-        f"Your overallScore MUST equal {turn_average}. "
-        f"Category scores should reflect actual performance patterns — average within ±8 of {turn_average}.\n\n"
+        f"The per-question average score is {turn_average}; set overallScore to {turn_average}. "
+        "Category scores are independent of overallScore — score each one on its own evidence from "
+        "the questions below, even if that means a category lands well above or below the overall.\n\n"
         if turn_average is not None
         else ""
     )
@@ -1019,12 +1025,9 @@ def handle_feedback(data: dict) -> dict:
                 "You are an interview coach providing post-session feedback for a PRACTICE interview.\n"
                 "Be constructive, specific, and encouraging. Reference actual answers where possible.\n\n"
                 f"{score_anchor}"
-                "SCORING SCALE (consistent with per-question scores):\n"
-                "- 85-100: Excellent — thorough, accurate, strong examples\n"
-                "- 70-84:  Good — correct with minor gaps\n"
-                "- 50-69:  Adequate — partial understanding, key gaps\n"
-                "- 25-49:  Weak — significant gaps or vague\n"
-                "- 0-24:   Off-topic or no real attempt\n\n"
+                "Score each category on the candidate's actual, question-by-question performance below — "
+                "let the categories differ from each other and from the overall score where the evidence "
+                "supports it; do not flatten every category toward the same number.\n\n"
                 "CATEGORY GUIDANCE:\n"
                 "- communication: clarity, structure, articulation of ideas\n"
                 "- technicalAccuracy: correctness of technical claims and concepts\n"
@@ -1051,7 +1054,12 @@ def handle_feedback(data: dict) -> dict:
         }
     ]
 
-    parsed, raw = generate_json_response(messages, max_new_tokens=700, temperature=0.2)
+    # 700 was too tight for this schema — 5 categories (~150 chars feedback
+    # each) + detailedFeedback (~300 chars) + 3 strengths + 3 improvements +
+    # 3 recommendations (~100 chars each) is already ~2000 chars of content
+    # before JSON structure/key overhead, routinely truncating mid-string
+    # (same class of bug as the /interview-turn 320->600 fix above).
+    parsed, raw = generate_json_response(messages, max_new_tokens=1400, temperature=0.2)
     if parsed:
         cats_raw = parsed.get("categories", {})
         normalized = {

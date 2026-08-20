@@ -1,7 +1,16 @@
 const User = require('../models/User');
 const Company = require('../models/Company');
+const Interview = require('../models/Interview');
+const Question = require('../models/Question');
+const Feedback = require('../models/Feedback');
+const Session = require('../models/Session');
+const Assessment = require('../models/Assessment');
+const VerificationEvent = require('../models/VerificationEvent');
+const Application = require('../models/Application');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
+const { deleteBlobUrls } = require('../services/blobService');
+const { cascadeDeleteCompanyData } = require('./companyController');
 
 const MANAGEABLE_ROLES = ['user', 'company', 'admin'];
 const normalize = (v, fallback, max) => Math.min(Math.max(parseInt(v, 10) || fallback, 1), max);
@@ -109,7 +118,45 @@ const deleteUser = async (req, res, next) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user || !MANAGEABLE_ROLES.includes(user.role)) return next(ApiError.notFound('User not found'));
-    if (user.company) await Company.findByIdAndDelete(user.company);
+
+    // A 'company' user is always that company's 1:1 adminUser (see
+    // createUser/updateUser above). Deleting them used to also delete the
+    // Company — unconditionally, with no check for other linked users, and
+    // only cleaning interviews owned by the admin account itself. Real
+    // candidate interviews for that company are owned by separate candidate
+    // users and linked via Interview.company, not Interview.user, so they
+    // were never touched — the exact "database gap" this fixes. Deleting the
+    // company's data now goes through the same guarded cascade as the
+    // dedicated "Delete Company" action instead of duplicating (and
+    // under-covering) it here.
+    if (user.role === 'company' && user.company) {
+      const linkedUsers = await User.countDocuments({ company: user.company, _id: { $ne: user._id } });
+      if (linkedUsers > 0) {
+        return next(ApiError.badRequest('Company cannot be deleted while it still has associated users. Remove them first.'));
+      }
+      await cascadeDeleteCompanyData(user.company);
+      await Company.findByIdAndDelete(user.company);
+    }
+
+    const interviewIds = await Interview.find({ user: user._id }).distinct('_id');
+    if (interviewIds.length) {
+      const audioUrls = await Question.find({ interview: { $in: interviewIds } }).distinct('audioUrl');
+      const interviewBlobs = await Interview.find({ _id: { $in: interviewIds } })
+        .select('recordingUrl recordingChunks').lean();
+      const recordingUrls = interviewBlobs.map((i) => i.recordingUrl).filter(Boolean);
+      const chunkUrls = interviewBlobs.flatMap((i) => (i.recordingChunks || []).map((c) => c.url));
+      await deleteBlobUrls([...recordingUrls, ...chunkUrls, ...audioUrls]);
+    }
+    await Promise.all([
+      Question.deleteMany({ interview: { $in: interviewIds } }),
+      Assessment.deleteMany({ interview: { $in: interviewIds } }),
+      VerificationEvent.deleteMany({ interview: { $in: interviewIds } }),
+      Application.deleteMany({ candidate: user._id }),
+      Feedback.deleteMany({ interview: { $in: interviewIds } }),
+      Session.deleteMany({ interview: { $in: interviewIds } }),
+      Interview.deleteMany({ user: user._id }),
+    ]);
+
     await user.deleteOne();
     ApiResponse.success(res, null, 'User deleted successfully');
   } catch (error) { next(error); }

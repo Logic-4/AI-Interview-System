@@ -3,7 +3,6 @@ export type WorkplaceType = 'on-site' | 'remote' | 'hybrid';
 export type ExperienceLevel = 'junior' | 'mid' | 'senior' | 'lead';
 export type JobStatus = 'draft' | 'published' | 'paused' | 'closed';
 export type InterviewLanguage = 'English' | 'Somali';
-export type InterviewType = 'technical' | 'behavioral' | 'hr' | 'system-design' | 'mixed';
 export type ApplicationStatus = 'applied' | 'under_review' | 'interview_scheduled' | 'interviewed' | 'shortlisted' | 'rejected' | 'hired';
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 export type ResumeStatus = 'uploaded' | 'missing' | 'reviewed';
@@ -28,7 +27,6 @@ export interface Job {
   education?: string;
   requiredEducation?: string;
   interviewLanguage: InterviewLanguage;
-  interviewType: InterviewType;
   targetJobRole?: string;
   durationMinutes: number;
   focusSkills: string[];
@@ -110,7 +108,6 @@ export interface CompanyInterview {
   };
   company: string;
   title: string;
-  type: InterviewType;
   difficulty: string;
   language: string;
   jobRole: string;

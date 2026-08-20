@@ -186,7 +186,6 @@ const CompanyDashboardPage = () => {
               <thead>
                 <tr>
                   <th>Candidate</th>
-                  <th>Type</th>
                   <th>Scheduled Time</th>
                   <th>Status</th>
                 </tr>
@@ -198,7 +197,6 @@ const CompanyDashboardPage = () => {
                       <div className="font-semibold text-black dark:text-white">{inv.user?.name || inv.title}</div>
                       <div className="text-xs text-white-dark">{inv.jobRole}</div>
                     </td>
-                    <td className="capitalize">{inv.type}</td>
                     <td className="text-xs">{dateTime(inv.scheduledAt)}</td>
                     <td>
                       <span className="badge badge-outline-warning">{inv.status}</span>

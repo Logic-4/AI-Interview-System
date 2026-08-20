@@ -1,4 +1,3 @@
-export type InterviewType = 'technical' | 'behavioral' | 'system-design' | 'mixed';
 export type InterviewDifficulty = 'junior' | 'mid' | 'senior' | 'lead';
 export type InterviewDomain = 'technology';
 
@@ -28,7 +27,6 @@ export interface Interview {
   user: string;
   company?: string | null;
   title: string;
-  type: InterviewType;
   difficulty: InterviewDifficulty;
   domain: InterviewDomain;
   language: InterviewLanguage;
@@ -98,7 +96,6 @@ export interface IdentityVerificationResult {
 
 export interface CreateInterviewPayload {
   title: string;
-  type: InterviewType;
   difficulty: InterviewDifficulty;
   domain: InterviewDomain;
   language?: InterviewLanguage;
@@ -174,7 +171,6 @@ export interface InterviewListParams {
   page?: number;
   limit?: number;
   status?: InterviewStatus;
-  type?: InterviewType;
   domain?: InterviewDomain;
   difficulty?: InterviewDifficulty;
   search?: string;

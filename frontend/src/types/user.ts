@@ -40,7 +40,7 @@ export interface DashboardScores {
 export interface RecentInterviewSummary {
   _id: string;
   title: string;
-  type: string;
+  jobRole?: string;
   difficulty: string;
   domain: string;
   status: string;

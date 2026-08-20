@@ -79,17 +79,6 @@ const AnalyticsPage = () => {
         },
     };
 
-    // Construct insight items from recent feedback improvements
-    const insightsList = useMemo(() => {
-        if (!progress?.recentInsights?.length) return [];
-        return progress.recentInsights.flatMap((insight) =>
-            (insight.improvements || []).map((imp) => ({
-                category: insight.interview?.title || 'Session feedback',
-                description: imp,
-            }))
-        ).slice(0, 5);
-    }, [progress]);
-
     if (loading && !progress) {
         return (
             <div className="flex items-center justify-center h-96">
@@ -171,60 +160,6 @@ const AnalyticsPage = () => {
                 ) : (
                     <ReactApexChart options={timelineChart.options} series={timelineChart.series} type="area" height={360} />
                 )}
-            </div>
-
-            {/* Focus areas and weak spots */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="panel">
-                    <h5 className="font-semibold text-lg dark:text-white-light mb-4">Key Improvement Areas</h5>
-                    {insightsList.length === 0 ? (
-                        <div className="py-8 text-center text-white-dark">
-                            Awesome! No weakness alerts identified. Keep practicing!
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {insightsList.map((w, idx) => (
-                                <div key={idx} className="flex gap-4 p-4 rounded-lg bg-gray-50 dark:bg-black/20 border border-white-light dark:border-white-light/10">
-                                    <div className="w-8 h-8 rounded-full bg-danger/10 text-danger font-bold flex items-center justify-center shrink-0">
-                                        !
-                                    </div>
-                                    <div>
-                                        <h6 className="font-bold text-sm dark:text-white-light capitalize mb-1">{w.category}</h6>
-                                        <p className="text-xs text-white-dark leading-relaxed">{w.description}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                <div className="panel">
-                    <h5 className="font-semibold text-lg dark:text-white-light mb-4">Domain Activity</h5>
-                    {!progress?.domainActivity?.length ? (
-                        <div className="py-8 text-center text-white-dark">
-                            No domain-specific records. Create interview sessions to view domain score mappings.
-                        </div>
-                    ) : (
-                        <div className="table-responsive">
-                            <table className="table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Domain / Job Role</th>
-                                        <th>Interviews Session Count</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {progress.domainActivity.map((item) => (
-                                        <tr key={item.domain}>
-                                            <td className="font-bold capitalize">{item.domain.replace(/_/g, ' ')}</td>
-                                            <td className="text-primary font-bold">{item.count}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
             </div>
         </div>
     );

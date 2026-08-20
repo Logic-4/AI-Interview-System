@@ -205,7 +205,6 @@ export default function InterviewsHistoryPage() {
               <thead>
                 <tr className="bg-white-light/30 dark:bg-[#1a2941]/50 border-b border-white-light dark:border-[#1b2e4b]">
                   <th className="px-6 py-4 text-[10px] font-semibold text-text-muted uppercase tracking-[0.2em]">Title</th>
-                  <th className="px-6 py-4 text-[10px] font-semibold text-text-muted uppercase tracking-[0.2em]">Type</th>
                   <th className="px-6 py-4 text-[10px] font-semibold text-text-muted uppercase tracking-[0.2em]">Domain</th>
                   <th className="px-6 py-4 text-[10px] font-semibold text-text-muted uppercase tracking-[0.2em]">Difficulty</th>
                   <th className="px-6 py-4 text-[10px] font-semibold text-text-muted uppercase tracking-[0.2em]">Date</th>
@@ -226,7 +225,6 @@ export default function InterviewsHistoryPage() {
                         {iv.title}
                       </Link>
                     </td>
-                    <td className="px-6 py-5 text-xs font-semibold text-text-muted capitalize">{iv.type.replace("-", " ")}</td>
                     <td className="px-6 py-5 text-xs font-semibold text-text-muted">{DOMAIN_LABELS[iv.domain] ?? iv.domain}</td>
                     <td className="px-6 py-5 text-xs font-semibold text-text-muted capitalize">{iv.difficulty}</td>
                     <td className="px-6 py-5 text-xs font-bold text-text-muted">

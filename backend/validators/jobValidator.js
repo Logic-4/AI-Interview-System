@@ -51,11 +51,6 @@ const jobValidationRules = [
     .isIn(['English', 'Somali'])
     .withMessage('Interview language must be English or Somali'),
 
-  body('interviewType')
-    .optional()
-    .isIn(['technical', 'behavioral', 'hr', 'system-design', 'mixed'])
-    .withMessage('Interview type must be technical, behavioral, hr, system-design, or mixed'),
-
   body('durationMinutes')
     .optional()
     .isInt({ min: 5, max: 120 })

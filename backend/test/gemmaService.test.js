@@ -23,32 +23,29 @@ test('recovers a score from JSON truncated mid-array (token-limit cutoff)', () =
   assert.equal(evaluation.evaluationStatus, 'completed');
 });
 
-test('uses one worker request for a batch of later questions', async () => {
+test('generates every question through the single-question endpoint (no batch)', async () => {
   resetCircuit();
   const originalFetch = global.fetch;
-  const requests = [];
+  const endpoints = [];
   global.fetch = async (_url, options) => {
     const body = JSON.parse(options.body);
-    requests.push(body);
+    endpoints.push(body.input.endpoint);
+    const index = body.input.payload.questionIndex;
     return Response.json({
       status: 'COMPLETED',
-      output: {
-        questions: body.input.payload.requests.map((item, index) => ({
-          question: `Question ${index + 1} about ${item.category}?`,
-          expectedAnswer: 'Expected',
-        })),
-      },
+      output: { question: `Question ${index} about ${body.input.payload.category}?`, expectedAnswer: 'Expected' },
     });
   };
   try {
-    const result = await gemma.generateInterviewQuestions('technical', 'technology', 'mid', 4, {
+    const result = await gemma.generateInterviewQuestions('technology', 'mid', 4, {
       jobRole: 'React developer',
       language: 'english',
       _startIndex: 1,
       _forcedCount: 5,
     });
-    assert.equal(requests.length, 1);
-    assert.equal(requests[0].input.endpoint, '/generate-questions');
+    // Model is the sole source: one /generate-question call per slot, never a batch.
+    assert.equal(endpoints.length, 4);
+    assert.ok(endpoints.every((e) => e === '/generate-question'));
     assert.deepEqual(result.map((question) => question.order), [1, 2, 3, 4]);
   } finally {
     global.fetch = originalFetch;
@@ -73,13 +70,15 @@ test('generates multiple Somali questions concurrently, capped, and in order', a
     await new Promise((resolve) => setTimeout(resolve, 20));
     inFlight -= 1;
     const index = body.input.payload.questionIndex;
+    // Must read as Somali (contains Somali tokens) or the language guard
+    // rejects it and retries — this test only exercises concurrency/ordering.
     return Response.json({
       status: 'COMPLETED',
-      output: { question: `Somali question ${index}?`, expectedAnswer: 'Expected' },
+      output: { question: `Waa maxay su'aasha ${index} ee React?`, expectedAnswer: 'Expected' },
     });
   };
   try {
-    const result = await gemma.generateInterviewQuestions('technical', 'technology', 'mid', 6, {
+    const result = await gemma.generateInterviewQuestions('technology', 'mid', 6, {
       jobRole: 'Developer',
       language: 'somali',
       _startIndex: 1,
@@ -116,7 +115,7 @@ test('accepts a Somali question that translates the target skill instead of quot
     // absoluteIndex must land away from 0/totalCount-1 (intro/outro), which
     // skip the target-skill check regardless of language — _startIndex: 1
     // with _forcedCount: 3 puts this in the middle of the interview.
-    const result = await gemma.generateInterviewQuestions('technical', 'technology', 'mid', 1, {
+    const result = await gemma.generateInterviewQuestions('technology', 'mid', 1, {
       jobRole: 'Developer',
       language: 'somali',
       focusSkills: ['communication'],
@@ -129,23 +128,31 @@ test('accepts a Somali question that translates the target skill instead of quot
   }
 });
 
-test('still falls back to a templated question when English generation misses the target skill', async () => {
+test('leaves a slot empty (no template) when the model keeps returning an invalid shape', async () => {
+  // Model is the ONLY source of questions. When it returns shape-invalid text
+  // (here: no '?'), the backend retries QUESTION_GEN_ATTEMPTS times and then
+  // leaves the slot empty so the pipeline can fail loudly — it never
+  // substitutes a hardcoded template.
   resetCircuit();
   const originalFetch = global.fetch;
-  global.fetch = async () => Response.json({
-    status: 'COMPLETED',
-    output: { question: 'What is your favorite programming language?', expectedAnswer: 'Expected' },
-  });
+  let calls = 0;
+  global.fetch = async () => {
+    calls += 1;
+    return Response.json({
+      status: 'COMPLETED',
+      output: { question: 'Tell me about your favorite language and your favorite framework', expectedAnswer: 'Expected' },
+    });
+  };
   try {
-    const result = await gemma.generateInterviewQuestions('technical', 'technology', 'mid', 1, {
+    const result = await gemma.generateInterviewQuestions('technology', 'mid', 1, {
       jobRole: 'Developer',
       language: 'english',
       focusSkills: ['communication'],
       _startIndex: 1,
       _forcedCount: 3,
     });
-    assert.ok(result[0].text.toLowerCase().includes('communication'), `expected fallback to mention the skill, got: ${result[0].text}`);
-    assert.notEqual(result[0].text, 'What is your favorite programming language?');
+    assert.equal(result[0].text, '', 'invalid model output must not be replaced by a template');
+    assert.ok(calls >= 3, `expected the model to be retried, got ${calls} call(s)`);
   } finally {
     global.fetch = originalFetch;
   }
@@ -161,11 +168,11 @@ test('opens the model circuit immediately for a missing endpoint', async () => {
   };
   try {
     await assert.rejects(
-      gemma.generateInterviewQuestions('technical', 'technology', 'mid', 1, { jobRole: 'Developer' }),
+      gemma.generateInterviewQuestions('technology', 'mid', 1, { jobRole: 'Developer' }),
       /404/
     );
     await assert.rejects(
-      gemma.generateInterviewQuestions('technical', 'technology', 'mid', 1, { jobRole: 'Developer' }),
+      gemma.generateInterviewQuestions('technology', 'mid', 1, { jobRole: 'Developer' }),
       (error) => error.code === 'GEMMA_CIRCUIT_OPEN'
     );
     assert.equal(calls, 1);
@@ -188,7 +195,7 @@ test('passes structured resume, title, skills, and timing context to question ge
     });
   };
   try {
-    await gemma.generateInterviewQuestions('technical', 'finance', 'senior', 1, {
+    await gemma.generateInterviewQuestions('finance', 'senior', 1, {
       title: 'Senior Payments Engineer',
       jobRole: 'Backend Engineer',
       duration: 45,
@@ -216,7 +223,7 @@ test('passes structured resume, title, skills, and timing context to question ge
   }
 });
 
-test('prioritizes selected focus skills and replaces off-target model questions', async () => {
+test('prioritizes selected focus skills in the payload and trusts shape-valid model questions', async () => {
   resetCircuit();
   const originalFetch = global.fetch;
   let workerPayload;
@@ -227,12 +234,12 @@ test('prioritizes selected focus skills and replaces off-target model questions'
       status: 'COMPLETED',
       output: {
         question: 'What is React?',
-        expectedAnswer: 'This must never be shown as a question.',
+        expectedAnswer: 'Candidate explains React basics.',
       },
     });
   };
   try {
-    const [question] = await gemma.generateInterviewQuestions('technical', 'technology', 'junior', 1, {
+    const [question] = await gemma.generateInterviewQuestions('technology', 'junior', 1, {
       jobRole: 'Frontend Development',
       focusSkills: ['HTML', 'CSS'],
       roleProfile: { requiredSkills: ['React'] },
@@ -240,8 +247,10 @@ test('prioritizes selected focus skills and replaces off-target model questions'
 
     assert.equal(workerPayload.targetSkill, 'html');
     assert.deepEqual(workerPayload.supportingSkills, ['css', 'react']);
-    assert.equal(question.text, 'How would you apply html in a practical project?');
-    assert.equal(question.expectedAnswer, '');
+    // Shape-valid model text is trusted as-is — no literal target-skill
+    // substring check (see the ponytail note in generateInterviewQuestions).
+    assert.equal(question.text, 'What is React?');
+    assert.equal(question.expectedAnswer, 'Candidate explains React basics.');
   } finally {
     global.fetch = originalFetch;
     resetCircuit();

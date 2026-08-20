@@ -180,7 +180,7 @@ const getDashboard = async (req, res, next) => {
     const recentInterviews = await Interview.find({ user: userId })
       .sort({ createdAt: -1 })
       .limit(5)
-      .select('title type domain difficulty status overallScore createdAt');
+      .select('title jobRole domain difficulty status overallScore createdAt');
 
     // Get score trend (last 10 completed interviews)
     const scoredTrend = await Interview.find({

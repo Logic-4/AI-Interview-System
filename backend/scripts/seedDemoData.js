@@ -31,7 +31,6 @@ function daysAgo(n) {
 const INTERVIEWS = [
   {
     title: 'Full-Stack Developer – React & Node.js',
-    type: 'technical',
     difficulty: 'mid',
     domain: 'technology',
     jobRole: 'Full-Stack Developer',
@@ -46,7 +45,6 @@ const INTERVIEWS = [
   },
   {
     title: 'Behavioral Interview – Team Leadership',
-    type: 'behavioral',
     difficulty: 'mid',
     domain: 'technology',
     jobRole: 'Engineering Team Lead',
@@ -91,7 +89,6 @@ const INTERVIEWS = [
   },
   {
     title: 'JavaScript Deep Dive – Async & Closures',
-    type: 'technical',
     difficulty: 'mid',
     domain: 'technology',
     jobRole: 'Frontend Developer',
@@ -106,7 +103,6 @@ const INTERVIEWS = [
   },
   {
     title: 'Mixed Interview – Backend Systems & Soft Skills',
-    type: 'mixed',
     difficulty: 'senior',
     domain: 'technology',
     jobRole: 'Backend Engineer',
@@ -121,7 +117,6 @@ const INTERVIEWS = [
   },
   {
     title: 'Healthcare Tech – Data Privacy & Compliance',
-    type: 'technical',
     difficulty: 'mid',
     domain: 'healthcare',
     jobRole: 'Healthcare Software Engineer',
@@ -136,7 +131,6 @@ const INTERVIEWS = [
   },
   {
     title: 'Algorithm Challenge – Arrays & Dynamic Programming',
-    type: 'technical',
     difficulty: 'senior',
     domain: 'technology',
     jobRole: 'Software Engineer',
@@ -151,7 +145,6 @@ const INTERVIEWS = [
   },
   {
     title: 'Finance Tech – Risk Assessment Systems',
-    type: 'technical',
     difficulty: 'mid',
     domain: 'finance',
     jobRole: 'FinTech Software Engineer',
@@ -166,7 +159,6 @@ const INTERVIEWS = [
   },
   {
     title: 'Behavioral – Handling Failure & Resilience',
-    type: 'behavioral',
     difficulty: 'junior',
     domain: 'technology',
     jobRole: 'Junior Software Developer',
@@ -181,7 +173,6 @@ const INTERVIEWS = [
   },
   {
     title: 'Full-Stack Interview – Advanced Concepts',
-    type: 'technical',
     difficulty: 'senior',
     domain: 'technology',
     jobRole: 'Senior Full-Stack Engineer',
@@ -214,7 +205,6 @@ const INTERVIEWS = [
 const IN_PROGRESS = [
   {
     title: 'Cloud Architecture – AWS & Microservices',
-    type: 'technical',
     difficulty: 'senior',
     domain: 'technology',
     jobRole: 'Cloud Engineer',
@@ -223,7 +213,6 @@ const IN_PROGRESS = [
   },
   {
     title: 'Leadership & Strategy – Engineering Manager',
-    type: 'behavioral',
     difficulty: 'lead',
     domain: 'technology',
     jobRole: 'Engineering Manager',

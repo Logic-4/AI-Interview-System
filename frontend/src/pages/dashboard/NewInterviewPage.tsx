@@ -8,10 +8,9 @@ import { TECHNOLOGY_SPECIALIZATIONS } from "../../lib/constants";
 import { estimateQuestionCount } from "../../lib/interviewHelpers";
 import interviewService from "../../services/interviewService";
 import { useInterviewStore } from "../../stores/interviewStore";
-import type { InterviewType, InterviewDifficulty, InterviewLanguage, CreateInterviewPayload, InterviewWarmupStatus } from "../../types/interview";
+import type { InterviewDifficulty, InterviewLanguage, CreateInterviewPayload, InterviewWarmupStatus } from "../../types/interview";
 
-import { Code, User, Settings, Zap, Clock, MessageSquare, Video, Plus, X, ArrowLeft, AlertCircle, CheckCheck, Upload, FileText, CheckSquare, Square } from "lucide-react";
-import { parseResumeFile } from "../../lib/fileParser";
+import { Code, User, Settings, Zap, Clock, MessageSquare, Video, Plus, X, ArrowLeft, AlertCircle, CheckCheck, CheckSquare, Square } from "lucide-react";
 import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
 
 const DIFFICULTY_LEVELS: { value: InterviewDifficulty; label: string; desc: string }[] = [
@@ -36,13 +35,11 @@ export default function NewInterviewPage() {
   const [selectedSpecializations, setSelectedSpecializations] = React.useState<string[]>([]);
 
   // Session configuration
-  const [interviewType, setInterviewType] = React.useState<InterviewType>("technical");
   const [difficulty, setDifficulty] = React.useState<InterviewDifficulty>("junior");
   const [language, setLanguage] = React.useState<InterviewLanguage>("english");
   const [duration, setDuration] = React.useState(30);
 
   // Tailoring details
-  const [resumeText, setResumeText] = React.useState("");
   const [focusSkills, setFocusSkills] = React.useState<string[]>([]);
   const [skillInput, setSkillInput] = React.useState("");
 
@@ -53,13 +50,16 @@ export default function NewInterviewPage() {
   const warmupPollCountRef = React.useRef(0);
   const submittingRef = React.useRef(false);
   const generationKeyRef = React.useRef<string | null>(null);
-  const [isUploadingResume, setIsUploadingResume] = React.useState(false);
-  const [resumeFileName, setResumeFileName] = React.useState<string | null>(null);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // The combined jobRole string sent to the model (e.g. "Frontend Development & Backend Development")
   const jobRole = selectedSpecializations.join(" & ");
-  const generationFocusSkills = focusSkills.length > 0 ? focusSkills : selectedSpecializations;
+  // Leave focusSkills empty when the candidate didn't type any — the backend
+  // treats an empty list as "derive topics from the specialization" and an
+  // explicit list as "the candidate's chosen scope", so sending the
+  // specializations here as fake focus skills collapsed that distinction and
+  // made every question target the broad specialization name instead of a
+  // concrete subtopic.
+  const generationFocusSkills = focusSkills;
 
   const toggleSpecialization = (spec: string) => {
     setSelectedSpecializations((prev) => {
@@ -133,29 +133,6 @@ export default function NewInterviewPage() {
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      setIsUploadingResume(true);
-      setError(null);
-      const extractedText = await parseResumeFile(file);
-      setResumeText(extractedText);
-      setResumeFileName(file.name);
-    } catch (err: any) {
-      setError(err.message || "Failed to extract text from file.");
-      setResumeFileName(null);
-    } finally {
-      setIsUploadingResume(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
-
-  const removeResume = () => {
-    setResumeText("");
-    setResumeFileName(null);
-  };
-
   // Step validation
   const isStep1Valid = selectedSpecializations.length > 0;
   const isStep2Valid = !!difficulty && !!duration;
@@ -186,14 +163,12 @@ export default function NewInterviewPage() {
     try {
       const payload: CreateInterviewPayload = {
         title: autoTitle,
-        type: interviewType,
         difficulty,
         domain: "technology",
         language,
         duration,
         jobRole,
         focusSkills: generationFocusSkills,
-        resumeText: resumeText.trim() || undefined,
       };
 
       generationKeyRef.current ||= typeof crypto !== "undefined" && crypto.randomUUID
@@ -587,69 +562,13 @@ export default function NewInterviewPage() {
                     <div className="border-b border-[#ebedf2] dark:border-[#1b2e4b] pb-4 mb-4">
                       <h4 className="text-lg font-bold text-black dark:text-white-light">Step 3: Personalise Your Session</h4>
                       <p className="text-xs text-text-muted opacity-70 mt-1">
-                        Upload your resume and add skills so the AI tailors questions directly to your background. Both fields are optional.
+                        Add skills so the AI tailors questions directly to your background. This field is optional.
                       </p>
                     </div>
 
                     <div className="space-y-6">
-                      {/* Resume Upload */}
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between px-1">
-                          <label className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em] dark:text-white block">
-                            Upload Your Resume / CV
-                            <span className="ml-2 text-[10px] font-semibold text-text-muted normal-case tracking-normal opacity-60">(optional — personalises questions to your background)</span>
-                          </label>
-                        </div>
-                        <div className="relative">
-                          <input
-                            type="file"
-                            accept=".txt,.pdf,.docx"
-                            className="hidden"
-                            ref={fileInputRef}
-                            onChange={handleFileUpload}
-                          />
-                          {resumeFileName ? (
-                            <div className="flex flex-col items-center justify-center w-full h-32 border-2 border-primary/30 border-dashed rounded-lg bg-primary/5">
-                              <FileText className="w-8 h-8 text-primary mb-2" />
-                              <p className="text-sm font-semibold text-text-primary dark:text-white">{resumeFileName}</p>
-                              <button
-                                type="button"
-                                onClick={removeResume}
-                                className="mt-2 text-xs font-bold text-danger hover:underline"
-                              >
-                                Remove File
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => fileInputRef.current?.click()}
-                              disabled={isUploadingResume}
-                              className="flex flex-col items-center justify-center w-full h-32 border-2 border-[#ebedf2] dark:border-[#1b2e4b] border-dashed rounded-lg hover:border-primary hover:bg-primary/5 transition-all bg-white dark:bg-[#121e32]"
-                            >
-                              {isUploadingResume ? (
-                                <div className="flex flex-col items-center gap-2">
-                                  <LoadingSpinner size="sm" className="h-6 w-6" />
-                                  <span className="text-xs font-semibold text-primary">Parsing file...</span>
-                                </div>
-                              ) : (
-                                <div className="flex flex-col items-center gap-2">
-                                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                                    <Upload className="w-5 h-5" />
-                                  </div>
-                                  <div>
-                                    <span className="text-sm font-bold text-text-primary dark:text-white">Click to upload your Resume</span>
-                                    <p className="text-[10px] font-semibold text-text-muted mt-1">Supports PDF, DOCX, TXT</p>
-                                  </div>
-                                </div>
-                              )}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
                       {/* Focus Skills */}
-                      <div className="space-y-3 pt-2 border-t border-[#ebedf2] dark:border-[#1b2e4b] mt-4">
+                      <div className="space-y-3">
                         <div className="flex items-center justify-between px-1">
                           <label className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em] dark:text-white">
                             Focus Skills

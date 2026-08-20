@@ -49,13 +49,12 @@ test('Colab fallback: a well-formed score/feedback pair is parsed through', asyn
       assert.equal(payload.answer, 'A function bundled with its lexical scope.');
       assert.equal(payload.expected_answer, 'A closure retains access to its lexical scope.');
       assert.equal(payload.category, 'core skills');
-      assert.equal(payload.interview_type, 'technical');
     },
   });
   try {
     const result = await gemma.processInterviewTurn(
       [{ role: 'interviewer', content: 'What is a closure?' }],
-      'engineering', 'Backend Engineer', 'english', 'technical',
+      'engineering', 'Backend Engineer', 'english',
       {
         currentQuestion: {
           text: 'What is a closure?',
@@ -80,7 +79,7 @@ test('Colab fallback: an out-of-range hallucinated score is rejected, not clampe
   try {
     const result = await gemma.processInterviewTurn(
       [{ role: 'interviewer', content: 'What is a closure?' }],
-      'engineering', 'Backend Engineer', 'english', 'technical',
+      'engineering', 'Backend Engineer', 'english',
       { currentQuestion: { text: 'What is a closure?' }, candidateAnswer: 'A function bundled with its lexical scope.' }
     );
     // Must NOT silently become 100 (clamped) — a wild hallucination is unscored.
@@ -105,7 +104,7 @@ test('Colab fallback: unparseable output is not displayed as candidate feedback 
   try {
     const result = await gemma.processInterviewTurn(
       [{ role: 'interviewer', content: 'What is a closure?' }],
-      'engineering', 'Backend Engineer', 'english', 'technical',
+      'engineering', 'Backend Engineer', 'english',
       { currentQuestion: { text: 'What is a closure?' }, candidateAnswer: 'A function bundled with its lexical scope.' }
     );
     assert.equal(result.evaluation.score, null);
@@ -149,7 +148,7 @@ test('Colab fallback keeps five different answers and their evaluations independ
     for (const answer of fixtures.keys()) {
       const result = await gemma.processInterviewTurn(
         [{ role: 'interviewer', content: 'Explain the concept.' }],
-        'engineering', 'Engineer', 'english', 'technical',
+        'engineering', 'Engineer', 'english',
         { currentQuestion: { text: 'Explain the concept.' }, candidateAnswer: answer }
       );
       scores.push(result.evaluation.score);
@@ -161,6 +160,118 @@ test('Colab fallback keeps five different answers and their evaluations independ
       evaluationStatus: 'completed',
       score,
     }))), 49);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+// The Colab path used to hardcode isFollowUp:false and a canned
+// nextInterviewerResponse, so a follow-up could never fire no matter what the
+// model decided — a partial answer was always accepted and moved past.
+test('Colab fallback: the model\'s follow-up decision is honoured, not hardcoded', async () => {
+  resetCircuit();
+  const originalFetch = global.fetch;
+  global.fetch = async (url, options) => {
+    const u = String(url);
+    if (u.endsWith('/interview-turn')) {
+      return new Response(JSON.stringify({ detail: 'not found' }), { status: 404 });
+    }
+    if (u.endsWith('/runsync')) {
+      assert.equal(JSON.parse(options.body).endpoint, '/score_candidate_answer');
+      return Response.json({
+        output: {
+          response: JSON.stringify({
+            score: 55,
+            feedback: 'Partly right — named the mechanism but not the trade-off.',
+            strengths: ['Named the mechanism'],
+            improvements: ['Cover the write-cost trade-off'],
+            suggestedAnswer: 'An index trades write cost for read speed.',
+            isFollowUp: true,
+            nextInterviewerResponse: 'What does that cost you on writes?',
+          }),
+        },
+      });
+    }
+    throw new Error(`Unexpected fetch to ${u}`);
+  };
+  try {
+    const result = await gemma.processInterviewTurn(
+      [{ role: 'interviewer', content: 'What is a database index?' }],
+      'engineering', 'Backend Engineer', 'english',
+      { currentQuestion: { text: 'What is a database index?' }, candidateAnswer: 'It makes lookups faster.' }
+    );
+    assert.equal(result.isFollowUp, true, 'model asked for a follow-up but it was dropped');
+    assert.equal(result.nextInterviewerResponse, 'What does that cost you on writes?');
+    assert.equal(result.evaluation.score, 55);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+// The real fine-tuned /score_candidate_answer task names these fields
+// needsFollowUp/followUpTarget (not isFollowUp/nextInterviewerResponse). If the
+// adapter only reads the latter, follow-ups never fire on the live path.
+test('Colab fallback: honours the notebook\'s needsFollowUp/followUpTarget fields', async () => {
+  resetCircuit();
+  const originalFetch = global.fetch;
+  global.fetch = async (url) => {
+    const u = String(url);
+    if (u.endsWith('/interview-turn')) {
+      return new Response(JSON.stringify({ detail: 'not found' }), { status: 404 });
+    }
+    if (u.endsWith('/runsync')) {
+      return Response.json({
+        output: {
+          response: JSON.stringify({
+            score: 55,
+            feedback: 'Named the mechanism but not the trade-off.',
+            needsFollowUp: true,
+            followUpTarget: 'the write-cost trade-off',
+          }),
+        },
+      });
+    }
+    throw new Error(`Unexpected fetch to ${u}`);
+  };
+  try {
+    const result = await gemma.processInterviewTurn(
+      [{ role: 'interviewer', content: 'What is a database index?' }],
+      'engineering', 'Backend Engineer', 'english',
+      { currentQuestion: { text: 'What is a database index?' }, candidateAnswer: 'It makes lookups faster.' }
+    );
+    assert.equal(result.isFollowUp, true, 'needsFollowUp:true was dropped');
+    assert.match(result.nextInterviewerResponse, /write-cost trade-off/);
+    assert.equal(result.evaluation.score, 55);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+// A follow-up off an evaluation we could not grade would loop the candidate on
+// a question that never scored, so it must be suppressed.
+test('Colab fallback: no follow-up is asked when the evaluation itself failed', async () => {
+  resetCircuit();
+  const originalFetch = global.fetch;
+  global.fetch = async (url) => {
+    const u = String(url);
+    if (u.endsWith('/interview-turn')) {
+      return new Response(JSON.stringify({ detail: 'not found' }), { status: 404 });
+    }
+    if (u.endsWith('/runsync')) {
+      return Response.json({
+        output: { response: JSON.stringify({ score: null, feedback: '', isFollowUp: true, nextInterviewerResponse: 'Tell me more?' }) },
+      });
+    }
+    throw new Error(`Unexpected fetch to ${u}`);
+  };
+  try {
+    const result = await gemma.processInterviewTurn(
+      [{ role: 'interviewer', content: 'What is a database index?' }],
+      'engineering', 'Backend Engineer', 'english',
+      { currentQuestion: { text: 'What is a database index?' }, candidateAnswer: 'It makes lookups faster.' }
+    );
+    assert.equal(result.evaluation.evaluationStatus, 'failed');
+    assert.equal(result.isFollowUp, false, 'asked a follow-up off an ungraded turn');
   } finally {
     global.fetch = originalFetch;
   }

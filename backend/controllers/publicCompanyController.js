@@ -37,8 +37,10 @@ const getPublicCompanyProfile = async (req, res, next) => {
  */
 const getAllPublicJobs = async (req, res, next) => {
   try {
+    const activeCompanyIds = await Company.find({ status: 'active' }).distinct('_id');
+
     // ponytail: fixed limit of 50, add cursor pagination when job count grows
-    const jobs = await Job.find({ status: 'published' })
+    const jobs = await Job.find({ status: 'published', company: { $in: activeCompanyIds } })
       .populate('company', 'name logo')
       .select('title employmentType workplaceType location applicationDeadline requiredSkills experienceLevel resumeRequired createdAt company')
       .sort({ createdAt: -1 })
@@ -90,15 +92,16 @@ const getPublicJobDetails = async (req, res, next) => {
     const { jobId } = req.params;
 
     const job = await Job.findById(jobId)
-      .populate('company', 'name logo contactEmail phone website address description')
+      .populate('company', 'name logo contactEmail phone website address description status')
       .lean();
 
-    if (!job || job.status !== 'published') {
+    if (!job || job.status !== 'published' || job.company?.status !== 'active') {
       return res.status(404).json({
         success: false,
         message: 'Job posting not found or no longer active',
       });
     }
+    delete job.company.status;
 
     res.status(200).json({
       success: true,
@@ -141,23 +144,20 @@ const applyPublicJob = async (req, res, next) => {
       });
     }
 
+    const company = await Company.findById(job.company).select('status').lean();
+    if (!company || company.status !== 'active') {
+      return res.status(404).json({
+        success: false,
+        message: 'Job posting not found or no longer active',
+      });
+    }
+
     // Enforce application deadline — a schema field that used to be ignored.
     if (job.applicationDeadline && Date.now() > new Date(job.applicationDeadline).getTime()) {
       return res.status(410).json({
         success: false,
         message: 'The application window for this job has closed.',
       });
-    }
-
-    // Enforce max application cap.
-    if (typeof job.maxApplications === 'number' && job.maxApplications > 0) {
-      const current = await Application.countDocuments({ job: job._id });
-      if (current >= job.maxApplications) {
-        return res.status(409).json({
-          success: false,
-          message: 'This job posting is no longer accepting new applications.',
-        });
-      }
     }
 
     // Always required validation with strict format checks
@@ -256,29 +256,55 @@ const applyPublicJob = async (req, res, next) => {
       ? String(resumeText || '').replace(/[ --]/g, '').slice(0, 50000)
       : '';
 
-    // Create Application record
-    const application = await Application.create({
-      job: job._id,
-      company: job.company,
-      candidate: candidateUser._id,
-      candidateName: fullName,
-      candidateEmail: email,
-      candidatePhone: phone,
-      profilePhotoUrl: profilePhotoUrl || '',
-      resumeUrl: job.resumeRequired ? resumeUrl : '',
-      resumeText: safeResumeText,
-      resumeStatus: job.resumeRequired && resumeUrl ? 'uploaded' : 'missing',
-      coverLetter: '',
-      selectedInterviewDate: null,
-      selectedInterviewTime: '',
-      status: 'applied',
-    });
+    const safeCoverLetter = String(coverLetter || '').trim().slice(0, 5000);
 
-    res.status(201).json({
-      success: true,
-      message: 'Application submitted successfully',
-      data: { application },
-    });
+    // Enforce max application cap atomically: reserve a slot on the Job
+    // document right before creating the Application, so two requests
+    // racing near the cap can't both slip through the way a plain
+    // countDocuments()-then-create() check would allow.
+    let capReserved = false;
+    if (typeof job.maxApplications === 'number' && job.maxApplications > 0) {
+      const reserved = await Job.findOneAndUpdate(
+        { _id: job._id, $expr: { $lt: [{ $ifNull: ['$applicationCount', 0] }, job.maxApplications] } },
+        { $inc: { applicationCount: 1 } }
+      );
+      if (!reserved) {
+        return res.status(409).json({
+          success: false,
+          message: 'This job posting is no longer accepting new applications.',
+        });
+      }
+      capReserved = true;
+    }
+
+    try {
+      // Create Application record
+      const application = await Application.create({
+        job: job._id,
+        company: job.company,
+        candidate: candidateUser._id,
+        candidateName: fullName,
+        candidateEmail: email,
+        candidatePhone: phone,
+        profilePhotoUrl: profilePhotoUrl || '',
+        resumeUrl: job.resumeRequired ? resumeUrl : '',
+        resumeText: safeResumeText,
+        resumeStatus: job.resumeRequired && resumeUrl ? 'uploaded' : 'missing',
+        coverLetter: safeCoverLetter,
+        selectedInterviewDate: null,
+        selectedInterviewTime: '',
+        status: 'applied',
+      });
+
+      res.status(201).json({
+        success: true,
+        message: 'Application submitted successfully',
+        data: { application },
+      });
+    } catch (error) {
+      if (capReserved) await Job.updateOne({ _id: job._id }, { $inc: { applicationCount: -1 } });
+      throw error;
+    }
   } catch (error) {
     if (error.code === 11000) {
       return res.status(409).json({

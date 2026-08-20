@@ -2,6 +2,7 @@ const logger = require('../utils/logger');
 const SystemConfig = require('../models/SystemConfig');
 const { isSimilarQuestionText } = require('../utils/questionHelpers');
 const { normalizeEvaluation } = require('../utils/evaluation');
+const { translateToSomali } = require('./geminiSpeechService');
 
 /* ─── API Configuration ─────────────────────────────────── */
 const currentGemmaUrl = (process.env.RUNPOD_API_URL || process.env.GEMMA_API_URL || '')
@@ -112,10 +113,16 @@ function getRunPodEndpointBase(url) {
 }
 
 const TIMEOUT_MS = Number(process.env.GEMMA_TIMEOUT_MS || 90000);
-// Scoring one already-recorded answer doesn't need the same budget as a
-// cold-start question-generation call — a tighter timeout here keeps the
-// worst case under the frontend's per-call submitAnswer timeout.
-const INTERVIEW_TURN_TIMEOUT_MS = Number(process.env.INTERVIEW_TURN_TIMEOUT_MS || 45000);
+// This must exceed real worst-case model latency or evaluations are aborted
+// mid-flight and the score is lost. Measured against the live server: ~30s to
+// score a short English answer, ~138s for the same call in Somali (Somali
+// costs far more tokens per word). At the old 45s budget every Somali
+// evaluation timed out — answers came back unscored no matter how good they
+// were, which is the "takes ages and returns nothing" failure.
+// Waiting is no longer felt by the candidate: submitAnswer responds after
+// FAST_EVAL_BUDGET_MS and the evaluation finishes in the background, with
+// completeInterview waiting for it before the final average is computed.
+const INTERVIEW_TURN_TIMEOUT_MS = Number(process.env.INTERVIEW_TURN_TIMEOUT_MS || 180000);
 const MAX_RETRIES = Number(process.env.GEMMA_MAX_RETRIES || 1);
 const RETRY_DELAY_MS = 1500;
 const HISTORY_WINDOW = 8;
@@ -130,6 +137,11 @@ const CIRCUIT_OPEN_MS = Number(process.env.GEMMA_CIRCUIT_OPEN_MS || 60000);
 const SOMALI_GEN_CONCURRENCY = Number(process.env.SOMALI_GEN_CONCURRENCY || 3);
 
 const circuit = { failures: 0, openUntil: 0, reason: '' };
+
+// Set once the configured base URL is discovered to be a runsync-only router
+// (the Colab/Lightning notebook) so later calls skip the always-404 probe.
+// Module-level is safe: the base URL is read once at load and never changes.
+let colabRunsyncOnly = false;
 
 function assertCircuitClosed() {
   if (circuit.openUntil > Date.now()) {
@@ -194,72 +206,177 @@ function isValidInterviewerResponse(text, isSomali = false) {
   return !/(return only valid json|expected answer|ideal answer|one field ["']?question|interview assessment)/i.test(response);
 }
 
-function isQuestionAboutTargetSkill(question, targetSkill) {
-  if (!targetSkill) return true;
-  return String(question).toLowerCase().includes(String(targetSkill).toLowerCase());
+// Generic words inside specialization-subtopic phrases ("HTML & CSS
+// fundamentals", "DOM and browser rendering") that carry no topical signal
+// on their own — stripped so matching is driven by the real technology/
+// concept words instead of connective filler.
+const SKILL_MATCH_STOPWORDS = new Set([
+  'and', 'or', 'the', 'a', 'an', 'of', 'for', 'in', 'on', 'with', 'to',
+  'fundamentals', 'concepts', 'principles', 'practices', 'basics', 'core',
+]);
+
+function skillMatchTokens(skill) {
+  return String(skill)
+    .toLowerCase()
+    .split(/[^a-z0-9]+/i)
+    .filter((t) => t.length >= 2 && !SKILL_MATCH_STOPWORDS.has(t));
 }
 
-// Reject any response that has zero Somali function-word signal. Blacklisting
-// English starters missed real-world worker output like "Open Mock Interview
-// Session..." (task-name echo) and "Please tell me..." / "Today we'll...".
-// A positive-signal check is much more robust: real Somali has at least one
-// of these tokens within the first ~20 words. If none appear, treat as not
-// Somali regardless of what English starter it opens with.
-const SOMALI_TOKEN_RE = /\b(waa|ma|iyo|oo|ah|ku|la|ka|aad|aan|waxaan|waxaa|waxaad|sidee|sida|maxaad|maxaa|xaggee|xaggeed|ayaad|khibrad|noo|tusaale|sharax|kartaa|leedahay|adeegsan|ula|marka|markaad|shaqada|shaqo)\b/i;
+// A token match alone can't tell "react" the library apart from "React
+// Native" the different, unrelated framework — "react" is a genuine
+// substring/whole-word hit inside "react native" too. Confirmed live:
+// target "react" let through "If I use strict mode with React Native app,
+// will styling problems be caught?" — exactly the drift this guard exists
+// to catch. Listed pairs are rejected even though the token technically
+// matches; extend only with pairs actually seen live, not hypothetical ones.
+const SKILL_CONFUSABLES = {
+  react: ['react native'],
+};
+
+// Lenient on-topic check: a full-phrase substring match (the old behavior)
+// almost never fires for a specialization subtopic like "HTML & CSS
+// fundamentals" — no natural question repeats that whole phrase — so this
+// matches on ANY significant token from targetSkill instead. Loose enough
+// not to reject legitimate rephrasing (a "React hooks" question for target
+// "react"), strict enough to catch outright drift confirmed live: assigned
+// "mongodb", the model asked about Webpack instead — zero shared tokens.
+function isQuestionAboutTargetSkill(question, targetSkill) {
+  if (!targetSkill) return true;
+  const tokens = skillMatchTokens(targetSkill);
+  if (!tokens.length) return true;
+  const q = String(question).toLowerCase();
+  return tokens.some((t) => {
+    if (!q.includes(t)) return false;
+    const confusables = SKILL_CONFUSABLES[t];
+    if (confusables && confusables.some((phrase) => q.includes(phrase))) return false;
+    return true;
+  });
+}
+
+// Somali technical questions routinely keep English loanwords like "API",
+// "React", or "database", so "no Somali token found" is too strict a test:
+// a real Somali question can be mostly technical terms plus only one or two
+// Somali cue words, and the old detector rejected those as English. Keep a
+// broad Somali cue list, but only classify text as English when it carries an
+// explicit English opener/preamble instead of merely lacking a Somali token.
+const SOMALI_TOKEN_RE = /\b(waa|maxaa|maxay|maxaad|maxayse|ma|iyo|oo|ah|ku|la|ka|aad|aan|waxaan|waxaa|waxaad|sidee|sideed|sida|goorma|kee|tee|xagee|xaggee|xaggeed|ayaad|khibrad|noo|tusaale|sharax|sharrax|farqiga|kartaa|leedahay|isticmaal|isticmaashaa|adeegsan|adeegsataa|ula|marka|markaad|shaqada|shaqo)\b/i;
+const ENGLISH_OPENING_RE = /^(what|how|why|when|where|which|who|can you|could you|would you|please|tell me|walk me through|describe|explain|today we('| wi)ll|open(?:ing)? mock interview session|review complete)\b/i;
 function looksSomali(text) {
   return SOMALI_TOKEN_RE.test(String(text || '').slice(0, 400));
 }
 function looksEnglish(text) {
-  // Kept for backwards compatibility with callers — a Somali response with
-  // no Somali signal is treated as English (the concrete failure mode we hit
-  // when the fine-tuned worker echoes English task-name text instead of a
-  // real Somali question).
-  return !looksSomali(text);
+  // Only reject as English on a positive signal. Somali technical questions
+  // often contain mostly borrowed English nouns, and treating "not clearly
+  // Somali" as English caused valid Somali questions to be thrown away.
+  const sample = String(text || '').trim().slice(0, 200);
+  return !looksSomali(sample) && ENGLISH_OPENING_RE.test(sample);
 }
 
-// 12 templates each (doubled from 6) so a full-length interview has more
-// room before it has to repeat one verbatim — see buildQuestionFallback.
-const FALLBACK_TEMPLATES_EN = [
-  (s) => `How would you apply ${s} in a practical project?`,
-  (s) => `What challenges have you faced working with ${s}?`,
-  (s) => `Can you describe a real-world scenario where ${s} was critical to the outcome?`,
-  (s) => `How do you stay current with best practices in ${s}?`,
-  (s) => `Walk me through your approach to debugging an issue related to ${s}.`,
-  (s) => `What trade-offs do you consider when using ${s}?`,
-  (s) => `What's a mistake you made early on with ${s}, and what did it teach you?`,
-  (s) => `How would you explain ${s} to a junior teammate who's never used it?`,
-  (s) => `What tools or resources do you rely on most when working with ${s}?`,
-  (s) => `How do you decide when ${s} is the right choice versus an alternative?`,
-  (s) => `What does a well-designed solution involving ${s} look like to you?`,
-  (s) => `Tell me about a time you had to optimize something related to ${s}.`,
-];
-const FALLBACK_TEMPLATES_SO = [
-  (s) => `Sidee ayaad ${s} ugu adeegsan lahayd mashruuc dhab ah?`,
-  (s) => `Waa maxay caqabadaha ugu waaweyn ee aad la kulantay markaad la shaqeynaysay ${s}?`,
-  (s) => `Ma tusaale ka bixin kartaa xaalad ${s} muhiim ku ahayd natiijadeeda?`,
-  (s) => `Sidee ayaad ula socotaa horumarka cusub ee ${s}?`,
-  (s) => `Sidee ayaad u xallisaa cilladaha la xiriira ${s}?`,
-  (s) => `Maxaa muhiim ah oo aad tixgelisid markaad isticmaalayso ${s}?`,
-  (s) => `Waa maxay khalad aad samaysay markii aad bilowday inaad isticmaasho ${s}, maxaadna ka bartay?`,
-  (s) => `Sidee ayaad ${s} ugu sharxi lahayd qof cusub oo aan weligiis isticmaalin?`,
-  (s) => `Waa maxay qalabka ama agabka aad ugu isticmaasho ${s}?`,
-  (s) => `Sidee ayaad u go'aamisaa marka ${s} ay tahay xulashada saxda ah?`,
-  (s) => `Sideed u qeexi lahayd xalka wanaagsan ee ku lug leh ${s}?`,
-  (s) => `Noo sheeg mar aad u baahatay inaad hagaajiso wax la xiriira ${s}.`,
-];
+// Broad specializations aren't testable technical anchors by themselves
+// ("frontend development" as a target produces a generic question) — expand
+// each one the frontend offers (see frontend/src/lib/constants.ts
+// TECHNOLOGY_SPECIALIZATIONS) into concrete subtopics so both real model
+// generation and the fallback templates below have something specific to
+// target when the candidate leaves Focus Skills empty.
+const SPECIALIZATION_SUBTOPICS = {
+  'frontend development': ['HTML & CSS fundamentals', 'JavaScript core concepts', 'DOM and browser rendering', 'responsive and accessible UI design', 'frontend state management', 'client-side performance optimization', 'consuming REST/GraphQL APIs', 'modern frontend frameworks'],
+  'backend development': ['API design and REST principles', 'database schema design', 'authentication and authorization', 'server-side architecture', 'caching strategies', 'concurrency and async processing', 'error handling and logging', 'HTTP and networking fundamentals'],
+  'mobile app development': ['mobile UI/UX patterns', 'native vs cross-platform trade-offs', 'app lifecycle and state management', 'offline storage and data sync', 'mobile performance and battery usage', 'push notifications', 'app release and distribution'],
+  'devops & infrastructure': ['CI/CD pipelines', 'containerization', 'infrastructure as code', 'monitoring and alerting', 'deployment strategies', 'configuration management', 'incident response'],
+  'cloud engineering': ['cloud service models (IaaS/PaaS/SaaS)', 'scalability and auto-scaling', 'cloud networking and security', 'cost optimization', 'serverless architecture', 'high-availability design'],
+  'database administration': ['relational schema design and normalization', 'indexing and query optimization', 'transactions and ACID properties', 'backup and recovery', 'replication and high availability', 'database security'],
+  'data science & analytics': ['data cleaning and preprocessing', 'statistical analysis fundamentals', 'data visualization', 'SQL for analytics', 'A/B testing', 'exploratory data analysis'],
+  'machine learning & ai': ['supervised vs unsupervised learning', 'model evaluation metrics', 'overfitting and regularization', 'feature engineering', 'training pipelines', 'deploying models to production'],
+  cybersecurity: ['common web vulnerabilities', 'authentication and access control', 'encryption fundamentals', 'network security basics', 'secure coding practices', 'incident response and threat detection'],
+  'software architecture': ['design patterns', 'system design trade-offs', 'scalability and reliability', 'microservices vs monolith', 'API and service boundaries', 'managing technical debt'],
+};
 
-// Deterministic per-slot template pick instead of a module-level shared
-// counter (the old design leaked state across concurrent interviews AND
-// still repeated within one interview after 6 slots — a real 30-minute,
-// single-specialization interview asked "Walk me through your approach to
-// debugging an issue related to cybersecurity" twice, verbatim, in live
-// testing). `index` should be the question's own position so two different
-// interviews generating concurrently never interfere with each other.
-function buildQuestionFallback({ targetSkill, jobRole, domain, language, index = 0 }) {
-  const subject = targetSkill || jobRole || domain || 'this field';
+/** Expands broad specialization names (e.g. from jobRole) into their concrete subtopics. */
+function expandSpecializationSubtopics(names = []) {
+  const subtopics = [];
+  for (const name of names) {
+    const key = String(name || '').trim().toLowerCase();
+    if (SPECIALIZATION_SUBTOPICS[key]) subtopics.push(...SPECIALIZATION_SUBTOPICS[key]);
+  }
+  return subtopics;
+}
+
+// The model is the ONLY source of interview questions — there are no
+// hardcoded question templates. When a generated question fails shape/language
+// validation we ask the model again (a fresh sample; on retry the previous
+// text is passed as `rejected_question` so the prompt steers away from it),
+// up to QUESTION_GEN_ATTEMPTS times. If every attempt is still unusable the
+// slot is left empty and the caller fails generation loudly (retryable) —
+// nothing templated ever reaches a candidate. A thrown call error (network,
+// 404, open circuit) is NOT retried here: it propagates so the pipeline marks
+// generation failed instead of masking a dead model as an empty question.
+const QUESTION_GEN_ATTEMPTS = Number(process.env.QUESTION_GEN_ATTEMPTS || 3);
+
+async function generateValidQuestion(payload, language, requestTimeoutMs) {
   const isSomali = String(language).toLowerCase() === 'somali';
-  const templates = isSomali ? FALLBACK_TEMPLATES_SO : FALLBACK_TEMPLATES_EN;
-  return templates[((index % templates.length) + templates.length) % templates.length](subject);
+  // For Somali, always ask the worker to COMPOSE in English (reliably good),
+  // then translate through Gemini (translateToSomali) below. Composing new
+  // technical content and getting Somali grammar right in the same model
+  // call is too much for this fine-tune — confirmed live with wrong verb
+  // choices and garbled multi-clause sentences even after lowering
+  // temperature and adding few-shot examples. Gemini is a much larger,
+  // broadly multilingual model already used for STT/TTS in this backend;
+  // routing translation through it here also means this fix iterates at
+  // Node speed instead of needing a Colab redeploy per attempt.
+  const composePayload = isSomali ? { ...payload, language: 'english' } : payload;
+  let lastEnglishText = '';
+  let lastText = '';
+  // A shape/language-valid question that missed the target-skill check —
+  // kept as a safety net. Topic relevance is a soft preference, not a hard
+  // gate like shape/language: the model can systematically drift on a given
+  // skill (confirmed live: 3/3 attempts targeting "mongodb" all landed on an
+  // unrelated topic), and emptying the slot after exhausting retries would
+  // turn "occasionally off-topic" into "sometimes the interview breaks" —
+  // strictly worse. A well-formed but off-target question beats none.
+  let offTargetFallback = null;
+  for (let attempt = 0; attempt < QUESTION_GEN_ATTEMPTS; attempt++) {
+    const result = await callGemma(
+      '/generate-question',
+      attempt === 0 ? composePayload : { ...composePayload, rejected_question: lastEnglishText },
+      0,
+      requestTimeoutMs || TIMEOUT_MS,
+    );
+    let qText = (result.question || result.text || '').trim();
+    if (qText) lastEnglishText = qText;
+
+    if (isSomali && qText) {
+      try {
+        qText = await translateToSomali(qText);
+      } catch (translateError) {
+        logger.warn(`[gemmaService] Somali translation failed (attempt ${attempt + 1}): ${translateError.message}`);
+        qText = '';
+      }
+    }
+
+    if (qText) lastText = qText;
+    const shapeValid = isValidGeneratedQuestion(qText) && !(isSomali && looksEnglish(qText));
+    const onTarget = shapeValid && isQuestionAboutTargetSkill(qText, payload.targetSkill);
+    if (shapeValid) {
+      const answer = {
+        text: qText,
+        expectedAnswer: result.expectedAnswer || result.expected_answer || result.answer || '',
+      };
+      if (onTarget) return answer;
+      offTargetFallback = answer;
+    }
+    logger.warn(JSON.stringify({
+      event: 'question_rejected_retrying',
+      attempt: attempt + 1,
+      isSomali,
+      shapeValid,
+      onTarget,
+      looksSomali: isSomali ? looksSomali(qText) : null,
+      englishSource: isSomali ? lastEnglishText.slice(0, 160) : undefined,
+      rawTextPreview: String(qText).slice(0, 160),
+    }));
+  }
+  if (offTargetFallback) return offTargetFallback;
+  return { text: '', expectedAnswer: '' };
 }
 
 function trimConversationHistory(history, maxTurns = HISTORY_WINDOW) {
@@ -462,6 +579,10 @@ function parseEvaluationResponse(rawText) {
   const evaluation = normalizeEvaluation(candidate);
   return {
     evaluation,
+    // `candidate` is returned so callers can read the turn-control fields the
+    // model returns alongside the score (isFollowUp / nextInterviewerResponse)
+    // instead of hardcoding them — see the /interview-turn branch below.
+    candidate,
     error: evaluation.evaluationStatus === 'completed'
       ? null
       : new Error('Evaluation response requires a score in [0,100] and non-empty feedback'),
@@ -563,6 +684,16 @@ async function callGemma(endpoint, payload, attempt = 0, timeoutMs = TIMEOUT_MS)
     return callRunPod(endpoint, payload, attempt, timeoutMs);
   }
 
+  // The notebook server exposes only /runsync, so the native-endpoint POST
+  // below always 404s there. Remembering that after the first probe saves a
+  // wasted round trip on every subsequent call — the notebook log showed
+  // `POST /interview-turn 404` immediately before each `POST /runsync 200`,
+  // and over an ngrok tunnel that round trip costs real latency on every
+  // question generated and every answer scored.
+  if (colabRunsyncOnly) {
+    return callColabRunsyncFallback(gemmaUrl, endpoint, payload, timeoutMs);
+  }
+
   const base = new URL(endpoint.replace(/^\/+/, ''), gemmaUrl.endsWith('/') ? gemmaUrl : `${gemmaUrl}/`).href;
   logGemmaRequest(base, endpoint, payload);
 
@@ -577,6 +708,10 @@ async function callGemma(endpoint, payload, attempt = 0, timeoutMs = TIMEOUT_MS)
     if (response.status === 404) {
       // The Colab instance is running the standard runsync task router.
       // Adapt the endpoint and payload to Colab's native fine-tuned task names.
+      if (!colabRunsyncOnly) {
+        colabRunsyncOnly = true;
+        logger.info('[gemmaService] native endpoints 404 — routing all further calls straight to /runsync');
+      }
       return await callColabRunsyncFallback(gemmaUrl, endpoint, payload, timeoutMs);
     }
 
@@ -642,10 +777,27 @@ async function callColabRunsyncFallback(gemmaUrl, endpoint, payload, timeoutMs) 
   const joinList = (list) => (Array.isArray(list) ? list.filter(Boolean).join('; ') : '');
 
   if (endpoint === '/generate-questions') {
+    // The notebook has no real batch endpoint, so a "batch" of N questions
+    // becomes N sequential /generate-question calls here. `timeoutMs` is the
+    // budget the caller gave the WHOLE batch (runQuestionGenerationPipeline
+    // passes REMAINING_QUESTIONS_TIMEOUT_MS, 60s) — handing that same 60s to
+    // EACH sub-call meant an N-question batch had no real ceiling at all
+    // (5 questions × up to 60s = 300s+, confirmed live: an interview sat at
+    // "generating-remaining" for 7+ minutes). A shared deadline means the
+    // batch as a whole respects the caller's budget: once it's spent, the
+    // remaining slots come back as empty questions, which the caller already
+    // knows how to turn into a fallback question — same safety net as a
+    // single slow item, just applied to the batch instead of each item.
     const requests = Array.isArray(payload?.requests) ? payload.requests : [];
+    const deadline = Date.now() + timeoutMs;
     const generatedQuestions = [];
     for (const req of requests) {
-      const singleQ = await callColabRunsyncFallback(gemmaUrl, '/generate-question', req, timeoutMs);
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) {
+        generatedQuestions.push({ question: '', expectedAnswer: '' });
+        continue;
+      }
+      const singleQ = await callColabRunsyncFallback(gemmaUrl, '/generate-question', req, remaining);
       generatedQuestions.push(singleQ);
     }
     return { questions: generatedQuestions };
@@ -689,6 +841,46 @@ async function callColabRunsyncFallback(gemmaUrl, endpoint, payload, timeoutMs) 
     return safeParseJSON(rawText);
   }
 
+  if (endpoint === '/generate-question') {
+    const targetSkill = String(payload?.targetSkill || '').trim();
+    const supportingSkills = Array.isArray(payload?.supportingSkills)
+      ? payload.supportingSkills.filter(Boolean).map((s) => String(s).trim()).filter(Boolean)
+      : [];
+    const focusSkills = targetSkill
+      ? [targetSkill]
+      : supportingSkills.slice(0, 1);
+    const data = await postRunsync(runsyncUrl, {
+      endpoint: '/ask_technical_question',
+      payload: {
+        language: (payload?.language || 'english').toLowerCase() === 'somali' ? 'so' : 'en',
+        // Keep the broader role/specialization here; the notebook prompt uses
+        // focus_skills to pin the exact technology and otherwise blends every
+        // raw context field into one overstuffed question.
+        specialization: payload?.jobRole || payload?.role || payload?.domain || targetSkill || 'Technology',
+        focus_skills: focusSkills,
+        supporting_skills: supportingSkills,
+        difficulty: payload?.difficulty || 'mid',
+        category: payload?.category || 'general',
+        responsibilities: payload?.responsibilities || [],
+        candidate_experience: payload?.candidateExperience || [],
+        candidate_projects: payload?.candidateProjects || [],
+        candidate_education: payload?.candidateEducation || [],
+        candidate_certifications: payload?.candidateCertifications || [],
+        job_description: (payload?.jobDescription || '').slice(0, 3000),
+        resume_text: (payload?.resumeText || '').slice(0, 3000),
+        previous_questions: Array.isArray(payload?.previous_questions) ? payload.previous_questions : [],
+        rejected_question: payload?.rejected_question || '',
+      },
+    }, timeoutMs);
+    const rawText = data?.output?.response || data?.output?.question || data?.response || data?.question || '';
+    return {
+      question: rawText,
+      expectedAnswer: `Candidate explains core concepts for ${targetSkill || focusSkills[0] || payload?.jobRole || payload?.domain || 'the role'}.`,
+      category: payload?.category || 'conceptual',
+      difficulty: payload?.difficulty || 'medium',
+    };
+  }
+
   let taskName = '/ask_technical_question';
   const category = (payload?.category || '').toLowerCase();
   const isHiring = payload?.sessionMode === 'company';
@@ -718,7 +910,6 @@ async function callColabRunsyncFallback(gemmaUrl, endpoint, payload, timeoutMs) 
       question_id: payload?.currentQuestion?.id || '',
       expected_answer: payload?.currentQuestion?.expectedAnswer || '',
       category: payload?.currentQuestion?.category || 'general',
-      interview_type: payload?.type || 'technical',
       candidate_experience: joinList(candidateBackground.candidateExperience),
       candidate_education: joinList(candidateBackground.candidateEducation),
       candidate_projects: joinList(candidateBackground.candidateProjects),
@@ -737,18 +928,45 @@ async function callColabRunsyncFallback(gemmaUrl, endpoint, payload, timeoutMs) 
   const data = await postRunsync(runsyncUrl, runsyncBody, timeoutMs);
   const rawText = data?.output?.response || data?.output?.question || data?.response || data?.question || '';
 
-  if (endpoint === '/generate-question') {
-    return {
-      question: rawText,
-      expectedAnswer: `Candidate explains core concepts for ${runsyncBody.payload.specialization}.`,
-      category: payload?.category || 'conceptual',
-      difficulty: payload?.difficulty || 'medium',
-    };
-  }
-
   if (endpoint === '/interview-turn') {
     const isSomali = (payload?.language || '').toLowerCase() === 'somali';
-    const { evaluation, error: parseError } = parseEvaluationResponse(rawText);
+    const { evaluation, candidate, error: parseError } = parseEvaluationResponse(rawText);
+
+    // The scoring task returns isFollowUp/nextInterviewerResponse alongside the
+    // score. These used to be hardcoded to `false` + a canned line here, which
+    // meant a follow-up could never fire on this path no matter what the model
+    // decided — a partial answer was always accepted and moved past.
+    // The fine-tuned /score_candidate_answer task names these
+    // needsFollowUp/followUpTarget (see the notebook's ClarityEvaluationOutput),
+    // NOT isFollowUp/nextInterviewerResponse. Reading only the latter meant a
+    // follow-up could never fire on the Colab path — every partial/unclear
+    // answer was silently accepted and the interview jumped to the next
+    // question (the "clarification is ignored" bug). Accept both shapes.
+    const modelWantsFollowUp = candidate?.isFollowUp === true || candidate?.needsFollowUp === true;
+    const followUpTarget = typeof candidate?.followUpTarget === 'string'
+      ? candidate.followUpTarget.trim()
+      : '';
+    const modelNextResponse = (typeof candidate?.nextInterviewerResponse === 'string'
+      && candidate.nextInterviewerResponse.trim())
+      ? candidate.nextInterviewerResponse.trim()
+      : (modelWantsFollowUp && followUpTarget)
+        ? (isSomali
+          ? `Fadlan wax dheeraad ah nooga sheeg ${followUpTarget}.`
+          : `Could you tell me a bit more about ${followUpTarget}?`)
+        : '';
+    const nextInterviewerResponse = isValidInterviewerResponse(modelNextResponse, isSomali)
+      ? modelNextResponse
+      : modelWantsFollowUp
+        ? (isSomali
+          ? 'Fadlan si faahfaahsan u sharax habkaaga.'
+          : 'Could you explain your approach in a little more detail?')
+        : (isSomali
+          ? 'Mahadsanid. Aan u gudubno mawduuca xiga.'
+          : 'Thank you. Let us move on to the next question.');
+    // Only honour a follow-up when the turn actually scored — asking a
+    // follow-up off a failed/unparseable evaluation would loop the candidate
+    // on a question we never managed to grade.
+    const isFollowUp = modelWantsFollowUp && evaluation.evaluationStatus === 'completed';
 
     const logEvaluation = parseError ? logger.warn.bind(logger) : logger.info.bind(logger);
     logEvaluation(JSON.stringify({
@@ -756,17 +974,16 @@ async function callColabRunsyncFallback(gemmaUrl, endpoint, payload, timeoutMs) 
       task: 'score_candidate_answer',
       score: evaluation.score,
       evaluationStatus: evaluation.evaluationStatus,
+      isFollowUp,
       parseError: parseError?.message || null,
       rawResponsePreview: IS_PROD ? undefined : rawText.slice(0, 500),
     }));
 
     return {
       evaluation,
-      nextInterviewerResponse: isSomali
-        ? 'Mahadsanid. Aan u gudubno mawduuca xiga.'
-        : 'Thank you. Let us move on to the next question.',
-      isFollowUp: false,
-      isTopicComplete: true,
+      nextInterviewerResponse,
+      isFollowUp,
+      isTopicComplete: !isFollowUp,
       evaluationStatus: evaluation.score !== null ? 'ok' : 'failed',
     };
   }
@@ -779,30 +996,19 @@ async function callColabRunsyncFallback(gemmaUrl, endpoint, payload, timeoutMs) 
  *   Endpoint: /generate-question (called multiple times for multiple questions)
  *   Payload:  { language, domain, role, category }
  */
-function resolveQuestionCategory(type, absoluteIndex, totalCount) {
-  if (absoluteIndex === 0) return 'intro';
-  if (absoluteIndex === totalCount - 1) return 'outro';
+// No intro/outro slots: every question is a genuine, model-generated
+// technical/topic question. The spoken greeting and farewell are handled by
+// the frontend engine, so a separate non-evaluable intro/outro question is
+// both hardcoded and unnecessary. Fallback only — callers normally pass
+// `_forcedCategory` (see interviewController.js's own copy of this cycle);
+// this covers the rare caller that doesn't (benchmark script, tests).
+const CATEGORY_CYCLE = ['core skills', 'motivation', 'applied knowledge', 'culture fit', 'debugging', 'past experience'];
 
-  let categoryCycle;
-  const lowerType = (type || 'mixed').toLowerCase();
-
-  if (lowerType === 'hr') {
-    categoryCycle = ['motivation', 'strengths/weaknesses', 'culture fit', 'experience'];
-  } else if (lowerType === 'technical') {
-    categoryCycle = ['core skills', 'applied knowledge', 'debugging', 'fundamentals'];
-  } else if (lowerType === 'behavioral') {
-    categoryCycle = ['STAR-based situation', 'past experience', 'problem solving'];
-  } else if (lowerType === 'system-design') {
-    categoryCycle = ['architecture overview', 'scalability', 'trade-offs', 'component design'];
-  } else {
-    // mixed: interleave technical and HR categories
-    categoryCycle = ['core skills', 'motivation', 'applied knowledge', 'culture fit', 'debugging', 'past experience'];
-  }
-
-  return categoryCycle[(absoluteIndex - 1) % categoryCycle.length];
+function resolveQuestionCategory(absoluteIndex) {
+  return CATEGORY_CYCLE[absoluteIndex % CATEGORY_CYCLE.length];
 }
 
-const generateInterviewQuestions = async (type, domain, difficulty, count = 1, context = {}) => {
+const generateInterviewQuestions = async (domain, difficulty, count = 1, context = {}) => {
   const {
     jobRole,
     language,
@@ -823,8 +1029,7 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
     requestTimeoutMs,
   } = context;
   const questions = [];
-  const batchRequests = [];
-  const singleRequests = [];
+  const requests = [];
 
   // Candidate-selected focus skills are the interview's explicit scope, so they
   // must outrank skills inferred from a resume or job description.
@@ -848,19 +1053,43 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
   ));
   const rawContextLimit = hasStructuredProfile ? 2000 : 12000;
 
+  // Falling back to the specialization NAME itself as the "target skill"
+  // produces generic questions ("What is frontend development?"); expand it
+  // into its concrete subtopics instead so there's still something specific
+  // to test. Computed unconditionally (not just when no skills exist) so a
+  // multi-specialization pick ("Frontend Development & Backend Development")
+  // still contributes topics even when the candidate also typed focus skills.
+  const specializationSubtopics = expandSpecializationSubtopics(
+    String(jobRole || '').split(/&|,|\+/).map((s) => s.trim())
+  );
+
+  // Priority: candidate-typed focus skills > resume/JD-derived skills, with
+  // specialization subtopics for the OTHER selected specializations appended
+  // (not substituted) so every picked specialization still gets covered.
+  // Previously specializationSubtopics was dropped entirely whenever any
+  // explicit/resume skill existed — confirmed live: typing one focus skill
+  // ("React") under a "Frontend Development & Backend Development" pick made
+  // every single question target React and backend was never asked about.
+  const primarySkills = explicitFocusSkills.length ? explicitFocusSkills
+    : uniqueSkills.length ? uniqueSkills
+    : [];
+  const targetPool = [
+    ...primarySkills,
+    ...specializationSubtopics.filter((topic) => !primarySkills.includes(topic.toLowerCase())),
+  ];
+
   console.log(`\n[gemmaService] 🎯 Fetching ${count} interview questions...`);
-  if (uniqueSkills.length) console.log(`[gemmaService] 📋 Focus skills: ${uniqueSkills.join(', ')}`);
+  if (targetPool.length) console.log(`[gemmaService] 📋 Target skills: ${targetPool.join(', ')}`);
 
   const totalCount = _forcedCount ?? count;
 
   // Generate questions one by one with appropriate categories
   for (let i = 0; i < count; i++) {
     const absoluteIndex = _forcedIndex !== undefined ? _forcedIndex : _startIndex + i;
-    const category = _forcedCategory || resolveQuestionCategory(type, absoluteIndex, totalCount);
+    const category = _forcedCategory || resolveQuestionCategory(absoluteIndex);
 
     // Pin this question slot to one specific skill so the model doesn't fall back to generic phrasing.
     // Rotate through the skill list by index so each question targets a different skill.
-    const targetPool = explicitFocusSkills.length ? explicitFocusSkills : uniqueSkills;
     const targetSkill = targetPool.length
       ? targetPool[absoluteIndex % targetPool.length]
       : '';
@@ -873,7 +1102,6 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
       role: jobRole || 'candidate',
       candidateName: candidateName || 'Candidate',
       category,
-      type: type || 'technical',
       difficulty: difficulty || 'mid',
       difficultyLabel: difficultyLabel || toDifficultyLabel(difficulty),
       targetSkill,
@@ -896,134 +1124,51 @@ const generateInterviewQuestions = async (type, domain, difficulty, count = 1, c
       requestId,
     };
 
-    // ponytail: RunPod's batch endpoint (/generate-questions) doesn't respect
-    // per-item language, so Somali always fell through to English. The single
-    // /generate-question call below is proven to honor language — use it for
-    // every question when Somali instead of batching.
-    if (count > 1 && String(language).toLowerCase() !== 'somali') {
-      batchRequests.push({ payload, category, absoluteIndex });
-      continue;
-    }
-
-    singleRequests.push({ payload, category, absoluteIndex, targetSkill });
+    requests.push({ payload, category, absoluteIndex, targetSkill });
   }
 
-  if (singleRequests.length) {
-    // Somali (or a lone single-question call) — these can't use the batch
-    // endpoint, so run them through a concurrency-capped runner instead of
-    // one at a time. For a single request this is equivalent to a plain await.
-    await mapWithConcurrency(singleRequests, SOMALI_GEN_CONCURRENCY, async (req) => {
-      const result = await callGemma('/generate-question', req.payload, 0, requestTimeoutMs || TIMEOUT_MS);
-      const qText = result.question || result.text || '';
-
-      const isIntroOutro = req.category === 'intro' || req.category === 'outro';
-      const isSomali = String(language).toLowerCase() === 'somali';
-      // ponytail: used to also gate on isQuestionAboutTargetSkill(qText, req.targetSkill)
-      // (a literal substring match) — that rejected genuinely on-topic model
-      // questions that just didn't repeat the skill name verbatim ("What
-      // techniques improve SPA performance?" for "frontend development"),
-      // discarding ~94% of real generated questions in live testing. Shape
-      // and language validity are enough; trust the prompt's own targetSkill
-      // instruction to keep the model on-topic.
-      const isValidQuestion = isValidGeneratedQuestion(qText)
-        && !(isSomali && looksEnglish(qText));
-      if (isValidQuestion) {
-        questions.push({
-          text: qText.trim(),
-          category: req.category,
-          difficulty: difficulty || 'medium',
-          expectedAnswer: result.expectedAnswer || result.expected_answer || result.answer || '',
-          order: req.absoluteIndex,
-        });
-      } else {
-        // Log why we're throwing away model output so the next test run tells
-        // us whether the worker returned English (looksSomali=false), invalid
-        // shape (isValidGeneratedQuestion=false), or off-target text.
-        logger.warn(JSON.stringify({
-          event: 'somali_question_rejected',
-          category: req.category,
-          absoluteIndex: req.absoluteIndex,
-          targetSkill: req.targetSkill,
-          isSomaliInterview: isSomali,
-          shapeValid: isValidGeneratedQuestion(qText),
-          looksSomali: isSomali ? looksSomali(qText) : null,
-          matchesTargetSkill: req.targetSkill
-            ? isQuestionAboutTargetSkill(qText, req.targetSkill)
-            : null,
-          rawTextPreview: String(qText || '').slice(0, 200),
-        }));
-        if (isIntroOutro) {
-          // Model output unusable — let the caller's dedicated fallback handle this
-          questions.push({
-            text: '',
-            category: req.category,
-            difficulty: difficulty || 'medium',
-            expectedAnswer: '',
-            order: req.absoluteIndex,
-          });
-        } else {
-          questions.push({
-            text: buildQuestionFallback({ targetSkill: req.targetSkill, jobRole, domain, language, index: req.absoluteIndex }),
-            category: req.category,
-            difficulty: difficulty || 'medium',
-            expectedAnswer: '',
-            order: req.absoluteIndex,
-          });
-        }
-      }
+  // Every slot is generated by the model (with per-slot retry). No batch
+  // endpoint: RunPod's /generate-questions ignores per-item language, and on
+  // the Colab worker it is sequential single calls anyway — so one uniform,
+  // concurrency-capped path per question is both simpler and correct for both
+  // languages. An unfillable slot is left with empty text; the caller fails
+  // generation loudly rather than substituting a template.
+  await mapWithConcurrency(requests, SOMALI_GEN_CONCURRENCY, async (req) => {
+    const q = await generateValidQuestion(req.payload, language, requestTimeoutMs);
+    questions.push({
+      text: q.text,
+      category: req.category,
+      difficulty: difficulty || 'medium',
+      expectedAnswer: q.expectedAnswer,
+      order: req.absoluteIndex,
     });
-  }
+  });
 
-  if (batchRequests.length) {
-    const result = await callGemma('/generate-questions', {
-      requests: batchRequests.map((item) => item.payload),
-      requestId,
-    }, 0, requestTimeoutMs || TIMEOUT_MS);
-    const generated = Array.isArray(result.questions) ? result.questions : [];
-    generated.forEach((item, index) => {
-      const meta = batchRequests[index];
-      const qText = item?.question || item?.text || '';
-      if (!meta) return;
-      const targetPool = explicitFocusSkills.length ? explicitFocusSkills : uniqueSkills;
-      const targetSkill = targetPool.length
-        ? targetPool[meta.absoluteIndex % targetPool.length]
-        : '';
-      const isIntroOutro = meta.category === 'intro' || meta.category === 'outro';
-      // ponytail: see the matching note in the single-request path above —
-      // the literal isQuestionAboutTargetSkill substring check is dropped.
-      const isValidQuestion = isValidGeneratedQuestion(qText);
-      questions.push({
-        text: isValidQuestion
-          ? qText.trim()
-          : isIntroOutro ? '' : buildQuestionFallback({ targetSkill, jobRole, domain, language, index: meta.absoluteIndex }),
-        category: meta.category,
-        difficulty: difficulty || 'medium',
-        expectedAnswer: isValidQuestion
-          ? item.expectedAnswer || item.expected_answer || item.answer || ''
-          : '',
-        order: meta.absoluteIndex,
-      });
-    });
-  }
+  questions.sort((a, b) => a.order - b.order);
 
-  // Deduplicate: replace duplicate question text with a skill-rotated fallback
+  // De-duplicate against earlier slots by asking the MODEL again for the
+  // clashing slot (passing the seen questions so the prompt steers away),
+  // never by substituting a template. A slot that still clashes or comes back
+  // empty is left empty so the caller fails loudly instead of shipping a repeat.
   const seen = [];
   for (const q of questions) {
-    if (q.text && isSimilarQuestionText(q.text, '')) continue; // skip empty
-    if (q.text && seen.some(s => isSimilarQuestionText(q.text, s))) {
-      const targetPool = explicitFocusSkills.length ? explicitFocusSkills : uniqueSkills;
-      const altSkill = targetPool.length
-        ? targetPool[(q.order + seen.length) % targetPool.length]
-        : '';
-      q.text = buildQuestionFallback({ targetSkill: altSkill, jobRole, domain, language, index: q.order + seen.length + 6 });
-      q.expectedAnswer = '';
+    if (q.text && seen.some((s) => isSimilarQuestionText(q.text, s))) {
+      const req = requests.find((r) => r.absoluteIndex === q.order);
+      const retry = req
+        ? await generateValidQuestion(
+            { ...req.payload, rejected_question: q.text, previous_questions: seen.map((t) => ({ question: t })) },
+            language,
+            requestTimeoutMs,
+          )
+        : { text: '', expectedAnswer: '' };
+      const usable = retry.text && !seen.some((s) => isSimilarQuestionText(retry.text, s));
+      q.text = usable ? retry.text : '';
+      q.expectedAnswer = usable ? retry.expectedAnswer : '';
     }
     if (q.text) seen.push(q.text);
   }
 
-  questions.sort((a, b) => a.order - b.order);
-
-  logger.info(`Generated ${questions.length} questions for ${type}/${domain}/${difficulty}`);
+  logger.info(`Generated ${questions.length} questions for ${domain}/${difficulty}`);
   return questions;
 };
 
@@ -1037,7 +1182,6 @@ const processInterviewTurn = async (
   domain = 'general',
   jobRole = '',
   language = 'english',
-  type = 'technical',
   options = {}
 ) => {
   const {
@@ -1070,7 +1214,6 @@ const processInterviewTurn = async (
     domain,
     role: jobRole || domain,
     language,
-    type,
     difficulty,
     difficultyLabel: toDifficultyLabel(difficulty),
     currentQuestion: currentQuestion
@@ -1094,7 +1237,6 @@ const processInterviewTurn = async (
     event: 'evaluation_request',
     questionId: payload.currentQuestion.id || null,
     language,
-    interviewType: type,
     category: payload.currentQuestion.category || 'general',
     answerLength: candidateAnswer.length,
     hasExpectedAnswer: Boolean(payload.currentQuestion.expectedAnswer),
@@ -1238,5 +1380,6 @@ module.exports = {
   isValidInterviewerResponse,
   checkGemmaStatus,
   warmGemma,
+  expandSpecializationSubtopics,
   _circuit: circuit,
 };

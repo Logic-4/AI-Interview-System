@@ -25,7 +25,6 @@ const defaultForm: JobPayload = {
   requiredEducation: '',
 
   interviewLanguage: 'English',
-  interviewType: 'mixed',
   targetJobRole: '',
   durationMinutes: 30,
   focusSkills: [],
@@ -77,7 +76,6 @@ const PostJobPage = () => {
             education: j.education || '',
             requiredEducation: j.requiredEducation || j.education || '',
             interviewLanguage: j.interviewLanguage || 'English',
-            interviewType: j.interviewType || 'mixed',
             targetJobRole: j.targetJobRole || '',
             durationMinutes: j.durationMinutes || 30,
             focusSkills: j.focusSkills || [],

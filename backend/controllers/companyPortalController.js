@@ -267,7 +267,7 @@ const getApplications = async (req, res, next) => {
       Application.find(filter)
         .populate('job', 'title experienceLevel')
         .populate('candidate', 'name email avatar skills experienceLevel')
-        .populate('interview', 'overallScore status type language duration scheduledAt')
+        .populate('interview', 'overallScore status language duration scheduledAt')
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
@@ -486,11 +486,10 @@ const getInterviews = async (req, res, next) => {
   try {
     const page = normalizePagination(req.query.page, 1, 1000);
     const limit = normalizePagination(req.query.limit, 10, 100);
-    const { search = '', status = '', type = '', language = '' } = req.query;
+    const { search = '', status = '', language = '' } = req.query;
 
     const filter = { company: req.companyId };
     if (status) filter.status = status;
-    if (type) filter.type = type;
     if (language) filter.language = language;
 
     const [interviews, total] = await Promise.all([
@@ -515,7 +514,7 @@ const getInterviews = async (req, res, next) => {
 
 const scheduleInterview = async (req, res, next) => {
   try {
-    const { applicationId, jobRole, type, difficulty, domain, language, duration, scheduledAt } = req.body;
+    const { applicationId, jobRole, difficulty, domain, language, duration, scheduledAt } = req.body;
     const scheduledDate = scheduledAt ? parseScheduledAt(scheduledAt, req.company?.timezone) : new Date();
     if (!scheduledDate) return next(ApiError.badRequest('Scheduled date must be a valid date and time'));
     if (scheduledDate.getTime() < Date.now() - 60000) {
@@ -575,7 +574,6 @@ const scheduleInterview = async (req, res, next) => {
       user: candidate._id,
       company: req.companyId,
       title: `${resolvedJobRole} Interview - ${candidate.name}`,
-      type: type || jobPayload?.type || 'mixed',
       difficulty: difficulty || jobPayload?.difficulty || 'mid',
       domain: domain || jobPayload?.domain || 'technology',
       language: (language || jobPayload?.language || 'english').toLowerCase(),
@@ -783,7 +781,7 @@ const getAssessments = async (req, res, next) => {
           candidate: inv.user,
           candidateName: inv.user?.name || 'Candidate',
           job: { title: jobTitleMap[String(inv._id)] || inv.jobRole || inv.title || 'Technical Assessment' },
-          assessmentType: `${inv.type.toUpperCase()} AI Evaluation`,
+          assessmentType: 'AI Evaluation',
           score: rawScore,
           passingScore,
           passFailStatus,
@@ -861,7 +859,7 @@ const getAssessmentById = async (req, res, next) => {
       candidate: interview.user,
       candidateName: interview.user?.name || 'Candidate',
       job: linkedApp?.job || { title: interview.jobRole || interview.title },
-      assessmentType: `${interview.type.toUpperCase()} AI Evaluation`,
+      assessmentType: 'AI Evaluation',
       score: rawScore,
       passingScore,
       passFailStatus,

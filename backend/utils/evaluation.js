@@ -43,6 +43,21 @@ function normalizeEvaluation(raw = {}, failureFeedback = '') {
   };
 }
 
+// Terminal statuses where the answer can never receive a score: there is no
+// usable transcript / no substantive answer to grade. These are "answered"
+// but must NOT sit in the score denominator — otherwise a single failed
+// transcription permanently nulls the whole interview's overall score, which
+// makes the feedback endpoint 400 in a loop ("Overall score is unavailable
+// until every answered question is evaluated") even though every substantive
+// answer was scored. Kept in sync with feedbackController's substantiveAnswers
+// filter (isPlaceholderAnswer) — same notion of "counts toward the score".
+const UNSCORABLE_STATUSES = new Set(['invalid', 'transcription_failed', 'placeholder']);
+
+/** Answered and, in principle, gradable — the true score denominator. */
+function countsTowardScore(question) {
+  return Boolean(question?.isAnswered) && !UNSCORABLE_STATUSES.has(question?.evaluationStatus);
+}
+
 /** Single source of truth: a question that should be counted in the score. */
 function isScorable(question) {
   return Boolean(
@@ -62,7 +77,7 @@ function isScorable(question) {
  * an entire interview appear to have scored 45).
  */
 function calculateOverallScore(questions = []) {
-  const answered = questions.filter((question) => question?.isAnswered);
+  const answered = questions.filter(countsTowardScore);
   const evaluated = answered.filter(isScorable);
   if (!evaluated.length) return null;
   if (evaluated.length !== answered.length) return null;
@@ -83,7 +98,10 @@ function summarizeEvaluations(questions = []) {
   ));
   const pending = list.filter((q) => q && q.evaluationStatus === 'pending');
   const answered = list.filter((q) => q?.isAnswered);
-  const evaluationComplete = answered.length > 0 && scorable.length === answered.length;
+  // Denominator excludes terminally-unscorable answers (see countsTowardScore)
+  // so a failed transcription doesn't hold the whole interview's score hostage.
+  const countable = list.filter(countsTowardScore);
+  const evaluationComplete = countable.length > 0 && scorable.length === countable.length;
   const overall = evaluationComplete
     ? Math.round(scorable.reduce((sum, q) => sum + q.score, 0) / scorable.length)
     : null;
@@ -99,4 +117,4 @@ function summarizeEvaluations(questions = []) {
   };
 }
 
-module.exports = { normalizeEvaluation, calculateOverallScore, isScorable, summarizeEvaluations };
+module.exports = { normalizeEvaluation, calculateOverallScore, isScorable, countsTowardScore, summarizeEvaluations };

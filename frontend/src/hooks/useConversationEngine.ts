@@ -3,7 +3,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useSpeechSynthesis } from "./useSpeechSynthesis";
-import { useSpeechRecognition } from "./useSpeechRecognition";
 import { useAudioRecorder } from "./useAudioRecorder";
 import { transcribeAudio as transcribeWithSTT } from "../services/sttService";
 import { isPlaceholderTranscript, isSomaliLanguage, speechLanguageCode } from "../lib/interviewHelpers";
@@ -40,7 +39,6 @@ export interface AnalysisStage {
 export interface ConversationEngineConfig {
   userName: string;
   interviewTitle: string;
-  interviewType: string;
   language?: string;
   questions: Question[];
   expectedQuestionCount?: number;
@@ -70,7 +68,6 @@ export interface ConversationEngineReturn {
   totalQuestions: number;
   answeredCount: number;
   tts: ReturnType<typeof useSpeechSynthesis>;
-  recognition: ReturnType<typeof useSpeechRecognition>;
   audioRecorder: ReturnType<typeof useAudioRecorder>;
   analysisStage: AnalysisStage;
   timer: number;
@@ -150,7 +147,6 @@ export function useConversationEngine(
   const {
     userName,
     interviewTitle,
-    interviewType,
     language = "english",
     questions,
     expectedQuestionCount = questions.length,
@@ -184,13 +180,6 @@ export function useConversationEngine(
 
   const languageCode = speechLanguageCode(language);
   const tts = useSpeechSynthesis(languageCode);
-  // Browser Web Speech API is used ONLY for English — it provides both live
-  // interim text for the UI and the primary submit-time transcript. On
-  // unsupported browsers or empty transcripts, submit falls back to the
-  // backend STT path (Gemini). Somali always uses the audio-upload path
-  // since the browser has no Somali recognition model.
-  const recognitionEnabled = !isSomaliLanguage(language);
-  const recognition = useSpeechRecognition(languageCode, recognitionEnabled);
   const audioRecorder = useAudioRecorder();
 
   const phaseRef = useRef(phase);
@@ -221,11 +210,8 @@ export function useConversationEngine(
     tts.pause();
     if (phaseRef.current === "listening") {
       audioRecorder.pauseRecording();
-      if (recognitionEnabled) {
-        try { recognition.stopListening(); } catch { /* ignore */ }
-      }
     }
-  }, [tts, audioRecorder.pauseRecording, recognition, recognitionEnabled]);
+  }, [tts, audioRecorder.pauseRecording]);
 
   const resume = useCallback(() => {
     if (!isPausedRef.current) return;
@@ -234,9 +220,8 @@ export function useConversationEngine(
     tts.resume();
     if (phaseRef.current === "listening") {
       audioRecorder.resumeRecording();
-      if (recognitionEnabled) recognition.startListening();
     }
-  }, [tts, audioRecorder.resumeRecording, recognition, recognitionEnabled]);
+  }, [tts, audioRecorder.resumeRecording]);
 
   /* ── Speak and wait until done ─────────────────────────── */
   const speakAndWait = useCallback(
@@ -272,12 +257,9 @@ export function useConversationEngine(
   const stopRecordingForReview = useCallback(() => {
     if (phaseRef.current === "listening") {
       audioRecorder.stopRecording();
-      if (recognitionEnabled) {
-        try { recognition.stopListening(); } catch { /* ignore */ }
-      }
       setPhase("reviewing");
     }
-  }, [audioRecorder.stopRecording, recognition, recognitionEnabled]);
+  }, [audioRecorder.stopRecording]);
 
   /* ── Listen watchdog: silence auto-review, max listen time ──────────
      Single unified path for both English and Somali: mic volume from the
@@ -330,12 +312,7 @@ export function useConversationEngine(
       setPhase("reviewing");
       return;
     }
-
-    if (recognitionEnabled) {
-      recognition.resetTranscript();
-      recognition.startListening();
-    }
-  }, [audioRecorder, recognition, recognitionEnabled]);
+  }, [audioRecorder]);
 
   /* ── Handle manual submit ────────────────────────────────── */
   const handleManualSubmit = useCallback(
@@ -347,51 +324,37 @@ export function useConversationEngine(
 
       try {
       const audioAnswer = await audioRecorder.finalizeRecording();
-      if (recognitionEnabled) {
-        try { recognition.stopListening(); } catch { /* ignore */ }
-      }
 
       // ── Determine transcript ─────────────────────────────────────────────
       // Priority order:
       //   1) An explicit textAnswer override (e.g. review-mode edit).
-      //   2) English: browser Web Speech API transcript (primary, live).
-      //   3) Backend STT: Gemini (fallback when the browser is unsupported
-      //      or returned nothing for English; always for Somali).
+      //   2) Backend STT (Gemini) — the only transcription path, always run
+      //      after the candidate submits. No browser live-transcribe.
       let transcript: string;
       let sttErrorMessage: string | null = null;
       if (textAnswer !== undefined) {
         transcript = textAnswer.trim();
+      } else if (!audioAnswer || audioAnswer.size < 500) {
+        toast.error(
+          audioAnswer
+            ? "Recording too short. Speak for at least 2 seconds, then submit."
+            : "No audio captured. Check your microphone and try again."
+        );
+        await beginListening();
+        return;
       } else {
-        const browserTranscript = recognitionEnabled
-          ? recognition.getTranscript().trim()
-          : "";
-
-        if (browserTranscript) {
-          transcript = browserTranscript;
-          console.log(`[STT] Using browser transcript (${transcript.length} chars): "${transcript.slice(0, 80)}"`);
-        } else if (!audioAnswer || audioAnswer.size < 500) {
-          toast.error(
-            audioAnswer
-              ? "Recording too short. Speak for at least 2 seconds, then submit."
-              : "No audio captured. Check your microphone and try again."
-          );
-          await beginListening();
-          return;
-        } else {
-          // Browser transcript unavailable — fall back to backend STT.
-          try {
-            console.log(`[STT] Sending ${(audioAnswer.size / 1024).toFixed(1)} KB to backend ASR…`);
-            transcript = await transcribeWithSTT(audioAnswer, 'answer.webm', languageCode);
-            if (!transcript.trim()) {
-              transcript = "[No speech detected]";
-            }
-            console.log(`[STT] Backend transcript received: "${transcript.slice(0, 80)}"`);
-          } catch (sttError) {
-            console.warn("[STT] Backend transcription failed:", sttError);
-            sttErrorMessage =
-              sttError instanceof Error ? sttError.message : "Speech recognition service unavailable";
-            transcript = "";
+        try {
+          console.log(`[STT] Sending ${(audioAnswer.size / 1024).toFixed(1)} KB to backend ASR…`);
+          transcript = await transcribeWithSTT(audioAnswer, 'answer.webm', languageCode);
+          if (!transcript.trim()) {
+            transcript = "[No speech detected]";
           }
+          console.log(`[STT] Backend transcript received: "${transcript.slice(0, 80)}"`);
+        } catch (sttError) {
+          console.warn("[STT] Backend transcription failed:", sttError);
+          sttErrorMessage =
+            sttError instanceof Error ? sttError.message : "Speech recognition service unavailable";
+          transcript = "";
         }
       }
 
@@ -460,7 +423,10 @@ export function useConversationEngine(
         if (result.isTimeUp) {
           answeredRef.current.add(question._id);
           setAnsweredCount(answeredRef.current.size);
-          await speakAndWait("We are out of time. Thank you for completing this interview. We will now prepare your report.");
+          const timeUpMessage = isSomaliLanguage(languageRef.current)
+            ? "Waqtigii wareysiga wuu dhammaaday. Mahadsanid. Hadda waxaan diyaarinaynaa warbixintaada."
+            : "We are out of time. Thank you for completing this interview. We will now prepare your report.";
+          await speakAndWait(timeUpMessage);
           await wrapUp();
           return;
         }
@@ -683,9 +649,6 @@ export function useConversationEngine(
   const interruptAndContinue = useCallback(() => {
     tts.cancel();
     audioRecorder.stopRecording();
-    if (recognitionEnabled) {
-      try { recognition.stopListening(); } catch { /* ignore */ }
-    }
 
     if (phase === "listening" || phase === "reviewing") {
       handleManualSubmit();
@@ -694,8 +657,6 @@ export function useConversationEngine(
     phase,
     tts,
     audioRecorder.stopRecording,
-    recognition,
-    recognitionEnabled,
     handleManualSubmit,
   ]);
 
@@ -704,7 +665,6 @@ export function useConversationEngine(
     return () => {
       abortRef.current = true;
       tts.cancel();
-      try { recognition.stopListening(); } catch { /* ignore */ }
       audioRecorder.resetRecording().catch(() => {});
       if (timerRef.current) clearInterval(timerRef.current);
     };
@@ -717,7 +677,6 @@ export function useConversationEngine(
     totalQuestions: questions.length,
     answeredCount,
     tts,
-    recognition,
     audioRecorder,
     analysisStage,
     timer,

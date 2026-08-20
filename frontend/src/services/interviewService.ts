@@ -119,13 +119,28 @@ const interviewService = {
 
   async reevaluateAnswer(interviewId: string, questionId: string): Promise<{ evaluation: AnswerEvaluation; question: import('@/types/question').Question }> {
     const res = await api.post<ApiResponse<{ evaluation: AnswerEvaluation; question: import('@/types/question').Question }>>(
-      `/interviews/${interviewId}/questions/${questionId}/evaluate`
+      `/interviews/${interviewId}/questions/${questionId}/evaluate`,
+      undefined,
+      // One evaluation legitimately takes ~25-45s on the model server (the
+      // backend's own INTERVIEW_TURN_TIMEOUT_MS is 45s, and Somali has been
+      // measured at 77s). The shared 30s default aborted the request at the
+      // exact moment the server was writing a successful score, so "Retry
+      // evaluation" reported failure for work that had actually succeeded.
+      { timeout: 150000 }
     );
     return res.data.data;
   },
 
   async completeInterview(id: string): Promise<Interview> {
-    const res = await api.put<ApiResponse<{ interview: Interview }>>(`/interviews/${id}/complete`);
+    // Completion waits for any still-running background evaluations and
+    // retries the failed ones before averaging, so it can outlast the shared
+    // 30s default. It is idempotent, so a client-side abort is recoverable —
+    // but aborting means the caller never learns the final score.
+    const res = await api.put<ApiResponse<{ interview: Interview }>>(
+      `/interviews/${id}/complete`,
+      undefined,
+      { timeout: 180000 }
+    );
     return res.data.data.interview;
   },
 

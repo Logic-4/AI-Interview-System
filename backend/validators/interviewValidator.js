@@ -8,12 +8,6 @@ const createInterviewValidator = [
     .isLength({ max: 200 })
     .withMessage('Title cannot exceed 200 characters'),
 
-  body('type')
-    .notEmpty()
-    .withMessage('Interview type is required')
-    .isIn(['technical', 'behavioral', 'system-design', 'hr', 'mixed'])
-    .withMessage('Type must be technical, behavioral, system-design, hr, or mixed'),
-
   body('difficulty')
     .notEmpty()
     .withMessage('Difficulty is required')
@@ -115,11 +109,6 @@ const listInterviewsValidator = [
     .optional()
     .isIn(['scheduled', 'in-progress', 'completed', 'cancelled'])
     .withMessage('Invalid status filter'),
-
-  query('type')
-    .optional()
-    .isIn(['technical', 'behavioral', 'system-design', 'hr', 'mixed'])
-    .withMessage('Invalid type filter'),
 
   query('search')
     .optional()

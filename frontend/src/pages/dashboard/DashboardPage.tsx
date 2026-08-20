@@ -291,7 +291,7 @@ const DashboardPage = () => {
                                 <tr className="bg-[#F8F9FC] dark:bg-[#1a2236] border-b border-[#E8ECF2] dark:border-white-light/10">
                                     <th className="px-6 py-4 text-xs font-bold text-[#1E2433] dark:text-white-light uppercase tracking-wider">Date</th>
                                     <th className="px-6 py-4 text-xs font-bold text-[#1E2433] dark:text-white-light uppercase tracking-wider">Title</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-[#1E2433] dark:text-white-light uppercase tracking-wider">Role / Type</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-[#1E2433] dark:text-white-light uppercase tracking-wider">Role</th>
                                     <th className="px-6 py-4 text-xs font-bold text-[#1E2433] dark:text-white-light uppercase tracking-wider">Score</th>
                                     <th className="px-6 py-4 text-xs font-bold text-[#1E2433] dark:text-white-light uppercase tracking-wider text-center">Action</th>
                                 </tr>
@@ -307,7 +307,7 @@ const DashboardPage = () => {
                                             })}
                                         </td>
                                         <td className="px-6 py-4 font-bold text-primary text-sm">{iv.title}</td>
-                                        <td className="px-6 py-4 capitalize text-[#697386] dark:text-white-dark text-sm">{iv.type}</td>
+                                        <td className="px-6 py-4 capitalize text-[#697386] dark:text-white-dark text-sm">{iv.jobRole || '—'}</td>
                                         <td className="px-6 py-4">
                                             <span className={`badge ${iv.overallScore && iv.overallScore >= 75 ? 'badge-outline-success' : 'badge-outline-warning'}`}>
                                                 {iv.overallScore ? `${iv.overallScore} / 100` : 'Pending'}

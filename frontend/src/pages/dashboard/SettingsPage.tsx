@@ -19,10 +19,6 @@ const SettingsPage = () => {
 
     // Profile state
     const [name, setName] = useState(user?.name ?? '');
-    const [bio, setBio] = useState(user?.bio ?? '');
-    const [targetRole, setTargetRole] = useState(user?.targetRole ?? '');
-    const [experienceLevel, setExperienceLevel] = useState<string>(user?.experienceLevel ?? '');
-    const [skills, setSkills] = useState(user?.skills?.join(', ') ?? '');
     const [saving, setSaving] = useState(false);
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
@@ -71,10 +67,6 @@ const SettingsPage = () => {
     useEffect(() => {
         if (user) {
             setName(user.name ?? '');
-            setBio(user.bio ?? '');
-            setTargetRole(user.targetRole ?? '');
-            setExperienceLevel(user.experienceLevel ?? '');
-            setSkills(user.skills?.join(', ') ?? '');
         }
     }, [user]);
 
@@ -91,19 +83,10 @@ const SettingsPage = () => {
             toast.error('Name must contain only letters');
             return;
         }
-        const trimmedRole = targetRole.trim();
-        if (trimmedRole && (trimmedRole.length < 2 || !/^[a-zA-Z\s'\-./&,()]+$/.test(trimmedRole))) {
-            toast.error('Target role must be at least 2 characters and contain only valid characters');
-            return;
-        }
         setSaving(true);
         try {
             const updated = await userService.updateProfile({
                 name: name.trim(),
-                bio: bio.trim(),
-                targetRole: targetRole.trim(),
-                experienceLevel: experienceLevel || undefined,
-                skills: skills.split(',').map((s) => s.trim()).filter(Boolean),
             });
             setUser(updated);
             toast.success('Profile updated successfully.');
@@ -258,54 +241,6 @@ const SettingsPage = () => {
                                             value={user?.email || ''}
                                             className="form-input bg-gray-100 dark:bg-black cursor-not-allowed"
                                             disabled
-                                        />
-                                    </div>
-                                    <div>
-                                        <label htmlFor="targetRole" className="font-bold dark:text-white-light">Target Job Title</label>
-                                        <input
-                                            id="targetRole"
-                                            type="text"
-                                            value={targetRole}
-                                            onChange={(e) => setTargetRole(e.target.value)}
-                                            className="form-input"
-                                            placeholder="e.g. Software Engineer"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label htmlFor="experienceLevel" className="font-bold dark:text-white-light">Experience Level</label>
-                                        <select
-                                            id="experienceLevel"
-                                            value={experienceLevel}
-                                            onChange={(e) => setExperienceLevel(e.target.value)}
-                                            className="form-select text-white-dark"
-                                        >
-                                            <option value="">Select Level</option>
-                                            <option value="entry">Entry Level</option>
-                                            <option value="mid">Mid Level</option>
-                                            <option value="senior">Senior Level</option>
-                                            <option value="lead">Lead / Managerial</option>
-                                        </select>
-                                    </div>
-                                    <div className="sm:col-span-2">
-                                        <label htmlFor="skills" className="font-bold dark:text-white-light">Key Skills (comma separated)</label>
-                                        <input
-                                            id="skills"
-                                            type="text"
-                                            value={skills}
-                                            onChange={(e) => setSkills(e.target.value)}
-                                            className="form-input"
-                                            placeholder="React, Node.js, System Design"
-                                        />
-                                    </div>
-                                    <div className="sm:col-span-2">
-                                        <label htmlFor="bio" className="font-bold dark:text-white-light">Professional Bio</label>
-                                        <textarea
-                                            id="bio"
-                                            rows={4}
-                                            value={bio}
-                                            onChange={(e) => setBio(e.target.value)}
-                                            className="form-input resize-none"
-                                            placeholder="Describe your background and career interests..."
                                         />
                                     </div>
                                     <div className="sm:col-span-2 mt-4">

@@ -1,3 +1,18 @@
+# Only track frontend/, backend/, and services/ — everything else at the
+# repo root (docs, notes, .claude/.agents config, graphify-out cache, etc.)
+# is intentionally kept out of git.
+*
+
+!frontend/
+!frontend/**
+!backend/
+!backend/**
+!services/
+!services/**
+!.gitignore
+!package.json
+!docker-compose.yml
+
 # Node/Next modules and builds
 node_modules/
 .next/
@@ -32,5 +47,3 @@ env/
 # OS files
 .DS_Store
 Thumbs.db
-
-dataset_defense_note_final.docx

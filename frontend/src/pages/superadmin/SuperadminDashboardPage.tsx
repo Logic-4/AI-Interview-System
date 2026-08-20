@@ -10,6 +10,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 const formatDate = (value?: string) => value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value)) : '—';
 const STATUS_COLORS: Record<string, string> = { active: '#00ab55', suspended: '#e2a03f', disabled: '#e7515a' };
+const roleLabel = (role: string) => (role === 'admin' || role === 'company' ? 'Company' : 'User');
 
 const SuperadminDashboardPage = () => {
   const dispatch = useDispatch();
@@ -23,7 +24,7 @@ const SuperadminDashboardPage = () => {
   }, [dispatch]);
 
   const chart = useMemo(() => {
-    const sorted = [...(data?.companyStatus ?? [])].sort((a, b) => a._id.localeCompare(b._id));
+    const sorted = [...(data?.userStatus ?? [])].sort((a, b) => a._id.localeCompare(b._id));
     return {
       series: sorted.map((item) => item.count),
       options: {
@@ -40,21 +41,20 @@ const SuperadminDashboardPage = () => {
   if (error) return <div className="panel text-center"><p className="text-danger">Unable to load platform statistics.</p><button className="btn btn-primary mt-4" onClick={() => window.location.reload()}>Retry</button></div>;
 
   const cards = [
-    { label: 'Total Companies', value: data!.metrics.totalCompanies, icon: Building2, iconClass: 'text-primary' },
-    { label: 'Active Companies', value: data!.metrics.activeCompanies, icon: Building2, iconClass: 'text-success' },
-    { label: 'Suspended Companies', value: data!.metrics.suspendedCompanies, icon: CirclePause, iconClass: 'text-warning' },
     { label: 'Total Users', value: data!.metrics.totalCandidates, icon: Users, iconClass: 'text-primary' },
+    { label: 'Active Users', value: data!.metrics.activeUsers, icon: Users, iconClass: 'text-success' },
+    { label: 'Disabled Users', value: data!.metrics.disabledUsers, icon: CirclePause, iconClass: 'text-warning' },
   ];
 
   return (
     <div className="space-y-6">
       <div><h1 className="text-2xl font-bold text-black dark:text-white">Platform Overview</h1><p className="mt-1 text-sm text-white-dark">Monitor companies and users across the platform.</p></div>
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map(({ label, value, icon: Icon, iconClass }) => <div className="panel" key={label}><div className="flex items-start justify-between"><div><p className="text-sm font-semibold text-white-dark">{label}</p><h3 className="mt-2 text-2xl font-bold text-black dark:text-white">{value}</h3></div><span className={iconClass}><Icon className="h-6 w-6" /></span></div></div>)}
       </div>
       <div className="grid gap-6 xl:grid-cols-3">
-        <div className="panel xl:col-span-2"><div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-bold text-black dark:text-white">Recent Company Registrations</h2><p className="text-sm text-white-dark">Latest tenants added to the platform</p></div><a className="btn btn-outline-primary btn-sm" href="/superadmin/companies">Manage companies</a></div><div className="table-responsive"><table><thead><tr><th>Company</th><th>Administrator</th><th>Status</th><th>Created</th></tr></thead><tbody>{data!.recentCompanies.length ? data!.recentCompanies.map((company) => <tr key={company._id}><td><div className="flex items-center gap-3"><span className="flex h-8 w-8 items-center justify-center bg-primary/10 text-primary"><Building2 className="h-4 w-4" /></span><span className="font-semibold">{company.name}</span></div></td><td>{company.adminUser?.email || company.contactEmail}</td><td><span className={`badge badge-outline-${company.status === 'active' ? 'success' : company.status === 'suspended' ? 'warning' : 'danger'}`}>{company.status}</span></td><td>{formatDate(company.createdAt)}</td></tr>) : <tr><td colSpan={4} className="py-10 text-center text-white-dark">No companies registered yet.</td></tr>}</tbody></table></div></div>
-        <div className="panel"><h2 className="text-lg font-bold text-black dark:text-white">Company Status</h2><p className="text-sm text-white-dark">Current tenant distribution</p>{chart.series.length ? <ReactApexChart type="donut" height={255} series={chart.series} options={chart.options as any} /> : <div className="flex h-56 items-center justify-center text-sm text-white-dark">No company data yet.</div>}</div>
+        <div className="panel xl:col-span-2"><div className="mb-5"><h2 className="text-lg font-bold text-black dark:text-white">Recent User Registrations</h2><p className="text-sm text-white-dark">Latest accounts added to the platform</p></div><div className="table-responsive"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th></tr></thead><tbody>{data!.recentUsers.length ? data!.recentUsers.map((user) => <tr key={user._id}><td><div className="flex items-center gap-3"><span className="flex h-8 w-8 items-center justify-center bg-primary/10 text-primary"><Users className="h-4 w-4" /></span><span className="font-semibold">{user.name}</span></div></td><td>{user.email}</td><td>{roleLabel(user.role)}</td><td><span className={`badge badge-outline-${user.accountStatus === 'active' ? 'success' : 'danger'}`}>{user.accountStatus}</span></td><td>{formatDate(user.createdAt)}</td></tr>) : <tr><td colSpan={5} className="py-10 text-center text-white-dark">No users registered yet.</td></tr>}</tbody></table></div></div>
+        <div className="panel"><h2 className="text-lg font-bold text-black dark:text-white">User Status</h2><p className="text-sm text-white-dark">Current account distribution</p>{chart.series.length ? <ReactApexChart type="donut" height={255} series={chart.series} options={chart.options as any} /> : <div className="flex h-56 items-center justify-center text-sm text-white-dark">No user data yet.</div>}</div>
       </div>
     </div>
   );

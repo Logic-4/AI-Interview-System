@@ -52,6 +52,12 @@ const jobSchema = new mongoose.Schema(
       type: Number,
       default: null,
     },
+    // Incremented atomically alongside the maxApplications cap check in
+    // applyPublicJob, so concurrent applications near the cap can't overshoot it.
+    applicationCount: {
+      type: Number,
+      default: 0,
+    },
     applicationDeadline: {
       type: Date,
       default: null,
@@ -103,11 +109,6 @@ const jobSchema = new mongoose.Schema(
       type: String,
       enum: ['English', 'Somali'],
       default: 'English',
-    },
-    interviewType: {
-      type: String,
-      enum: ['technical', 'behavioral', 'hr', 'system-design', 'mixed'],
-      default: 'mixed',
     },
     targetJobRole: {
       type: String,

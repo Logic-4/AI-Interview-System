@@ -22,14 +22,6 @@ const interviewSchema = new mongoose.Schema(
       trim: true,
       maxlength: [200, 'Title cannot exceed 200 characters'],
     },
-    type: {
-      type: String,
-      required: [true, 'Interview type is required'],
-      enum: {
-        values: ['technical', 'behavioral', 'system-design', 'hr', 'mixed'],
-        message: 'Type must be technical, behavioral, system-design, hr, or mixed',
-      },
-    },
     difficulty: {
       type: String,
       required: [true, 'Difficulty level is required'],
@@ -256,7 +248,6 @@ interviewSchema.index({ company: 1, createdAt: -1 });
 // queries, which the createdAt-sorted index above doesn't fully cover.
 interviewSchema.index({ company: 1, status: 1 });
 interviewSchema.index({ user: 1, createdAt: -1 });
-interviewSchema.index({ type: 1, difficulty: 1 });
 interviewSchema.index({ isDeleted: 1 });
 interviewSchema.index(
   { user: 1, generationKey: 1 },

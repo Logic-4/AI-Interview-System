@@ -33,6 +33,18 @@ test('overall score remains null when no answer was successfully evaluated', () 
   assert.equal(calculateOverallScore([{ isAnswered: true, evaluationStatus: 'failed', score: null }]), null);
 });
 
+test('a failed transcription does not null the score of otherwise-scored answers', () => {
+  // The exact loop bug: one unscorable transcription_failed answer used to
+  // make the whole interview score null forever (feedback endpoint 400 loop).
+  const score = calculateOverallScore([
+    { isAnswered: true, evaluationStatus: 'completed', score: 70 },
+    { isAnswered: true, evaluationStatus: 'completed', score: 90 },
+    { isAnswered: true, evaluationStatus: 'transcription_failed', score: null },
+    { isAnswered: true, evaluationStatus: 'invalid', score: null },
+  ]);
+  assert.equal(score, 80);
+});
+
 test('rejects an out-of-range hallucinated score instead of clamping it', () => {
   const result = normalizeEvaluation({ score: 5000, evaluationStatus: 'ok' });
   assert.equal(result.score, null);

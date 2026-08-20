@@ -1,10 +1,56 @@
 const Company = require('../models/Company');
 const User = require('../models/User');
 const Interview = require('../models/Interview');
+const Question = require('../models/Question');
+const Feedback = require('../models/Feedback');
+const Session = require('../models/Session');
+const Assessment = require('../models/Assessment');
+const VerificationEvent = require('../models/VerificationEvent');
+const Application = require('../models/Application');
+const Job = require('../models/Job');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
+const { deleteBlobUrls } = require('../services/blobService');
+
+/**
+ * Deletes every record scoped to a company, including the part both
+ * deleteCompany and (formerly) deleteUser used to miss: interviews belong to
+ * the CANDIDATE who took them (Interview.user), not the company admin, and
+ * are linked to the company only via Interview.company. Cleaning up only
+ * `Interview.find({ user: company.adminUser })` finds almost nothing — the
+ * admin account itself rarely has interviews — leaving every real candidate
+ * interview/question/feedback/session/recording for that company orphaned in
+ * the database after the company was "deleted".
+ */
+async function cascadeDeleteCompanyData(companyId) {
+  const interviews = await Interview.find({ company: companyId })
+    .select('_id recordingUrl recordingChunks')
+    .lean();
+  const interviewIds = interviews.map((i) => i._id);
+
+  if (interviewIds.length) {
+    const audioUrls = await Question.find({ interview: { $in: interviewIds } }).distinct('audioUrl');
+    const recordingUrls = interviews.map((i) => i.recordingUrl).filter(Boolean);
+    const chunkUrls = interviews.flatMap((i) => (i.recordingChunks || []).map((c) => c.url));
+    await deleteBlobUrls([...recordingUrls, ...chunkUrls, ...audioUrls]);
+  }
+
+  await Promise.all([
+    Question.deleteMany({ interview: { $in: interviewIds } }),
+    Feedback.deleteMany({ interview: { $in: interviewIds } }),
+    Session.deleteMany({ interview: { $in: interviewIds } }),
+    Interview.deleteMany({ _id: { $in: interviewIds } }),
+    Job.deleteMany({ company: companyId }),
+    Application.deleteMany({ company: companyId }),
+    Assessment.deleteMany({ company: companyId }),
+    VerificationEvent.deleteMany({ company: companyId }),
+  ]);
+}
 
 const tenantUserFields = 'name email username lastLogin accountStatus createdAt';
+// Same set superadminUserController's MANAGEABLE_ROLES manages/lists — keeps
+// the dashboard's user counts in sync with what the Users page actually shows.
+const PLATFORM_USER_ROLES = ['user', 'company', 'admin'];
 const normalizePagination = (value, fallback, max) => Math.min(Math.max(parseInt(value, 10) || fallback, 1), max);
 
 const listCompanies = async (req, res, next) => {
@@ -131,7 +177,15 @@ const deleteCompany = async (req, res, next) => {
     if (!company) return next(ApiError.notFound('Company not found'));
     const linkedUsers = await User.countDocuments({ company: company._id, _id: { $ne: company.adminUser } });
     if (linkedUsers > 0) return next(ApiError.badRequest('Company cannot be deleted while it still has associated users'));
-    if (company.adminUser) await User.findByIdAndDelete(company.adminUser);
+
+    // Every interview/question/feedback/session/recording scoped to this
+    // company — not just the admin's own (near-empty) interview list.
+    await cascadeDeleteCompanyData(company._id);
+
+    if (company.adminUser) {
+      await User.findByIdAndDelete(company.adminUser);
+    }
+
     await company.deleteOne();
     ApiResponse.success(res, null, 'Company deleted successfully');
   } catch (error) { next(error); }
@@ -139,19 +193,21 @@ const deleteCompany = async (req, res, next) => {
 
 const dashboard = async (req, res, next) => {
   try {
-    const [totalCompanies, activeCompanies, suspendedCompanies, totalCandidates, totalInterviews, recentCompanies] = await Promise.all([
+    const [totalCompanies, activeCompanies, suspendedCompanies, totalCandidates, totalInterviews, recentUsers] = await Promise.all([
       Company.countDocuments(), Company.countDocuments({ status: 'active' }), Company.countDocuments({ status: 'suspended' }),
-      User.countDocuments({ role: 'user', company: { $ne: null } }), Interview.countDocuments(),
-      Company.find().populate('adminUser', tenantUserFields).sort({ createdAt: -1 }).limit(6).lean(),
+      User.countDocuments({ role: { $in: PLATFORM_USER_ROLES } }), Interview.countDocuments(),
+      User.find().populate('company', 'name').sort({ createdAt: -1 }).limit(6).select('name email role company accountStatus createdAt').lean(),
     ]);
-    const companyStatus = await Company.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]);
+    const userStatus = await User.aggregate([{ $match: { role: { $in: PLATFORM_USER_ROLES } } }, { $group: { _id: '$accountStatus', count: { $sum: 1 } } }]);
+    const activeUsers = userStatus.find((s) => s._id === 'active')?.count || 0;
+    const disabledUsers = userStatus.find((s) => s._id === 'disabled')?.count || 0;
     ApiResponse.success(res, {
-      metrics: { totalCompanies, activeCompanies, suspendedCompanies, totalCandidates, totalInterviews, totalJobPosts: 0 },
-      recentCompanies,
-      companyStatus,
+      metrics: { totalCompanies, activeCompanies, suspendedCompanies, totalCandidates, activeUsers, disabledUsers, totalInterviews, totalJobPosts: 0 },
+      recentUsers,
+      userStatus,
       subscription: { active: 0, trial: 0, pastDue: 0, label: 'Subscription management will be available in a future release.' },
     });
   } catch (error) { next(error); }
 };
 
-module.exports = { listCompanies, getCompany, createCompany, updateCompany, updateCompanyStatus, resetCompanyPassword, deleteCompany, dashboard };
+module.exports = { listCompanies, getCompany, createCompany, updateCompany, updateCompanyStatus, resetCompanyPassword, deleteCompany, dashboard, cascadeDeleteCompanyData };

@@ -134,7 +134,6 @@ const CompanyInterviewsPage = () => {
                   <tr>
                     <th>Candidate</th>
                     <th>Job / Role</th>
-                    <th>Type</th>
                     <th>Language</th>
                     <th>Scheduled</th>
                     <th>Status</th>
@@ -151,7 +150,6 @@ const CompanyInterviewsPage = () => {
                         <div className="text-xs text-white-dark">{inv.user?.email}</div>
                       </td>
                       <td>{inv.jobRole || 'Standard Role'}</td>
-                      <td className="capitalize">{inv.type}</td>
                       <td className="capitalize">{inv.language}</td>
                       <td className="text-xs">{dateTime(inv.scheduledAt)}</td>
                       <td>
@@ -261,8 +259,8 @@ const CompanyInterviewsPage = () => {
                     <p className="font-semibold text-black dark:text-white">{resultsModal.jobRole || '—'}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-white-dark">Type / Language</p>
-                    <p className="font-semibold text-black dark:text-white capitalize">{resultsModal.type} · {resultsModal.language}</p>
+                    <p className="text-xs text-white-dark">Language</p>
+                    <p className="font-semibold text-black dark:text-white capitalize">{resultsModal.language}</p>
                   </div>
                   <div>
                     <p className="text-xs text-white-dark">Overall Score</p>

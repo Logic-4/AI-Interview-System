@@ -61,29 +61,31 @@ export default function InterviewReportPage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState(false);
+  const [retryingAll, setRetryingAll] = useState(false);
   const [retaking, setRetaking] = useState(false);
   const [reevaluatingId, setReevaluatingId] = useState<string | null>(null);
   const [evaluationError, setEvaluationError] = useState<string | null>(null);
+  const [isFinalizing, setIsFinalizing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     // The candidate lands here right after the engine calls completeInterview()
-    // and immediately navigates — the backend write can still be in flight.
-    // Retry briefly instead of bouncing straight back to the interview page,
-    // which otherwise looks like "the redirect didn't happen".
+    // and immediately navigates — the backend write can still be in flight,
+    // especially when it is waiting on background evaluations. Stay here and
+    // keep polling instead of bouncing back to the interview page, which made
+    // a successful redirect look like it had failed.
     const load = async (attempt = 0) => {
       try {
         const data = await interviewService.getInterview(interviewId);
         if (cancelled) return;
         if (data.status !== "completed") {
-          if (attempt < 5) {
-            setTimeout(() => load(attempt + 1), 1000);
-            return;
-          }
-          navigate(`/interviews/${interviewId}`, { replace: true });
+          setIsFinalizing(true);
+          setLoading(false);
+          setTimeout(() => load(attempt + 1), attempt < 10 ? 1000 : 2000);
           return;
         }
+        setIsFinalizing(false);
         setInterview(data);
         setLoading(false);
       } catch {
@@ -97,12 +99,14 @@ export default function InterviewReportPage() {
     return () => { cancelled = true; };
   }, [interviewId, navigate]);
 
-  if (loading) {
+  if (loading || isFinalizing) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-4">
           <LoadingSpinner size="lg" />
-          <p className="text-sm font-semibold text-text-muted animate-pulse">Loading report...</p>
+          <p className="text-sm font-semibold text-text-muted animate-pulse">
+            {isFinalizing ? "Finalizing interview and preparing report..." : "Loading report..."}
+          </p>
         </div>
       </div>
     );
@@ -144,13 +148,60 @@ export default function InterviewReportPage() {
     setEvaluationError(null);
     try {
       await feedbackService.generateFeedback(interviewId, true);
-      // Reload interview data to get fresh feedback
-      const data = await interviewService.getInterview(interviewId);
-      setInterview(data);
     } catch (err: any) {
       setEvaluationError(err.response?.data?.message || 'Feedback could not be generated. Retry incomplete evaluations first.');
     } finally {
+      // Always reload, including after a failure. The server re-runs the AI
+      // evaluation for every unscored answer before it builds the report, so
+      // even a request that ends in 409 ("some answers are still unevaluated")
+      // can have scored several of them. Reloading only on success meant those
+      // recovered scores were never shown and the button looked like it had
+      // done nothing at all.
+      try {
+        setInterview(await interviewService.getInterview(interviewId));
+      } catch {
+        /* keep whatever is already on screen */
+      }
       setRegenerating(false);
+    }
+  };
+
+  // Answered questions that still have no usable score. These, not the written
+  // report, are what block the overall score from being calculated.
+  const unscoredAnswers = questions.filter(
+    (q) => q.isAnswered
+      && q.evaluationStatus !== 'invalid'
+      && !(q.evaluationStatus === 'completed' && q.score !== null)
+  );
+
+  const handleRetryAllEvaluations = async () => {
+    setRetryingAll(true);
+    setEvaluationError(null);
+    let recovered = 0;
+    try {
+      // Sequential rather than concurrent: the model server is a single GPU
+      // worker, and firing a burst of evaluations at it measurably collapsed
+      // its success rate during testing. Slower here is more likely to finish.
+      for (const q of unscoredAnswers) {
+        try {
+          await interviewService.reevaluateAnswer(interviewId, q._id);
+          recovered += 1;
+        } catch {
+          /* one answer failing must not abandon the rest */
+        }
+      }
+    } finally {
+      try {
+        setInterview(await interviewService.getInterview(interviewId));
+      } catch {
+        /* keep whatever is already on screen */
+      }
+      if (recovered < unscoredAnswers.length) {
+        setEvaluationError(
+          `Scored ${recovered} of ${unscoredAnswers.length} answers. The AI service may still be busy — retry the rest shortly.`
+        );
+      }
+      setRetryingAll(false);
     }
   };
 
@@ -219,9 +270,8 @@ export default function InterviewReportPage() {
 
           {/* Stats grid */}
           <div className="flex-1 w-full">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               {[
-                { label: "Type", value: interview.type.replace("-", " "), icon: MessageSquare },
                 { label: "Level", value: interview.difficulty, icon: BarChart3 },
                 { label: "Time Spent", value: formatTime(totalTimeSpent), icon: Clock },
                 { label: "Answered", value: `${answeredQuestions.length}/${questions.length}`, icon: CheckCircle2 },
@@ -254,20 +304,54 @@ export default function InterviewReportPage() {
         <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
       </Card>
 
-      {/* Regenerate feedback banner */}
+      {/* Unscored answers banner — this, not the written report, is what keeps
+          the overall score unavailable, so it gets the primary retry action and
+          sits above the feedback banner. The per-question retry buttons live
+          inside the collapsed question cards, where they were easy to miss. */}
+      {unscoredAnswers.length > 0 && (
+        <Card hoverEffect={false} className="p-5 border border-warning/30 bg-warning/5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-warning flex-shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-text-primary dark:text-white">
+                  {unscoredAnswers.length} answer{unscoredAnswers.length === 1 ? '' : 's'} not scored yet
+                </p>
+                <p className="text-xs text-text-muted font-semibold">
+                  Your overall score stays unavailable until every answered question is evaluated. This re-runs the AI evaluation for just those answers.
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={handleRetryAllEvaluations}
+              disabled={retryingAll || regenerating}
+              className="h-9 px-5 rounded-md text-xs font-bold flex-shrink-0 text-white"
+            >
+              {retryingAll ? <LoadingSpinner size="sm" className="mr-2 inline-block text-white" /> : <RefreshCw className="w-3.5 h-3.5 mr-2" />}
+              {retryingAll ? 'Scoring...' : `Score ${unscoredAnswers.length} answer${unscoredAnswers.length === 1 ? '' : 's'}`}
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* Regenerate feedback banner — the written report only. */}
       {!hasFeedback && (
         <Card hoverEffect={false} className="p-5 border border-warning/30 bg-warning/5">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <AlertCircle className="w-5 h-5 text-warning flex-shrink-0" />
               <div>
-                <p className="text-sm font-bold text-text-primary dark:text-white">AI Feedback Missing or Incomplete</p>
-                <p className="text-xs text-text-muted font-semibold">Click regenerate to get detailed AI-powered analysis of your interview performance.</p>
+                <p className="text-sm font-bold text-text-primary dark:text-white">Written Report Missing or Incomplete</p>
+                <p className="text-xs text-text-muted font-semibold">
+                  {unscoredAnswers.length > 0
+                    ? 'Score the remaining answers above first — the written report is built from the per-question scores.'
+                    : 'Regenerate the detailed AI analysis of your interview performance.'}
+                </p>
               </div>
             </div>
             <Button
               onClick={handleRegenerateFeedback}
-              disabled={regenerating}
+              disabled={regenerating || retryingAll}
               className="h-9 px-5 rounded-md text-xs font-bold flex-shrink-0 text-white"
             >
               {regenerating ? <LoadingSpinner size="sm" className="mr-2 inline-block text-white" /> : <RefreshCw className="w-3.5 h-3.5 mr-2" />}

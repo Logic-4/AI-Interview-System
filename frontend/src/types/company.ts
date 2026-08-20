@@ -26,9 +26,19 @@ export interface CompanyPayload {
   status?: CompanyStatus;
 }
 
+export interface DashboardRecentUser {
+  _id: string;
+  name: string;
+  email: string;
+  role: string;
+  company?: { _id: string; name: string } | null;
+  accountStatus: 'active' | 'disabled';
+  createdAt: string;
+}
+
 export interface SuperadminDashboard {
-  metrics: { totalCompanies: number; activeCompanies: number; suspendedCompanies: number; totalCandidates: number; totalInterviews: number; totalJobPosts: number };
-  recentCompanies: Company[];
-  companyStatus: { _id: CompanyStatus; count: number }[];
+  metrics: { totalCompanies: number; activeCompanies: number; suspendedCompanies: number; totalCandidates: number; activeUsers: number; disabledUsers: number; totalInterviews: number; totalJobPosts: number };
+  recentUsers: DashboardRecentUser[];
+  userStatus: { _id: 'active' | 'disabled'; count: number }[];
   subscription: { active: number; trial: number; pastDue: number; label: string };
 }

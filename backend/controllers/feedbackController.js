@@ -38,14 +38,13 @@ function normalizeFeedback(raw, interview) {
     throw new Error('Comprehensive feedback response must be a JSON object');
   }
   const cats = raw.categories || raw.skillBreakdown || {};
-  const normalizeCategory = (value, name) => {
-    const score = value?.score != null ? Number(value.score) : NaN;
-    const feedback = typeof value?.feedback === 'string' ? value.feedback.trim() : '';
-    if (!Number.isFinite(score) || score < 0 || score > 100 || !feedback) {
-      throw new Error(`Comprehensive feedback category '${name}' is invalid`);
-    }
-    return { score: Math.round(score), feedback };
-  };
+  // The model sometimes closes "categories" after the first entry and emits
+  // the remaining four at the top level (confirmed live). Reading through to
+  // the top level as a fallback means one structural slip costs nothing — the
+  // prompt asks for correct nesting, this just stops a slip being fatal.
+  const pickCategory = (...names) => names
+    .map((name) => cats[name] ?? raw[name])
+    .find((value) => value && typeof value === 'object');
 
   // Use the same predicate everywhere so the number in the feedback report
   // agrees with the number on the interview record and the assessment card.
@@ -55,23 +54,45 @@ function normalizeFeedback(raw, interview) {
     throw new Error('Overall score is unavailable until every answered question is evaluated');
   }
 
-  const detailedFeedback = raw.detailedFeedback || raw.summary || '';
-  if (typeof detailedFeedback !== 'string' || !detailedFeedback.trim()) {
-    throw new Error('Comprehensive feedback is missing its detailed explanation');
-  }
+  // A missing/malformed category or detailedFeedback used to fail the whole
+  // report (confirmed live: the deployed worker's /feedback response
+  // routinely omits categories entirely or gets truncated mid-string). The
+  // turn average is already authoritative and always available here, so
+  // falling back to it — instead of throwing — turns "candidate gets no
+  // report at all" into "candidate gets a report with a generic note in the
+  // field the model didn't fill in."
+  const isSomali = String(interview.language || '').toLowerCase() === 'somali';
+  const fallbackCategoryNote = isSomali
+    ? 'Faah faahin gaar ah lama heli karin qaybtan — dhibcaha guud ayaa la isticmaalay.'
+    : 'Detailed feedback for this category was unavailable — the overall score was used.';
+  const normalizeCategory = (value) => {
+    const score = value?.score != null ? Number(value.score) : NaN;
+    const feedback = typeof value?.feedback === 'string' ? value.feedback.trim() : '';
+    if (Number.isFinite(score) && score >= 0 && score <= 100 && feedback) {
+      return { score: Math.round(score), feedback };
+    }
+    return { score: authoritativeScore, feedback: fallbackCategoryNote };
+  };
+
+  const rawDetailedFeedback = raw.detailedFeedback || raw.summary || '';
+  const detailedFeedback = typeof rawDetailedFeedback === 'string' && rawDetailedFeedback.trim()
+    ? rawDetailedFeedback.trim()
+    : (isSomali
+      ? `Dhibcaha guud ee shaqsigan waa ${authoritativeScore}/100.`
+      : `Overall performance score: ${authoritativeScore}/100.`);
 
   return {
     overallScore: authoritativeScore,
     categories: {
-      communication: normalizeCategory(cats.communication, 'communication'),
-      technicalAccuracy: normalizeCategory(cats.technicalAccuracy || cats.technical_accuracy || cats.technical, 'technicalAccuracy'),
-      problemSolving: normalizeCategory(cats.problemSolving || cats.problem_solving, 'problemSolving'),
-      codeQuality: normalizeCategory(cats.codeQuality || cats.code_quality, 'codeQuality'),
-      confidence: normalizeCategory(cats.confidence, 'confidence'),
+      communication: normalizeCategory(pickCategory('communication')),
+      technicalAccuracy: normalizeCategory(pickCategory('technicalAccuracy', 'technical_accuracy', 'technical')),
+      problemSolving: normalizeCategory(pickCategory('problemSolving', 'problem_solving')),
+      codeQuality: normalizeCategory(pickCategory('codeQuality', 'code_quality')),
+      confidence: normalizeCategory(pickCategory('confidence')),
     },
     strengths: Array.isArray(raw.strengths) ? raw.strengths : [],
     improvements: Array.isArray(raw.improvements) ? raw.improvements : [],
-    detailedFeedback: detailedFeedback.trim(),
+    detailedFeedback,
     recommendations: Array.isArray(raw.recommendations) ? raw.recommendations : [],
   };
 }

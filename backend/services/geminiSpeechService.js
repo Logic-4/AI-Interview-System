@@ -10,7 +10,10 @@ const STT_THINKING_LEVEL = process.env.GEMINI_STT_THINKING_LEVEL || 'medium';
 // 429 errors under normal load — measured live, not hypothetical. The SDK's
 // own retry is opt-in (disabled unless retryOptions is passed), so without
 // this every transient error failed the candidate's turn outright.
-const STT_TIMEOUT_MS = Number(process.env.GEMINI_STT_TIMEOUT_MS || 20000);
+// 20s used to abort long answers outright ("This operation was aborted") —
+// the frontend allows up to 120s of recording (MAX_LISTEN_SEC), and
+// transcoding + model processing for a clip that long routinely exceeds 20s.
+const STT_TIMEOUT_MS = Number(process.env.GEMINI_STT_TIMEOUT_MS || 60000);
 const STT_RETRY_ATTEMPTS = Number(process.env.GEMINI_STT_RETRY_ATTEMPTS || 3);
 // Pinned to a specific prebuilt voice — do not let this fall back silently.
 // Env override is allowed for ops, but the product default is "Orus".
@@ -153,29 +156,99 @@ async function transcribeAudio(fileBuffer, originalname = 'answer.webm', mimetyp
   const wavBuffer = await transcodeToWav(fileBuffer, suffix);
 
   const ai = getClient();
-  const response = await ai.models.generateContent({
-    model: STT_MODEL,
-    contents: createUserContent([
-      createPartFromBase64(wavBuffer.toString('base64'), 'audio/wav'),
-      buildTranscribePrompt(languageCode),
-    ]),
-    config: {
-      thinkingConfig: { thinkingLevel: STT_THINKING_LEVEL },
-      httpOptions: {
-        timeout: STT_TIMEOUT_MS,
-        retryOptions: { attempts: STT_RETRY_ATTEMPTS, initialDelay: 0.5, maxDelay: 4 },
-      },
-    },
-  });
+  const audioPart = createPartFromBase64(wavBuffer.toString('base64'), 'audio/wav');
+  const prompt = buildTranscribePrompt(languageCode);
 
-  const transcription = String(response.text || '').trim();
-  logger.info(`[geminiSpeechService] Transcription received via Gemini (lang=${languageCode}, ${transcription.length} chars)`);
-  return transcription;
+  // Retried by hand instead of via httpOptions.retryOptions: the SDK creates
+  // ONE AbortController/timeout before the retry loop and reuses that same
+  // signal across every attempt (dist/node/index.mjs, includeExtraHttpOptionsToRequestInit
+  // called once, then apiCall's pRetry wraps the same requestInit). That means
+  // STT_TIMEOUT_MS was a shared clock for all 3 attempts combined, not per
+  // attempt — two transient 503s could burn most of the 60s budget on backoff
+  // alone, and the 3rd (often otherwise-successful) attempt got hard-aborted
+  // by the original timer with time still needed. Confirmed live: "This
+  // operation was aborted" on answers that were well within the 60s single-call
+  // budget. Calling generateContent() fresh each loop iteration gives each
+  // attempt its own full timeout window instead of a shrinking shared one.
+  let lastError;
+  for (let attempt = 1; attempt <= STT_RETRY_ATTEMPTS; attempt++) {
+    try {
+      const response = await ai.models.generateContent({
+        model: STT_MODEL,
+        contents: createUserContent([audioPart, prompt]),
+        config: {
+          thinkingConfig: { thinkingLevel: STT_THINKING_LEVEL },
+          httpOptions: { timeout: STT_TIMEOUT_MS },
+        },
+      });
+      const transcription = String(response.text || '').trim();
+      logger.info(`[geminiSpeechService] Transcription received via Gemini (lang=${languageCode}, ${transcription.length} chars, attempt ${attempt}/${STT_RETRY_ATTEMPTS})`);
+      return transcription;
+    } catch (err) {
+      lastError = err;
+      logger.warn(`[geminiSpeechService] STT attempt ${attempt}/${STT_RETRY_ATTEMPTS} failed: ${err.message}`);
+      if (attempt < STT_RETRY_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, 500 * attempt));
+      }
+    }
+  }
+  throw lastError;
+}
+
+const TRANSLATE_MODEL = process.env.GEMINI_TRANSLATE_MODEL || 'gemini-flash-latest';
+const TRANSLATE_TIMEOUT_MS = Number(process.env.GEMINI_TRANSLATE_TIMEOUT_MS || 20000);
+const TRANSLATE_RETRY_ATTEMPTS = Number(process.env.GEMINI_TRANSLATE_RETRY_ATTEMPTS || 3);
+
+/**
+ * Translates an already-correct English interview question into Somali.
+ *
+ * The fine-tuned Gemma worker composes reliably in English but produces
+ * plausible-but-wrong Somali when asked to invent technical content and get
+ * Somali grammar right in the same step (confirmed live: wrong verb choices,
+ * garbled multi-clause sentences, stray English words left untranslated).
+ * Gemini is a much larger, broadly multilingual model already wired into
+ * this backend for STT/TTS — routing translation through it here means the
+ * fix iterates at Node speed (no Colab redeploy) and gets real Somali
+ * fluency instead of a smaller fine-tune's weaker second-language output.
+ *
+ * Retries on transient errors for the same reason transcribeAudio does above
+ * (confirmed live here too): Gemini Flash returns 503 "high demand" under
+ * normal load and the SDK's own retry is opt-in, so a single unretried call
+ * failed the whole question-generation attempt on a purely transient error.
+ */
+async function translateToSomali(englishText) {
+  const ai = getClient();
+  const prompt =
+    'Translate the following interview question into natural, grammatically correct Somali — '
+    + 'exactly how a fluent native Somali speaker would actually ask it out loud in a technical interview.\n'
+    + 'Keep established English technical terms (API, React, database, server, and framework/library names) '
+    + 'unchanged — do not invent Somali words for them.\n'
+    + "Return ONLY the translated question: no quotes, no explanation, no English commentary, exactly one '?' at the end.\n\n"
+    + `English question: ${englishText}`;
+
+  let lastError;
+  for (let attempt = 1; attempt <= TRANSLATE_RETRY_ATTEMPTS; attempt++) {
+    try {
+      const response = await ai.models.generateContent({
+        model: TRANSLATE_MODEL,
+        contents: prompt,
+        config: { httpOptions: { timeout: TRANSLATE_TIMEOUT_MS } },
+      });
+      return String(response.text || '').trim().replace(/^["']|["']$/g, '');
+    } catch (err) {
+      lastError = err;
+      if (attempt < TRANSLATE_RETRY_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, 500 * attempt));
+      }
+    }
+  }
+  throw lastError;
 }
 
 module.exports = {
   synthesizeSpeechStream,
   transcribeAudio,
+  translateToSomali,
   TTS_MODEL,
   STT_MODEL,
 };

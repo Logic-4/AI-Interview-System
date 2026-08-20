@@ -9,6 +9,37 @@ const api = axios.create({
   timeout: 30000,
 });
 
+let refreshPromise: Promise<{ accessToken?: string; refreshToken?: string }> | null = null;
+
+async function refreshAccessToken(): Promise<{ accessToken?: string; refreshToken?: string }> {
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      const stored = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+      const validRefreshToken = stored && stored !== 'null' && stored !== 'undefined' ? stored : undefined;
+      const res = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1"}/auth/refresh-token`,
+        validRefreshToken ? { refreshToken: validRefreshToken } : {},
+        {
+          withCredentials: true,
+          headers: validRefreshToken ? { 'X-Refresh-Token': validRefreshToken } : undefined,
+        }
+      );
+      const { accessToken, refreshToken } = res.data.data || {};
+      if (typeof window !== 'undefined') {
+        if (accessToken) localStorage.setItem('accessToken', accessToken);
+        if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+      }
+      if (accessToken) {
+        api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+      }
+      return { accessToken, refreshToken };
+    })().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
+
 // Add Authorization header to every request
 api.interceptors.request.use((config) => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
@@ -52,27 +83,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       try {
-        const stored = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
-        const validRefreshToken = stored && stored !== 'null' && stored !== 'undefined' ? stored : undefined;
-
-        const res = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1"}/auth/refresh-token`,
-          validRefreshToken ? { refreshToken: validRefreshToken } : {},
-          {
-            withCredentials: true,
-            headers: validRefreshToken ? { 'X-Refresh-Token': validRefreshToken } : undefined,
-          }
-        );
-        
-        const { accessToken, refreshToken: newRefreshToken } = res.data.data || {};
-        if (typeof window !== 'undefined') {
-          if (accessToken) localStorage.setItem('accessToken', accessToken);
-          if (newRefreshToken) localStorage.setItem('refreshToken', newRefreshToken);
-        }
-        
-        // Update auth header for future requests
-        api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
-        
+        const { accessToken } = await refreshAccessToken();
         // Retry original request with new token
         originalRequest.headers = originalRequest.headers || {};
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;

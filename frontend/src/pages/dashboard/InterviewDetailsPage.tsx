@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   AlertCircle,
   BarChart3,
-  MessageSquare,
   Zap,
   Mic,
   MicOff,
@@ -337,7 +336,6 @@ export default function InterviewDetailsPage() {
   const engine = useConversationEngine({
     userName: user?.name ?? "there",
     interviewTitle: interview?.title ?? "",
-    interviewType: interview?.type ?? "mixed",
     language: interview?.language ?? "english",
     questions,
     onSubmitAnswer,
@@ -404,19 +402,16 @@ export default function InterviewDetailsPage() {
   const toggleMic = useCallback(() => {
     const canToggle = engine.phase === "listening" || engine.phase === "reviewing";
     if (!canToggle) return;
-    const isSomali = isSomaliLanguage(interview?.language);
 
     setIsMicMuted((prev) => {
       if (prev) {
         engine.audioRecorder.resumeRecording();
-        if (!isSomali) engine.recognition.startListening();
       } else {
         engine.audioRecorder.pauseRecording();
-        if (!isSomali) engine.recognition.stopListening();
       }
       return !prev;
     });
-  }, [engine.audioRecorder, engine.recognition, engine.phase, interview?.language]);
+  }, [engine.audioRecorder, engine.phase]);
 
   /* ── End interview ───────────────────────────────────────── */
   const handleEndInterview = async () => {
@@ -424,7 +419,6 @@ export default function InterviewDetailsPage() {
     setIsEnding(true);
     engine.tts.cancel();
     engine.audioRecorder.stopRecording();
-    try { engine.recognition.stopListening(); } catch { /* ignore */ }
 
     try {
       await ensureInterviewCompleted();
@@ -515,14 +509,10 @@ export default function InterviewDetailsPage() {
                 <Zap className="w-8 h-8 text-primary" />
               </div>
               <h1 className="text-2xl font-bold tracking-tight text-text-primary dark:text-white">{interview.title}</h1>
-              <p className="text-sm text-text-muted font-semibold">
-                Your AI interviewer is ready. This will feel like a live conversation — just speak naturally.
-              </p>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               {[
-                { label: "Type", value: interview.type.replace("-", " "), icon: MessageSquare },
                 { label: "Level", value: interview.difficulty, icon: BarChart3 },
                 { label: "Duration", value: `${interview.duration}m`, icon: Clock },
                 { label: "Questions", value: String(questions.length), icon: CheckCircle2 },
@@ -543,15 +533,6 @@ export default function InterviewDetailsPage() {
                 <Badge className="bg-primary/10 text-primary border-primary/20 text-xs font-semibold">{interview.jobRole}</Badge>
               </div>
             )}
-
-            <div className="p-4 rounded-md bg-primary/5 border border-primary/10 flex gap-3">
-              <InfoIcon className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-              <div className="text-xs font-semibold text-text-muted leading-relaxed space-y-1">
-                <p>The interviewer will <strong className="text-text-primary dark:text-white">greet you by name</strong>, ask questions, and <strong className="text-text-primary dark:text-white">listen automatically</strong> when you respond.</p>
-                <p>Just <strong className="text-text-primary dark:text-white">speak naturally</strong> — recording starts and stops automatically. No buttons needed during the interview.</p>
-                <p>Make sure your <strong className="text-text-primary dark:text-white">microphone is allowed</strong> in your browser.</p>
-              </div>
-            </div>
 
             {recordingRequired && questionsReady && (
               <label className="flex items-start gap-3 p-4 rounded-md bg-warning/5 border border-warning/20 cursor-pointer">
@@ -924,23 +905,6 @@ export default function InterviewDetailsPage() {
             )}
           </div>
 
-          {/* Live interim transcript — English only (browser Web Speech API).
-              Somali has no browser STT, so the mic activity block below is
-              the only feedback for it. */}
-          {!isSomali && (engine.phase === "listening" || engine.phase === "reviewing") && engine.recognition.getTranscript() && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="max-w-lg w-full text-center mb-3 flex-shrink-0"
-            >
-              <div className="px-4 py-3 rounded-md bg-primary/10 border border-primary/20 inline-block max-w-full">
-                <p className="text-sm text-foreground dark:text-white font-semibold leading-relaxed">
-                  {engine.recognition.getTranscript()}
-                </p>
-              </div>
-            </motion.div>
-          )}
-
           {/* Prompt candidate to start recording manually */}
           {engine.phase === "asked" && (
             <motion.div
@@ -1155,15 +1119,5 @@ function VolumeBar({ volume }: { volume: number }) {
         />
       ))}
     </div>
-  );
-}
-
-function InfoIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 16v-4" />
-      <path d="M12 8h.01" />
-    </svg>
   );
 }

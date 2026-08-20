@@ -116,7 +116,7 @@ const companyService = {
   },
 
   // Interviews
-  async getInterviews(params: { page?: number; limit?: number; search?: string; status?: string; type?: string; language?: string } = {}) {
+  async getInterviews(params: { page?: number; limit?: number; search?: string; status?: string; language?: string } = {}) {
     const response = await api.get<ApiResponse<{ interviews: CompanyInterview[]; pagination: any }>>('/company/interviews', { params });
     return response.data.data;
   },
@@ -125,7 +125,6 @@ const companyService = {
     applicationId?: string;
     candidateId?: string;
     jobRole?: string;
-    type?: string;
     difficulty?: string;
     language?: string;
     duration?: number;

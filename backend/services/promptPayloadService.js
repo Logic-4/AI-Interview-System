@@ -43,7 +43,6 @@ function buildInterviewPayload(job, application = null) {
 
   return {
     // Interview.create() fields
-    type: job.interviewType || 'mixed',
     difficulty,
     language: (job.interviewLanguage || 'English').toLowerCase(),
     domain: job.domain || 'technology',
