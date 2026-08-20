@@ -239,24 +239,8 @@ const updateJob = async (req, res, next) => {
 
 const deleteJob = async (req, res, next) => {
   try {
-    const job = await Job.findOne({ _id: req.params.id, company: req.companyId });
+    const job = await Job.findOneAndDelete({ _id: req.params.id, company: req.companyId });
     if (!job) return next(ApiError.notFound('Job not found'));
-
-    // Applications (and their interviews) reference the job by id, so a plain
-    // Job delete left them orphaned — findOne('job').title breaking in the
-    // company UI, and the candidate's old application permanently blocking
-    // them from ever re-applying were the job re-posted, since nothing freed
-    // up the (job, email, phone) slot the duplicate-application check uses.
-    const applications = await Application.find({ job: job._id }).select('_id interview');
-    for (const application of applications) {
-      if (application.interview) {
-        const interview = await Interview.findOne({ _id: application.interview, company: req.companyId });
-        if (interview) await deleteCompanyInterviewRecord(interview);
-      }
-    }
-    await Application.deleteMany({ job: job._id });
-    await job.deleteOne();
-
     ApiResponse.success(res, null, 'Job deleted successfully');
   } catch (error) {
     next(error);
