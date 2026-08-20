@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, Clock, Hourglass } from "lucide-react";
+import { Clock, Hourglass } from "lucide-react";
 import { Card } from "../ui/Card";
 
 interface InterviewWaitingRoomProps {
@@ -53,13 +52,6 @@ export default function InterviewWaitingRoom({
 
   return (
     <div className="max-w-2xl mx-auto py-12 space-y-8 animate-in fade-in duration-700 text-black dark:text-white-dark">
-      <Link
-        to="/interviews"
-        className="inline-flex items-center gap-2 text-sm font-semibold text-text-muted hover:text-text-primary dark:hover:text-white transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" /> Back to Interviews
-      </Link>
-
       <Card hoverEffect={false} className="p-8 border border-white-light dark:border-[#1b2e4b] bg-white dark:bg-black text-center space-y-6">
         <div className="w-16 h-16 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto">
           <Hourglass className="w-8 h-8 text-primary" />

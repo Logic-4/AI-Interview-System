@@ -498,9 +498,11 @@ export default function InterviewDetailsPage() {
   if (pagePhase === "ready" && interview) {
     return (
       <div className="max-w-2xl mx-auto py-12 space-y-8 animate-in fade-in duration-700 text-black dark:text-white-dark">
-        <Link to="/interviews" className="inline-flex items-center gap-2 text-sm font-semibold text-text-muted hover:text-text-primary dark:hover:text-white transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Back to Interviews
-        </Link>
+        {!interview.company && (
+          <Link to="/interviews" className="inline-flex items-center gap-2 text-sm font-semibold text-text-muted hover:text-text-primary dark:hover:text-white transition-colors">
+            <ArrowLeft className="w-4 h-4" /> Back to Interviews
+          </Link>
+        )}
 
         <Card hoverEffect={false} className="p-8 border border-white-light dark:border-[#1b2e4b] bg-white dark:bg-black relative overflow-hidden">
           <div className="space-y-6">
