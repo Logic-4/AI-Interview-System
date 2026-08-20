@@ -55,7 +55,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'Idempotency-Key'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'Idempotency-Key', 'X-Refresh-Token'],
   exposedHeaders: ['X-Request-ID', 'Server-Timing', 'X-TTS-Provider', 'X-TTS-Cache'],
 }));
 
