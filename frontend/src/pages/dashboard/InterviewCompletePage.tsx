@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { CheckCircle2, ShieldCheck, ArrowRight } from "lucide-react";
+import { CheckCircle2, ShieldCheck } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
@@ -84,11 +84,7 @@ export default function InterviewCompletePage() {
         </div>
 
         {isCompanyInterview ? (
-          <Link to="/dashboard">
-            <Button className="w-full text-white" rightIcon={<ArrowRight className="w-4 h-4" />}>
-              Back to Dashboard
-            </Button>
-          </Link>
+          <p className="text-xs font-semibold text-text-muted">You may now close this window.</p>
         ) : (
           // Non-company sessions land here only via manual navigation; keep the
           // door open to the report they own.
